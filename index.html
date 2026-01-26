@@ -327,6 +327,77 @@
         } else {
           inQ = !inQ;
         }
+
+
+  // -----------------------
+  // Google Sheets loader (CORS-safe via gviz JSON-in-script)
+  // -----------------------
+  const SPREADSHEET_ID = "1tBeOwvL_396MVAxCznf18ecTe3R5tcnVOcPY-cU0r6M";
+
+  function loadDataFromSheet(){
+    return new Promise((resolve, reject) => {
+      if (!SPREADSHEET_ID || SPREADSHEET_ID.includes("PASTE_")) {
+        resolve(null);
+        return;
+      }
+
+      const gid = 0;
+      const src = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&gid=${gid}&_=${Date.now()}`;
+
+      const prevGoogle = window.google;
+      window.google = window.google || {};
+      window.google.visualization = window.google.visualization || {};
+      window.google.visualization.Query = window.google.visualization.Query || {};
+
+      const oldSetResponse = window.google.visualization.Query.setResponse;
+
+      window.google.visualization.Query.setResponse = (resp) => {
+        try {
+          window.google.visualization.Query.setResponse = oldSetResponse || (()=>{});
+          if (prevGoogle) window.google = prevGoogle;
+
+          const table = resp && resp.table;
+          const cols = (table?.cols || []).map(c => String(c.label || "").trim().toLowerCase());
+          const iStand = cols.indexOf("stand");
+          const iStatus = cols.indexOf("status");
+          const iCompany = cols.indexOf("company");
+
+          if (iStand === -1) {
+            resolve({});
+            return;
+          }
+
+          const out = {};
+          const rows = table?.rows || [];
+          for (const r of rows) {
+            const c = r.c || [];
+            const stand = String(c[iStand]?.v ?? "").trim();
+            if (!stand) continue;
+            const statusRaw = String(c[iStatus]?.v ?? "available").trim().toLowerCase();
+            const company = String(c[iCompany]?.v ?? "").trim();
+            out[stand] = {
+              status: statusRaw === "sold" ? "sold" : "available",
+              company
+            };
+          }
+          resolve(out);
+        } catch (e) {
+          reject(e);
+        }
+      };
+
+      const s = document.createElement("script");
+      s.src = src;
+      s.async = true;
+      s.onerror = () => {
+        window.google.visualization.Query.setResponse = oldSetResponse || (()=>{});
+        if (prevGoogle) window.google = prevGoogle;
+        reject(new Error("Failed to load Google Sheet data script."));
+      };
+      document.head.appendChild(s);
+    });
+  }
+
         continue;
       }
 
@@ -354,12 +425,6 @@
     }
     return rows;
   }
-
-  async function loadDataFromSheet(){
-    if (!SHEET_CSV_URL || SHEET_CSV_URL.includes("PASTE_YOUR_")){
-      console.warn("SHEET_CSV_URL not set; falling back to local storage data (admin) or defaults (public).");
-      return null;
-    }
     const res = await fetch(SHEET_CSV_URL, { cache: "no-store" });
     if (!res.ok) throw new Error("Could not fetch Google Sheet CSV. Check sharing/publish settings.");
     const text = await res.text();
