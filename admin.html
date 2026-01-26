@@ -278,16 +278,54 @@
   // Admin: push updates to Google Sheet via Apps Script Web App
   // -----------------------
   let saveTimer = null;
+  function setSyncStatus(msg){
+    const el = document.getElementById('syncStatus');
+    if (el) el.textContent = 'Sync: ' + msg;
+  }
+    setSyncStatus("sending…");
 
-  async function saveDataToSheet(){
-    if (!APPS_SCRIPT_WEBAPP_URL || APPS_SCRIPT_WEBAPP_URL.includes("PASTE_YOUR_")){
-      return;
-    }
-    await fetch(APPS_SCRIPT_WEBAPP_URL, {
+    const payload = JSON.stringify(data);
+
+    // Try fetch (no-cors). Even though we can't read the response, it usually works.
+    return fetch(APPS_SCRIPT_WEBAPP_URL, {
       method: "POST",
       mode: "no-cors",
-      body: JSON.stringify(data)
+      body: payload
+    }).then(() => {
+      setSyncStatus("sent (check sheet)");
+      return true;
+    }).catch((e) => {
+      console.warn(e);
+      // Fallback: sendBeacon
+      try{
+        const ok = navigator.sendBeacon(APPS_SCRIPT_WEBAPP_URL, payload);
+        setSyncStatus(ok ? "sent (beacon)" : "failed");
+        return ok;
+      }catch(err){
+        console.warn(err);
+        setSyncStatus("failed (see console)");
+        return false;
+      }
     });
+  }
+
+  async function reloadFromSheet(){
+    setSyncStatus("loading…");
+    try{
+      const sheetData = await (globalThis.loadDataFromSheet ? globalThis.loadDataFromSheet() : loadDataFromSheet());
+      if (sheetData){
+        data = sheetData;
+        ensureDefaults();
+        applyAllToPlan();
+        renderAdminTable();
+        setSyncStatus("reloaded");
+      } else {
+        setSyncStatus("no sheet data");
+      }
+    }catch(e){
+      console.warn(e);
+      setSyncStatus("error loading");
+    }
   }
 
   function queueSaveToSheet(){
@@ -484,6 +522,16 @@
     applyAllToPlan();
     renderAdminTable();
     hookStandHover();
+
+    // Sync UI
+    const sheetLink = document.getElementById("openSheetLink");
+    if (sheetLink) sheetLink.href = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`;
+    const syncBtn = document.getElementById("syncNowBtn");
+    if (syncBtn) syncBtn.addEventListener("click", async () => { await saveDataToSheet(); });
+    const reloadBtn = document.getElementById("reloadFromSheetBtn");
+    if (reloadBtn) reloadBtn.addEventListener("click", async () => { await reloadFromSheet(); });
+
+
   }
 
   function discoverStandGroups(svg){
