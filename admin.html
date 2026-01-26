@@ -296,6 +296,7 @@
 
   async function saveDataToSheet(){
     if (!APPS_SCRIPT_WEBAPP_URL || APPS_SCRIPT_WEBAPP_URL.includes("PASTE_YOUR_")){
+      setSyncStatus('Apps Script URL not set');
       return;
     }
     setSyncStatus('sending…');
@@ -308,6 +309,7 @@
     }
 
   function queueSaveToSheet(){
+    setSyncStatus('queued…');
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       saveDataToSheet().catch(console.warn);
