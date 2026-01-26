@@ -196,7 +196,16 @@
       <div class="title">Exhibition Stand Availability</div>
 </div>
     <div class="right">
-      <span class="pill"><span class="dot sold"></span> Sold</span>
+      <span class="pill"><span class="dot sold"></span>
+
+        <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+          <a href="https://docs.google.com/spreadsheets/d/1tBeOwvL_396MVAxCznf18ecTe3R5tcnVOcPY-cU0r6M/edit" target="_blank" rel="noopener"
+             style="font-weight:700; text-decoration:none; border:1px solid var(--border); padding:8px 10px; border-radius:10px; background:#fff;">
+            Open Google Sheet
+          </a>
+          <span id="syncStatus" class="small" style="margin-left:auto;">Sync: idle</span>
+        </div>
+ Sold</span>
       <span class="pill"><span class="dot av"></span> Available</span>
       <button id="toggleAdminBtn" type="button">Admin</button>
     </div>
@@ -214,25 +223,8 @@
       <div id="adminTop">
         <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
           <strong>Administrator Spreadsheet</strong>
-          <span class="small">Data syncs with Google Sheets. Export/Import still works with Excel XML or CSV.</span>
-        
-        <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-          <a id="openSheetLink" href="https://docs.google.com/spreadsheets/d/1tBeOwvL_396MVAxCznf18ecTe3R5tcnVOcPY-cU0r6M/edit" target="_blank" rel="noopener"
-             style="font-weight:700; text-decoration:none; border:1px solid var(--border); padding:8px 10px; border-radius:10px; background:#fff;">
-            Open Google Sheet
-          </a>
-          <button id="syncNowBtn" type="button"
-             style="font-weight:700; border:1px solid var(--border); padding:8px 10px; border-radius:10px; background:#fff; cursor:pointer;">
-            Sync now
-          </button>
-          <button id="reloadFromSheetBtn" type="button"
-             style="font-weight:700; border:1px solid var(--border); padding:8px 10px; border-radius:10px; background:#fff; cursor:pointer;">
-            Reload from sheet
-          </button>
-          <span id="syncStatus" class="small" style="margin-left:auto;">Sync: idle</span>
+          <span class="small">Synced to Google Sheets. Changes are sent automatically. Export/Import still works with Excel XML or CSV.</span>
         </div>
-
-      </div>
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
           <input id="search" type="text" placeholder="Search stand or company…" />
           <button id="exportBtn" type="button">Export Excel</button>
@@ -260,7 +252,7 @@
     </section>
   </main>
 
-<script type="module">
+<script>
 
   /***********************
    * GOOGLE SHEETS (shared data)
@@ -291,18 +283,17 @@
   }
   function saveData(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
 
-  // -----------------------
-  // Admin: push updates to Google Sheet via Apps Script Web App
-  // -----------------------
-  let saveTimer = null;
   function setSyncStatus(msg){
     const el = document.getElementById('syncStatus');
     if (el) el.textContent = 'Sync: ' + msg;
   }
 
+  // -----------------------
+  // Admin: push updates to Google Sheet via Apps Script Web App
+  // -----------------------
+  let saveTimer = null;
 
   async function saveDataToSheet(){
-    setSyncStatus('sending…');
     if (!APPS_SCRIPT_WEBAPP_URL || APPS_SCRIPT_WEBAPP_URL.includes("PASTE_YOUR_")){
       return;
     }
@@ -310,26 +301,7 @@
       method: "POST",
       mode: "no-cors",
       body: JSON.stringify(data)
-    }).then(() => setSyncStatus('sent (check sheet)')).catch((e)=>{console.warn(e); setSyncStatus('error (see console)');});
-  }
-
-  async function reloadFromSheet(){
-    setSyncStatus('loading…');
-    try{
-      const sheetData = await (globalThis.loadDataFromSheet ? globalThis.loadDataFromSheet() : loadDataFromSheet());
-      if (sheetData){
-        data = sheetData;
-        ensureDefaults();
-        applyAllToPlan();
-        renderAdminTable();
-        setSyncStatus('reloaded');
-      } else {
-        setSyncStatus('no sheet data');
-      }
-    }catch(e){
-      console.warn(e);
-      setSyncStatus('error loading (see console)');
-    }
+    });
   }
 
   function queueSaveToSheet(){
@@ -526,13 +498,6 @@
     applyAllToPlan();
     renderAdminTable();
     hookStandHover();
-
-    // Sync controls
-    const syncBtn = document.getElementById('syncNowBtn');
-    if (syncBtn) syncBtn.addEventListener('click', async () => { await saveDataToSheet(); });
-    const reloadBtn = document.getElementById('reloadFromSheetBtn');
-    if (reloadBtn) reloadBtn.addEventListener('click', async () => { await reloadFromSheet(); });
-
   }
 
   function discoverStandGroups(svg){
@@ -971,6 +936,7 @@
     applyAllToPlan();
     renderAdminTable();
     queueSaveToSheet();
+    queueSaveToSheet();
     hookStandHover();
   }
 
@@ -979,6 +945,7 @@
     saveData();
     applyAllToPlan();
     renderAdminTable();
+    queueSaveToSheet();
     queueSaveToSheet();
     hookStandHover();
   }
