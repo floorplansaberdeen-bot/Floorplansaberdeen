@@ -333,16 +333,15 @@
   // Google Sheets loader (CORS-safe via gviz JSON-in-script)
   // -----------------------
   const SPREADSHEET_ID = "1tBeOwvL_396MVAxCznf18ecTe3R5tcnVOcPY-cU0r6M";
+  const SHEET_GID = 0; // change if you use a different tab
 
-  function loadDataFromSheet(){
-    return new Promise((resolve, reject) => {
-      if (!SPREADSHEET_ID || SPREADSHEET_ID.includes("PASTE_")) {
-        resolve(null);
-        return;
-      }
+  async function loadDataFromSheet(){
+    if (!SPREADSHEET_ID || SPREADSHEET_ID.includes("PASTE_")) {
+      return null;
+    }
 
-      const gid = 0;
-      const src = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&gid=${gid}&_=${Date.now()}`;
+    return await new Promise((resolve, reject) => {
+      const src = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&gid=${SHEET_GID}&_=${Date.now()}`;
 
       const prevGoogle = window.google;
       window.google = window.google || {};
@@ -368,13 +367,14 @@
           }
 
           const out = {};
-          const rows = table?.rows || [];
-          for (const r of rows) {
+          for (const r of (table?.rows || [])) {
             const c = r.c || [];
             const stand = String(c[iStand]?.v ?? "").trim();
             if (!stand) continue;
+
             const statusRaw = String(c[iStatus]?.v ?? "available").trim().toLowerCase();
             const company = String(c[iCompany]?.v ?? "").trim();
+
             out[stand] = {
               status: statusRaw === "sold" ? "sold" : "available",
               company
@@ -392,7 +392,7 @@
       s.onerror = () => {
         window.google.visualization.Query.setResponse = oldSetResponse || (()=>{});
         if (prevGoogle) window.google = prevGoogle;
-        reject(new Error("Failed to load Google Sheet data script."));
+        reject(new Error("Failed to load Google Sheet data (gviz). Check sharing settings."));
       };
       document.head.appendChild(s);
     });
@@ -425,36 +425,6 @@
     }
     return rows;
   }
-    const res = await fetch(SHEET_CSV_URL, { cache: "no-store" });
-    if (!res.ok) throw new Error("Could not fetch Google Sheet CSV. Check sharing/publish settings.");
-    const text = await res.text();
-    const rows = parseCsv(text).filter(r => r.some(c => String(c||"").trim().length));
-
-    if (rows.length < 2) return {};
-
-    const header = rows[0].map(h => String(h||"").trim().toLowerCase());
-    const iStand = header.indexOf("stand");
-    const iStatus = header.indexOf("status");
-    const iCompany = header.indexOf("company");
-
-    if (iStand === -1) throw new Error("CSV must include a 'stand' column header.");
-
-    const out = {};
-    for (let i=1; i<rows.length; i++){
-      const r = rows[i];
-      const stand = String(r[iStand] ?? "").trim();
-      if (!stand) continue;
-      const statusRaw = String(r[iStatus] ?? "available").trim().toLowerCase();
-      const company = String(r[iCompany] ?? "").trim();
-
-      out[stand] = {
-        status: statusRaw === "sold" ? "sold" : "available",
-        company
-      };
-    }
-    return out;
-  }
-
 
   async function loadSvg(){
     const res = await fetch(SVG_FILE, { cache:"no-store" });
