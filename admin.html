@@ -282,6 +282,12 @@
     const el = document.getElementById('syncStatus');
     if (el) el.textContent = 'Sync: ' + msg;
   }
+
+  function saveDataToSheet(){
+    if (!APPS_SCRIPT_WEBAPP_URL) {
+      setSyncStatus('Apps Script URL not set');
+      return Promise.resolve(false);
+    }
     setSyncStatus("sending…");
 
     const payload = JSON.stringify(data);
