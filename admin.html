@@ -214,8 +214,25 @@
       <div id="adminTop">
         <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
           <strong>Administrator Spreadsheet</strong>
-          <span class="small">Data syncs with Google Sheets. Changes are sent automatically (usually within 1–2 seconds). Export/Import still works with Excel XML or CSV.</span>
+          <span class="small">Data syncs with Google Sheets. Export/Import still works with Excel XML or CSV.</span>
+        
+        <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+          <a id="openSheetLink" href="https://docs.google.com/spreadsheets/d/1tBeOwvL_396MVAxCznf18ecTe3R5tcnVOcPY-cU0r6M/edit" target="_blank" rel="noopener"
+             style="font-weight:700; text-decoration:none; border:1px solid var(--border); padding:8px 10px; border-radius:10px; background:#fff;">
+            Open Google Sheet
+          </a>
+          <button id="syncNowBtn" type="button"
+             style="font-weight:700; border:1px solid var(--border); padding:8px 10px; border-radius:10px; background:#fff; cursor:pointer;">
+            Sync now
+          </button>
+          <button id="reloadFromSheetBtn" type="button"
+             style="font-weight:700; border:1px solid var(--border); padding:8px 10px; border-radius:10px; background:#fff; cursor:pointer;">
+            Reload from sheet
+          </button>
+          <span id="syncStatus" class="small" style="margin-left:auto;">Sync: idle</span>
         </div>
+
+      </div>
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
           <input id="search" type="text" placeholder="Search stand or company…" />
           <button id="exportBtn" type="button">Export Excel</button>
@@ -283,40 +300,21 @@
     if (el) el.textContent = 'Sync: ' + msg;
   }
 
-  function saveDataToSheet(){
-    if (!APPS_SCRIPT_WEBAPP_URL) {
-      setSyncStatus('Apps Script URL not set');
-      return Promise.resolve(false);
+
+  async function saveDataToSheet(){
+    setSyncStatus('sending…');
+    if (!APPS_SCRIPT_WEBAPP_URL || APPS_SCRIPT_WEBAPP_URL.includes("PASTE_YOUR_")){
+      return;
     }
-    setSyncStatus("sending…");
-
-    const payload = JSON.stringify(data);
-
-    // Try fetch (no-cors). Even though we can't read the response, it usually works.
-    return fetch(APPS_SCRIPT_WEBAPP_URL, {
+    await fetch(APPS_SCRIPT_WEBAPP_URL, {
       method: "POST",
       mode: "no-cors",
-      body: payload
-    }).then(() => {
-      setSyncStatus("sent (check sheet)");
-      return true;
-    }).catch((e) => {
-      console.warn(e);
-      // Fallback: sendBeacon
-      try{
-        const ok = navigator.sendBeacon(APPS_SCRIPT_WEBAPP_URL, payload);
-        setSyncStatus(ok ? "sent (beacon)" : "failed");
-        return ok;
-      }catch(err){
-        console.warn(err);
-        setSyncStatus("failed (see console)");
-        return false;
-      }
-    });
+      body: JSON.stringify(data)
+    }).then(() => setSyncStatus('sent (check sheet)')).catch((e)=>{console.warn(e); setSyncStatus('error (see console)');});
   }
 
   async function reloadFromSheet(){
-    setSyncStatus("loading…");
+    setSyncStatus('loading…');
     try{
       const sheetData = await (globalThis.loadDataFromSheet ? globalThis.loadDataFromSheet() : loadDataFromSheet());
       if (sheetData){
@@ -324,13 +322,13 @@
         ensureDefaults();
         applyAllToPlan();
         renderAdminTable();
-        setSyncStatus("reloaded");
+        setSyncStatus('reloaded');
       } else {
-        setSyncStatus("no sheet data");
+        setSyncStatus('no sheet data');
       }
     }catch(e){
       console.warn(e);
-      setSyncStatus("error loading");
+      setSyncStatus('error loading (see console)');
     }
   }
 
@@ -529,14 +527,11 @@
     renderAdminTable();
     hookStandHover();
 
-    // Sync UI
-    const sheetLink = document.getElementById("openSheetLink");
-    if (sheetLink) sheetLink.href = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/edit`;
-    const syncBtn = document.getElementById("syncNowBtn");
-    if (syncBtn) syncBtn.addEventListener("click", async () => { await saveDataToSheet(); });
-    const reloadBtn = document.getElementById("reloadFromSheetBtn");
-    if (reloadBtn) reloadBtn.addEventListener("click", async () => { await reloadFromSheet(); });
-
+    // Sync controls
+    const syncBtn = document.getElementById('syncNowBtn');
+    if (syncBtn) syncBtn.addEventListener('click', async () => { await saveDataToSheet(); });
+    const reloadBtn = document.getElementById('reloadFromSheetBtn');
+    if (reloadBtn) reloadBtn.addEventListener('click', async () => { await reloadFromSheet(); });
 
   }
 
