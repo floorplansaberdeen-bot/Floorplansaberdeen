@@ -45,3 +45,16 @@ Upload these three files to any static host (Netlify, GitHub Pages, etc.):
 - Public page updates on refresh. You can add auto-refresh if you want.
 - Admin changes are debounced (~600ms) before sending to the sheet.
 - The admin POST uses `mode: "no-cors"` for compatibility with Apps Script web apps.
+
+
+## IMPORTANT: Apps Script deployment settings (to allow syncing)
+In Apps Script > Deploy > Manage deployments:
+- Type: Web app
+- Execute as: **Me**
+- Who has access: **Anyone**
+
+If "Who has access" is not "Anyone", the website can show "sent" but the sheet will NOT update (Google redirects to a login page).
+
+## IMPORTANT: Sheet tab name
+The Apps Script in `apps_script.gs` writes to SHEET_NAME = "Sheet1".
+If your tab is named differently (e.g. "Stands"), change SHEET_NAME accordingly before deploying.

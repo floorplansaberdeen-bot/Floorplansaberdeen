@@ -188,6 +188,10 @@
       fill-opacity: .22;
     }
 
+
+    /* Admin top bar tidy */
+    #adminTop > div { flex-wrap: wrap; gap: 10px; }
+    #adminTop a, #adminTop button { white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -201,7 +205,12 @@
         <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
           <a href="https://docs.google.com/spreadsheets/d/1tBeOwvL_396MVAxCznf18ecTe3R5tcnVOcPY-cU0r6M/edit" target="_blank" rel="noopener"
              style="font-weight:700; text-decoration:none; border:1px solid var(--border); padding:8px 10px; border-radius:10px; background:#fff;">
-            Open Google Sheet
+            Open Google Sheet</a>
+          <a href="https://script.google.com/macros/s/AKfycbxEq83BUYJ-oewP_2lPFL0tyol4veM2mhukSTTMCaKCZgEJS5m-f8Jqy1EO_bDc3q3a/exec" target="_blank" rel="noopener"
+             style="font-weight:700; text-decoration:none; border:1px solid var(--border); padding:8px 10px; border-radius:10px; background:#fff;">
+            Test Sync Endpoint
+          </a>
+          <a
           </a>
           <span id="syncStatus" class="small" style="margin-left:auto;">Sync: idle</span>
         </div>
