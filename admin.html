@@ -271,7 +271,7 @@
   const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1tBeOwvL_396MVAxCznf18ecTe3R5tcnVOcPY-cU0r6M/export?format=csv&gid=0";
   const APPS_SCRIPT_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxEq83BUYJ-oewP_2lPFL0tyol4veM2mhukSTTMCaKCZgEJS5m-f8Jqy1EO_bDc3q3a/exec";
   const SVG_FILE = "event_plan.svg";
-  console.log('Build GS-PROD-v1-2026-01-27 loaded');
+  console.log('Build GS-PROD-v1.2-2026-01-27 loaded');
   const STORAGE_KEY = "exhibition-stands-cad-outline-v1";
 
   // Exclude the huge number of CAD technical groups that also match PREFIX+NUMBER
@@ -298,32 +298,51 @@
     if (el) el.textContent = 'Sync: ' + msg;
   }
 
+
+  // --- Google Sheets sync (GET JSONP write) ---
+  let __saveTimer = null;
+  let __pendingStandId = null;
+
+  function writeStandToSheet(standId){
+    if (!APPS_SCRIPT_WEBAPP_URL) { setSyncStatus("no endpoint"); return; }
+    const v = data[standId] || { status:"available", company:"" };
+    setSyncStatus("sending…");
+
+    const cbName = "__write_cb_" + Math.random().toString(16).slice(2);
+    const url = `${APPS_SCRIPT_WEBAPP_URL}?action=write&stand=${encodeURIComponent(standId)}&status=${encodeURIComponent(v.status||"available")}&company=${encodeURIComponent(v.company||"")}&callback=${cbName}&_=${Date.now()}`;
+
+    let scriptEl = null;
+    const timeout = setTimeout(() => { cleanup(); setSyncStatus("failed"); }, 8000);
+
+    function cleanup(){
+      clearTimeout(timeout);
+      try { delete window[cbName]; } catch(e){ window[cbName] = undefined; }
+      if (scriptEl && scriptEl.parentNode) scriptEl.parentNode.removeChild(scriptEl);
+    }
+
+    window[cbName] = () => {
+      cleanup();
+      setSyncStatus("sent");
+    };
+
+    scriptEl = document.createElement("script");
+    scriptEl.src = url;
+    scriptEl.async = true;
+    scriptEl.onerror = () => { cleanup(); setSyncStatus("failed"); };
+    document.head.appendChild(scriptEl);
+  }
+
+  function queueSaveToSheet(standId){
+    __pendingStandId = standId || __pendingStandId;
+    setSyncStatus("queued…");
+    if (__saveTimer) clearTimeout(__saveTimer);
+    __saveTimer = setTimeout(() => writeStandToSheet(__pendingStandId), 600);
+  }
+
+
   // -----------------------
   // Admin: push updates to Google Sheet via Apps Script Web App
   // -----------------------
-  let saveTimer = null;
-
-  async function saveDataToSheet(){
-    if (!APPS_SCRIPT_WEBAPP_URL || APPS_SCRIPT_WEBAPP_URL.includes("PASTE_YOUR_")){
-      setSyncStatus('Apps Script URL not set');
-      return;
-    }
-    setSyncStatus('sending…');
-    fetch(APPS_SCRIPT_WEBAPP_URL, {
-      method: "POST",
-      mode: "no-cors",
-      body: JSON.stringify(data)
-    }).then(()=>setSyncStatus('sent (check sheet)'))
-      .catch((e)=>{console.warn(e); setSyncStatus('failed (see console)');});
-    }
-
-  function queueSaveToSheet(){
-    setSyncStatus('queued…');
-    if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-      saveDataToSheet().catch(console.warn);
-    }, 600);
-  }
 
 
   function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
@@ -776,7 +795,7 @@
       sel.addEventListener("change", () => {
         data[id].status = sel.value;
         saveData();
-        queueSaveToSheet();
+        queueSaveToSheet(id);
         applyStandToPlan(id);
         renderAdminTable();
       });
@@ -792,7 +811,7 @@
       ta.addEventListener("input", () => {
         data[id].company = ta.value;
         saveData();
-        queueSaveToSheet();
+        queueSaveToSheet(id);
         applyStandToPlan(id);
       });
       tdCompany.appendChild(ta);
@@ -821,7 +840,7 @@
       fs.addEventListener("change", () => {
         data[id].fontSize = (fs.value === "auto") ? "auto" : Number(fs.value);
         saveData();
-        queueSaveToSheet();
+        queueSaveToSheet(id);
         applyStandToPlan(id);
       });
       tdFont.appendChild(fs);
@@ -920,8 +939,8 @@
     ensureDefaults();
     applyAllToPlan();
     renderAdminTable();
-    queueSaveToSheet();
-    queueSaveToSheet();
+    queueSaveToSheet(id);
+    queueSaveToSheet(id);
     hookStandHover();
   }
 
@@ -930,8 +949,8 @@
     saveData();
     applyAllToPlan();
     renderAdminTable();
-    queueSaveToSheet();
-    queueSaveToSheet();
+    queueSaveToSheet(id);
+    queueSaveToSheet(id);
     hookStandHover();
   }
 
