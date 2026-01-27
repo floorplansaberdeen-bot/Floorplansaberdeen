@@ -244,7 +244,9 @@
     </section>
   </main>
 
-<script>
+<script>var svgReady = false;
+var pendingSheetData = null;
+
 
   /***********************
    * GOOGLE SHEETS (shared data)
@@ -253,7 +255,7 @@
    ***********************/
   const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1tBeOwvL_396MVAxCznf18ecTe3R5tcnVOcPY-cU0r6M/export?format=csv&gid=0";
   const SVG_FILE = "event_plan.svg";
-  console.log('Build GS-PROD-v1.5-2026-01-27 loaded');
+  console.log('Build GS-PROD-v1.6-2026-01-27 loaded');
   const APPS_SCRIPT_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxEq83BUYJ-oewP_2lPFL0tyol4veM2mhukSTTMCaKCZgEJS5m-f8Jqy1EO_bDc3q3a/exec";
   
 
@@ -472,7 +474,17 @@ const STORAGE_KEY = "exhibition-stands-cad-outline-v1";
     applyAllToPlan();
     renderAdminTable();
     hookStandHover();
+
+  // Mark SVG ready and apply any pending sheet data
+  svgReady = true;
+  if (pendingSheetData){
+    data = pendingSheetData;
+    pendingSheetData = null;
+    ensureDefaults();
+    applyAllToPlan();
   }
+
+}
 
   function discoverStandGroups(svg){
     const out = [];
@@ -966,10 +978,11 @@ search.addEventListener("input", renderAdminTable);
         pendingSheetData = sheetData;
         return;
       }
-      data = sheetData;
-      ensureDefaults();
-      applyAllToPlan();
-    }
+      if (!svgReady) { pendingSheetData = sheetData; return; }
+    data = sheetData;
+    ensureDefaults();
+    applyAllToPlan();
+}
   }).catch((e)=>console.warn(e));
   }, 30000);
 
@@ -977,10 +990,11 @@ search.addEventListener("input", renderAdminTable);
     window.loadDataFromSheet().then((sheetData) => {
       if (!sheetData) return;
       if (!svgReady) { pendingSheetData = sheetData; return; }
-      data = sheetData;
-      ensureDefaults();
-      applyAllToPlan();
-    }).catch(console.warn);
+      if (!svgReady) { pendingSheetData = sheetData; return; }
+    data = sheetData;
+    ensureDefaults();
+    applyAllToPlan();
+}).catch(console.warn);
   });
 
 function setLastSync(msg){
@@ -994,10 +1008,11 @@ async function refreshFromSheet(){
     console.log("Sheet rows", sheetData ? Object.keys(sheetData).length : 0);
     if (!sheetData) return;
 
+    if (!svgReady) { pendingSheetData = sheetData; return; }
     data = sheetData;
     ensureDefaults();
     applyAllToPlan();
-    setLastSync(new Date().toLocaleString());
+setLastSync(new Date().toLocaleString());
   }catch(e){
     console.warn("refreshFromSheet failed", e);
   }
