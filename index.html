@@ -918,13 +918,27 @@ search.addEventListener("input", renderAdminTable);
   // Auto-refresh public view every 30 seconds
   setInterval(() => {
     loadDataFromSheet().then((sheetData) => {
-      if (sheetData) {
-        data = sheetData;
-        ensureDefaults();
-        applyAllToPlan();
+    if (sheetData) {
+      if (!svgReady) {
+        pendingSheetData = sheetData;
+        return;
       }
-    }).catch((e)=>console.warn(e));
+      data = sheetData;
+      ensureDefaults();
+      applyAllToPlan();
+    }
+  }).catch((e)=>console.warn(e));
   }, 30000);
+
+  document.getElementById("refreshNow")?.addEventListener("click", () => {
+    loadDataFromSheet().then((sheetData) => {
+      if (!sheetData) return;
+      if (!svgReady) { pendingSheetData = sheetData; return; }
+      data = sheetData;
+      ensureDefaults();
+      applyAllToPlan();
+    }).catch(console.warn);
+  });
 </script>
 </body>
 </html>
