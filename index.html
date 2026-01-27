@@ -253,7 +253,7 @@
    ***********************/
   const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1tBeOwvL_396MVAxCznf18ecTe3R5tcnVOcPY-cU0r6M/export?format=csv&gid=0";
   const SVG_FILE = "event_plan.svg";
-  console.log('Build GS-PROD-v1.1-2026-01-27 loaded');
+  console.log('Build GS-PROD-v1.3-2026-01-27 loaded');
   const APPS_SCRIPT_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxEq83BUYJ-oewP_2lPFL0tyol4veM2mhukSTTMCaKCZgEJS5m-f8Jqy1EO_bDc3q3a/exec";
   const STORAGE_KEY = "exhibition-stands-cad-outline-v1";
 
@@ -939,6 +939,31 @@ search.addEventListener("input", renderAdminTable);
       applyAllToPlan();
     }).catch(console.warn);
   });
+
+function setLastSync(msg){
+  const el = document.getElementById("lastSync");
+  if (el) el.textContent = "Last sync: " + msg;
+}
+
+async function refreshFromSheet(){
+  try{
+    const sheetData = await loadDataFromSheet();
+    console.log("Sheet rows", sheetData ? Object.keys(sheetData).length : 0, sheetData);
+    if (!sheetData) return;
+    data = sheetData;
+    ensureDefaults();
+    applyAllToPlan();
+    setLastSync(new Date().toLocaleString());
+  }catch(e){
+    console.warn("refreshFromSheet failed", e);
+  }
+}
+
+// Force one refresh after everything settles (handles SVG timing issues)
+setTimeout(refreshFromSheet, 1000);
+
+// And keep refreshing every 30 seconds
+setInterval(refreshFromSheet, 30000);
 </script>
 </body>
 </html>
