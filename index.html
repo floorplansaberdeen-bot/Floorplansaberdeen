@@ -253,7 +253,7 @@
    ***********************/
   const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1tBeOwvL_396MVAxCznf18ecTe3R5tcnVOcPY-cU0r6M/export?format=csv&gid=0";
   const SVG_FILE = "event_plan.svg";
-  console.log('Build GS-PROD-v1-2026-01-27 loaded');
+  console.log('Build GS-PROD-v1.1-2026-01-27 loaded');
   const APPS_SCRIPT_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxEq83BUYJ-oewP_2lPFL0tyol4veM2mhukSTTMCaKCZgEJS5m-f8Jqy1EO_bDc3q3a/exec";
   const STORAGE_KEY = "exhibition-stands-cad-outline-v1";
 
@@ -418,7 +418,7 @@
     stands.sort(naturalSort);    // Public view reads from Google Sheet (shared data)
     let sheetData = null;
     try {
-      sheetData = await (globalThis.loadDataFromSheet ? globalThis.loadDataFromSheet() : Promise.resolve(null));
+      sheetData = await loadDataFromSheet();
     } catch (e) {
       console.warn(e);
     }
