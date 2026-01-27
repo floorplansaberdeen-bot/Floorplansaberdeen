@@ -194,7 +194,21 @@
     #adminTop a, #adminTop button { white-space: nowrap; }
 
 .stand-row-highlight{ outline:3px solid #333; border-radius:8px; }
+
+.btn-logout{
+  margin-left:auto;
+  background:transparent;
+  border:none;
+  color:#555;
+  font-weight:600;
+  padding:6px 8px;
+}
+.btn-logout:hover{
+  text-decoration:underline;
+  background:transparent;
+}
 </style>
+
 </head>
 <body>
 <div id="authOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:9999;">
@@ -292,6 +306,15 @@ function requireAdminAuth(){
   const overlay = document.getElementById("authOverlay");
   if (!overlay) return;
   if (ok){ overlay.style.display = "none"; return; }
+
+
+function logoutAdmin(){
+  try { sessionStorage.removeItem(ADMIN_AUTH_KEY); } catch(e){}
+  // show overlay again
+  const overlay = document.getElementById("authOverlay");
+  if (overlay) overlay.style.display = "flex";
+}
+
   overlay.style.display = "flex";
   const msg = document.getElementById("authMsg");
   const input = document.getElementById("adminPass");
@@ -1080,6 +1103,10 @@ setInterval(autoRefreshAdminFromSheet, 20000);
 document.getElementById("undoBtn")?.addEventListener("click", () => undoLastChange());
 document.getElementById("reloadSheetBtn")?.addEventListener("click", () => autoRefreshAdminFromSheet());
 window.addEventListener("load", () => requireAdminAuth());
+
+document.getElementById("logoutBtn")?.addEventListener("click", () => {
+  logoutAdmin();
+});
 </script>
 </body>
 </html>
