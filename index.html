@@ -255,52 +255,8 @@ var pendingSheetData = null;
    ***********************/
   const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1tBeOwvL_396MVAxCznf18ecTe3R5tcnVOcPY-cU0r6M/export?format=csv&gid=0";
   const SVG_FILE = "event_plan.svg";
-  console.log('Build GS-PROD-v1.6-2026-01-27 loaded');
   const APPS_SCRIPT_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxEq83BUYJ-oewP_2lPFL0tyol4veM2mhukSTTMCaKCZgEJS5m-f8Jqy1EO_bDc3q3a/exec";
-  
-
-// --- Google Sheets loader (JSONP via Apps Script) ---
-// Defined early and attached to window to avoid any scoping issues on Safari/iOS.
-var loadDataFromSheet = function(){
-  return new Promise((resolve, reject) => {
-    try{
-      const cbName = "__stands_cb_" + Math.random().toString(16).slice(2);
-      const url = `${APPS_SCRIPT_WEBAPP_URL}?action=read&callback=${cbName}&_=${Date.now()}`;
-
-      const timeout = setTimeout(() => {
-        cleanup();
-        reject(new Error("Timed out loading sheet data"));
-      }, 8000);
-
-      let scriptEl = null;
-
-      function cleanup(){
-        clearTimeout(timeout);
-        try { delete window[cbName]; } catch(e){ window[cbName] = undefined; }
-        if (scriptEl && scriptEl.parentNode) scriptEl.parentNode.removeChild(scriptEl);
-      }
-
-      window[cbName] = (data) => {
-        cleanup();
-        resolve(data || {});
-      };
-
-      scriptEl = document.createElement("script");
-      scriptEl.src = url;
-      scriptEl.async = true;
-      scriptEl.onerror = () => {
-        cleanup();
-        reject(new Error("Failed to load data from Apps Script"));
-      };
-      document.head.appendChild(scriptEl);
-    }catch(e){
-      reject(e);
-    }
-  });
-};
-window.loadDataFromSheet = loadDataFromSheet;
-
-const STORAGE_KEY = "exhibition-stands-cad-outline-v1";
+  const STORAGE_KEY = "exhibition-stands-cad-outline-v1";
 
   // Exclude the huge number of CAD technical groups that also match PREFIX+NUMBER
   const EXCLUDE_PREFIXES = new Set([
@@ -463,7 +419,7 @@ const STORAGE_KEY = "exhibition-stands-cad-outline-v1";
     stands.sort(naturalSort);    // Public view reads from Google Sheet (shared data)
     let sheetData = null;
     try {
-      sheetData = await window.loadDataFromSheet();
+      sheetData = await loadDataFromSheet();
     } catch (e) {
       console.warn(e);
     }
@@ -472,10 +428,7 @@ const STORAGE_KEY = "exhibition-stands-cad-outline-v1";
 
     buildFillOverlays();
     applyAllToPlan();
-    renderAdminTable();
-    hookStandHover();
 
-  // Mark SVG ready and apply any pending sheet data
   svgReady = true;
   if (pendingSheetData){
     data = pendingSheetData;
@@ -484,7 +437,9 @@ const STORAGE_KEY = "exhibition-stands-cad-outline-v1";
     applyAllToPlan();
   }
 
-}
+    renderAdminTable();
+    hookStandHover();
+  }
 
   function discoverStandGroups(svg){
     const out = [];
@@ -972,52 +927,39 @@ search.addEventListener("input", renderAdminTable);
 
   // Auto-refresh public view every 30 seconds
   setInterval(() => {
-    window.loadDataFromSheet().then((sheetData) => {
+    loadDataFromSheet().then((sheetData) => {
     if (sheetData) {
       if (!svgReady) {
         pendingSheetData = sheetData;
         return;
       }
-      if (!svgReady) { pendingSheetData = sheetData; return; }
-    data = sheetData;
-    ensureDefaults();
-    applyAllToPlan();
-}
+      data = sheetData;
+      ensureDefaults();
+      applyAllToPlan();
+    }
   }).catch((e)=>console.warn(e));
   }, 30000);
 
   document.getElementById("refreshNow")?.addEventListener("click", () => {
-    window.loadDataFromSheet().then((sheetData) => {
+    loadDataFromSheet().then((sheetData) => {
       if (!sheetData) return;
       if (!svgReady) { pendingSheetData = sheetData; return; }
-      if (!svgReady) { pendingSheetData = sheetData; return; }
-    data = sheetData;
-    ensureDefaults();
-    applyAllToPlan();
-}).catch(console.warn);
+      data = sheetData;
+      ensureDefaults();
+      applyAllToPlan();
+    }).catch(console.warn);
   });
-
-function setLastSync(msg){
-  const el = document.getElementById("lastSync");
-  if (el) el.textContent = "Last sync: " + msg;
-}
 
 async function refreshFromSheet(){
   try{
     const sheetData = await window.loadDataFromSheet();
-    console.log("Sheet rows", sheetData ? Object.keys(sheetData).length : 0);
     if (!sheetData) return;
-
     if (!svgReady) { pendingSheetData = sheetData; return; }
     data = sheetData;
     ensureDefaults();
     applyAllToPlan();
-setLastSync(new Date().toLocaleString());
-  }catch(e){
-    console.warn("refreshFromSheet failed", e);
-  }
+  }catch(e){}
 }
-
 setTimeout(refreshFromSheet, 1200);
 setInterval(refreshFromSheet, 30000);
 </script>

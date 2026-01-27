@@ -192,9 +192,21 @@
     /* Admin top bar tidy */
     #adminTop > div { flex-wrap: wrap; gap: 10px; }
     #adminTop a, #adminTop button { white-space: nowrap; }
+
+.stand-row-highlight{ outline:3px solid #333; border-radius:8px; }
 </style>
 </head>
 <body>
+<div id="authOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:9999;">
+  <div style="background:#fff;border-radius:12px;padding:18px;max-width:360px;width:92%;box-shadow:0 10px 40px rgba(0,0,0,.25);">
+    <div style="font-weight:700;font-size:18px;margin-bottom:10px;">Admin login</div>
+    <div style="font-size:13px;opacity:.8;margin-bottom:10px;">Enter the admin password to continue.</div>
+    <input id="adminPass" type="password" placeholder="Password" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:10px;margin-bottom:10px;" />
+    <button id="adminLoginBtn" class="btn" style="width:100%;">Continue</button>
+    <div id="authMsg" style="margin-top:10px;font-size:12px;color:#b00020;display:none;"></div>
+  </div>
+</div>
+
   <header>
     <div class="left">
       <div class="title">Exhibition Stand Availability</div>
@@ -271,8 +283,30 @@
   const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1tBeOwvL_396MVAxCznf18ecTe3R5tcnVOcPY-cU0r6M/export?format=csv&gid=0";
   const APPS_SCRIPT_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxEq83BUYJ-oewP_2lPFL0tyol4veM2mhukSTTMCaKCZgEJS5m-f8Jqy1EO_bDc3q3a/exec";
   const SVG_FILE = "event_plan.svg";
-  console.log('Build GS-PROD-v1.2-2026-01-27 loaded');
-  const STORAGE_KEY = "exhibition-stands-cad-outline-v1";
+  
+const ADMIN_PASSWORD = "CHANGE_ME"; // set your password (simple client-side lock)
+const ADMIN_AUTH_KEY = "stand_admin_authed_v1";
+
+function requireAdminAuth(){
+  const ok = sessionStorage.getItem(ADMIN_AUTH_KEY) === "1";
+  const overlay = document.getElementById("authOverlay");
+  if (!overlay) return;
+  if (ok){ overlay.style.display = "none"; return; }
+  overlay.style.display = "flex";
+  const msg = document.getElementById("authMsg");
+  const input = document.getElementById("adminPass");
+  const btn = document.getElementById("adminLoginBtn");
+  btn.onclick = () => {
+    if ((input.value || "") === ADMIN_PASSWORD){
+      sessionStorage.setItem(ADMIN_AUTH_KEY, "1");
+      overlay.style.display = "none";
+    }else{
+      if (msg){ msg.style.display="block"; msg.textContent="Incorrect password"; }
+    }
+  };
+}
+
+const STORAGE_KEY = "exhibition-stands-cad-outline-v1";
 
   // Exclude the huge number of CAD technical groups that also match PREFIX+NUMBER
   const EXCLUDE_PREFIXES = new Set([
@@ -794,6 +828,7 @@
       sel.value = row.status || "available";
       sel.addEventListener("change", () => {
         data[id].status = sel.value;
+        pushHistory();
         saveData();
         queueSaveToSheet(id);
         applyStandToPlan(id);
@@ -810,6 +845,7 @@
       ta.style.width = "min(560px, 100%)";
       ta.addEventListener("input", () => {
         data[id].company = ta.value;
+        pushHistory();
         saveData();
         queueSaveToSheet(id);
         applyStandToPlan(id);
@@ -839,6 +875,7 @@
       fs.value = (row.fontSize ?? "auto").toString();
       fs.addEventListener("change", () => {
         data[id].fontSize = (fs.value === "auto") ? "auto" : Number(fs.value);
+        pushHistory();
         saveData();
         queueSaveToSheet(id);
         applyStandToPlan(id);
@@ -992,6 +1029,57 @@
         </div>`;
     });
   })();
+
+const HISTORY_KEY = STORAGE_KEY + "_history_v1";
+function pushHistory(){
+  try{
+    const hist = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+    hist.push({ t: Date.now(), data: data });
+    while (hist.length > 30) hist.shift();
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(hist));
+  }catch(e){}
+}
+function undoLastChange(){
+  try{
+    const hist = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+    if (hist.length < 2) return;
+    hist.pop();
+    const prev = hist[hist.length-1];
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(hist));
+    if (prev && prev.data){
+      data = prev.data;
+      saveData();
+      renderAdminTable();
+      applyAllToPlan();
+    }
+  }catch(e){}
+}
+
+function focusStandRow(standId){
+  const row = document.getElementById("row-" + standId);
+  if (!row) return;
+  document.querySelectorAll(".stand-row-highlight").forEach(el => el.classList.remove("stand-row-highlight"));
+  row.classList.add("stand-row-highlight");
+  row.scrollIntoView({ behavior:"smooth", block:"center" });
+  const inp = row.querySelector("textarea, input");
+  if (inp) inp.focus();
+}
+
+async function autoRefreshAdminFromSheet(){
+  try{
+    const sheetData = await window.loadDataFromSheet();
+    if (!sheetData) return;
+    data = sheetData;
+    saveData();
+    renderAdminTable();
+    applyAllToPlan();
+  }catch(e){}
+}
+setInterval(autoRefreshAdminFromSheet, 20000);
+
+document.getElementById("undoBtn")?.addEventListener("click", () => undoLastChange());
+document.getElementById("reloadSheetBtn")?.addEventListener("click", () => autoRefreshAdminFromSheet());
+window.addEventListener("load", () => requireAdminAuth());
 </script>
 </body>
 </html>
