@@ -1,967 +1,106 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Exhibition Stands – Availability</title>
-    <link rel="icon" href="./favicon.ico" type="image/x-icon">
+  <meta charset="UTF-8" />
+  <title>Exhibition Floorplan</title>
   <style>
-    :root{
-      --sold:#e53935;
-      --available:#27ae60;
-      --ink:#111;
-      --muted:#666;
-      --bg:#fafafa;
-      --card:#fff;
-      --border:#ddd;
-    }
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg);}
-    header{
-      position:sticky;top:0;z-index:5;
-      background:rgba(255,255,255,.92);backdrop-filter:blur(6px);
-      border-bottom:1px solid var(--border);
-      padding:10px 14px;
-      display:flex;gap:10px;align-items:center;justify-content:space-between;
-    }
-    header .left{display:flex;flex-direction:column;gap:2px;}
-    header .title{font-weight:800;}
-    header .sub{color:var(--muted);font-size:12px;}
-    header .right{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
-    button{
-      border:1px solid var(--border);background:var(--card);
-      padding:7px 10px;border-radius:10px;cursor:pointer;
-    }
-    button:hover{filter:brightness(0.98);}
-    .pill{display:inline-flex;gap:8px;align-items:center;font-size:12px;color:var(--muted);}
-    .dot{width:10px;height:10px;border-radius:50%;display:inline-block;}
-    .dot.sold{background:var(--sold);}
-    .dot.av{background:var(--available);}
-
-    main{display:grid;grid-template-columns:1fr;gap:12px;padding:12px;}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;}
-
-    #planWrap{height:calc(100vh - 90px);min-height:520px;}
-    #plan{width:100%;height:100%;overflow:auto;background:#fff;}
-    #plan svg{width:1600px;height:auto;display:block;}
-    .hint{padding:10px 12px;font-size:12px;color:var(--muted);border-top:1px solid var(--border);}
-
-    /* Admin */
-    #adminWrap{display:none;}
-    #adminTop{
-      display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;
-      padding:12px;border-bottom:1px solid var(--border);
-    }
-    #search{padding:8px 10px;border:1px solid var(--border);border-radius:10px;min-width:220px;}
-    table{width:100%;border-collapse:collapse;}
-    thead th{
-      position:sticky;top:0;background:#fff;
-      border-bottom:1px solid var(--border);
-      font-size:12px;color:var(--muted);
-      text-align:left;padding:10px 12px;
-    }
-    tbody td{border-bottom:1px solid #f0f0f0;padding:8px 12px;vertical-align:middle;}
-    tbody tr:hover{background:#fcfcfc;}
-    .standId{font-weight:800;}
-    select, textarea{
-      border:1px solid var(--border);
-      border-radius:10px;
-      padding:7px 9px;
-      background:#fff;
-      font-family:inherit;
-      font-size:14px;
-    }
-    textarea{resize:vertical;min-height:44px;}
-    .rowSold .standId{color:var(--sold);}
-    .small{font-size:12px;color:var(--muted);}
-
-    /* AVAILABLE: highlight stand outline in green */
-    .stand-available :is(path, polyline, polygon, line, rect, circle, ellipse){
-      stroke: var(--available) !important;
-      stroke-opacity: 1;
-      fill: none !important;
-    }
-    .stand-sold :is(path, polyline, polygon, line, rect, circle, ellipse){
-      stroke: var(--sold) !important;
-      stroke-opacity: 1;
-      fill: none !important;
-    }
-    /* In case some stands are a single shape element directly on the group */
-    g.stand-available{ stroke: var(--available) !important; }
-    g.stand-sold{ stroke: var(--sold) !important; }
-.stand-sold *[fill="none"], .stand-sold[fill="none"]{ fill: none !important; }
-
-    /* Make stand groups clickable */
-    g.stand-available, g.stand-sold { cursor: pointer; pointer-events: all; }
-
-
-    /* Company label (foreignObject) */
-    .companyFo{ pointer-events:none; }
-    .companyDiv{
-      width:100%;height:100%;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      text-align:center;
-      line-height:1.15;
-      white-space:normal;
-      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-      font-weight:800;
-      color:#111;
-      text-shadow:0 0 2px rgba(255,255,255,.95), 0 0 3px rgba(255,255,255,.95);
-      word-break:break-word;
-      overflow:hidden;
-      padding:6px;
-    }
-  
-    /* Tooltip popup */
-    #popup {
-      position: fixed;
-      z-index: 50;
-      max-width: 320px;
-      background: rgba(255,255,255,.95);
-      backdrop-filter: blur(6px);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 10px 12px;
-      box-shadow: 0 8px 24px rgba(0,0,0,.12);
-      display: none;
-    }
-    #popup .line1 { font-weight: 800; }
-    #popup .line2 { margin-top: 2px; color: var(--muted); font-size: 12px; white-space: pre-wrap; }
-    #popup .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      margin-top: 6px;
-      font-size: 12px;
-      padding: 4px 8px;
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      background: #fff;
-    }
-    #popup .badge .dot { width: 8px; height: 8px; border-radius: 50%; display:inline-block; }
-
-  
-    /* Keep stand number text readable (do not stroke text when highlighting) */
-    .stand-available text, .stand-available tspan,
-    .stand-sold text, .stand-sold tspan{
-      stroke: none !important;
-      fill: #111 !important;
-      paint-order: normal;
-    }
-
-
-.stand-available :is(path, polygon, rect, circle, ellipse){
-      stroke: var(--available) !important;
-      stroke-opacity: 1;
-      fill: var(--available) !important;
-      fill-opacity: .18;
-    }
-    .stand-sold :is(path, polygon, rect, circle, ellipse){
-      stroke: var(--sold) !important;
-      stroke-opacity: 1;
-      fill: var(--sold) !important;
-      fill-opacity: .22;
-    }
-    /* Keep open geometry (lines/polylines) as stroke-only */
-    .stand-available :is(line, polyline){
-      stroke: var(--available) !important;
-      stroke-opacity: 1;
-      fill: none !important;
-    }
-    .stand-sold :is(line, polyline){
-      stroke: var(--sold) !important;
-      stroke-opacity: 1;
-      fill: none !important;
-    }
-
-    /* Fill overlays for stands whose CAD geometry is stroke-only (e.g., line/polyline outlines) */
-    .stand-fill-overlay{
-      pointer-events: none;
-    }
-    .stand-fill-overlay.available{
-      fill: var(--available);
-      fill-opacity: .18;
-    }
-    .stand-fill-overlay.sold{
-      fill: var(--sold);
-      fill-opacity: .22;
-    }
-
-
-    .public-hide{ display:none !important; }
+    body { margin: 0; font-family: sans-serif; }
+    svg { width: 100%; height: auto; }
+    .stand-available { fill: #4CAF50 !important; }
+    .stand-sold { fill: #E53935 !important; }
   </style>
 </head>
 <body>
-  <header>
-    <div class="left">
-      <div class="title">Exhibition Stand Availability</div>
-</div>
-    <div class="right">
-      <span class="pill"><span class="dot sold"></span> Sold</span>
-      <span class="pill"><span class="dot av"></span> Available</span>
-</div>
-  </header>
-  <div id="popup" role="dialog" aria-live="polite"></div>
 
-
-  <main>
-    <section id="planWrap" class="card">
-      <div id="plan"></div>
-      <div class="hint">Hover over a stand to see its status. If sold, the company name pops up; if green, it shows “available”.</div>
-    </section>
-
-    <section id="adminWrap" class="card">
-      <div id="adminTop">
-        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-          <strong>Administrator Spreadsheet</strong>
-          <span class="small">Saved in this browser (localStorage). Export/Import works with Excel XML or CSV.</span>
-        </div>
-        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-          <input id="search" type="text" placeholder="Search stand or company…" />
-          <button id="exportBtn" type="button">Export Excel</button>
-          <label style="display:inline-flex; gap:8px; align-items:center; cursor:pointer;">
-            <input id="importFile" type="file" accept=".xml,.csv,application/xml,text/csv" style="display:none;">
-            <span style="border:1px solid var(--border); background:#fff; padding:7px 10px; border-radius:10px;">Import Excel</span>
-          </label>
-          <button id="clearBtn" type="button">Clear All</button>
-        </div>
-      </div>
-
-      <div style="max-height: 55vh; overflow:auto;">
-        <table>
-          <thead>
-            <tr>
-              <th style="width:140px;">Stand #</th>
-              <th style="width:160px;">Status</th>
-              <th>Company Name</th>
-              <th style="width:140px;">Font size</th>
-            </tr>
-          </thead>
-          <tbody id="adminBody"></tbody>
-        </table>
-      </div>
-    </section>
-  </main>
-
-<script>var svgReady = false;
-var pendingSheetData = null;
-
-
-  /***********************
-   * GOOGLE SHEETS (shared data)
-   * 1) Publish your sheet to web as CSV and paste the URL into SHEET_CSV_URL
-   * 2) Deploy Apps Script as a Web App and paste the URL into APPS_SCRIPT_WEBAPP_URL (admin only)
-   ***********************/
-  const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1tBeOwvL_396MVAxCznf18ecTe3R5tcnVOcPY-cU0r6M/export?format=csv&gid=0";
-  const SVG_FILE = "event_plan.svg";
-  const APPS_SCRIPT_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxEq83BUYJ-oewP_2lPFL0tyol4veM2mhukSTTMCaKCZgEJS5m-f8Jqy1EO_bDc3q3a/exec";
-  const STORAGE_KEY = "exhibition-stands-cad-outline-v1";
-
-  // Exclude the huge number of CAD technical groups that also match PREFIX+NUMBER
-  const EXCLUDE_PREFIXES = new Set([
-    "LINE","SPLINE","ELLIPSE","ARC","ATTRIB","LWPOLYLINE","SOLID","MTEXT","DIMENSION","CIRCLE","TEXT"
-  ]);
-
-  let svgRoot = null;
-  let stands = [];          // ["A1","AA3","SB12",...]
-  let data = {};            // { [id]: {status, company, fontSize} }
-
-  function loadData(){
-    try{
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if(!raw) return {};
-      const parsed = JSON.parse(raw);
-      return (parsed && typeof parsed === "object") ? parsed : {};
-    }catch{ return {}; }
-  }
-  function saveData(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
-
-  function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
-  function naturalSort(a,b){
-    const ax=a.match(/^([A-Z]+)(\d+)$/);
-    const bx=b.match(/^([A-Z]+)(\d+)$/);
-    if(!ax||!bx) return a.localeCompare(b);
-    if(ax[1]!==bx[1]) return ax[1].localeCompare(bx[1]);
-    return Number(ax[2])-Number(bx[2]);
-  }
-  function escCss(id){
-    return (window.CSS && CSS.escape) ? CSS.escape(id) : String(id).replace(/[^a-zA-Z0-9_-]/g, "\\$&");
-  }
-  function getById(id){
-    if(!svgRoot) return null;
-    if(svgRoot.getElementById){
-      const el = svgRoot.getElementById(id);
-      if(el) return el;
-    }
-    return svgRoot.querySelector("#" + escCss(id));
-  }
-
-  function ensureDefaults(){
-    for(const id of stands){
-      if(!data[id]) data[id] = { status:"available", company:"", fontSize:"auto" };
-      if(!data[id].status) data[id].status = "available";
-      if(typeof data[id].company !== "string") data[id].company = "";
-      if(data[id].fontSize === undefined) data[id].fontSize = "auto";
-    }
-    for(const k of Object.keys(data)){
-      if(!stands.includes(k)) delete data[k];
-    }
-    saveData();
-  }
-
-
-  // -----------------------
-  // CSV helpers (handles basic quoted CSV)
-  // -----------------------
-  function parseCsv(text){
-    const rows = [];
-    let row = [];
-    let cur = "";
-    let inQ = false;
-
-    for (let i=0; i<text.length; i++){
-      const ch = text[i];
-      const next = text[i+1];
-
-      if (ch === '"' ){
-        if (inQ && next === '"'){ // escaped quote
-          cur += '"';
-          i++;
-        } else {
-          inQ = !inQ;
-        }
-
-
-  // -----------------------
-  // Google Sheets loader (CORS-safe via gviz JSON-in-script)
-  // -----------------------
-  const SPREADSHEET_ID = "1tBeOwvL_396MVAxCznf18ecTe3R5tcnVOcPY-cU0r6M";
-  const SHEET_GID = 0;
-  const SHEET_NAME = "Sheet1"; // tab name used for reads // change if you use a different tab
-
-  async function loadDataFromSheet(){
-    return new Promise((resolve, reject) => {
-      if (!APPS_SCRIPT_WEBAPP_URL) return resolve(null);
-
-      const cbName = "__stands_cb_" + Math.random().toString(16).slice(2);
-      const url = `${APPS_SCRIPT_WEBAPP_URL}?action=read&callback=${cbName}&_=${Date.now()}`;
-
-      const timeout = setTimeout(() => {
-        cleanup();
-        reject(new Error("Timed out loading sheet data"));
-      }, 8000);
-
-      let scriptEl = null;
-
-      function cleanup(){
-        clearTimeout(timeout);
-        try { delete window[cbName]; } catch(e){ window[cbName] = undefined; }
-        if (scriptEl && scriptEl.parentNode) scriptEl.parentNode.removeChild(scriptEl);
-      }
-
-      window[cbName] = (data) => {
-        cleanup();
-        resolve(data || {});
-      };
-
-      scriptEl = document.createElement("script");
-      scriptEl.src = url;
-      scriptEl.async = true;
-      scriptEl.onerror = () => {
-        cleanup();
-        reject(new Error("Failed to load data from Apps Script"));
-      };
-      document.head.appendChild(scriptEl);
-    });
-  }
-
-        continue;
-      }
-
-      if (!inQ && (ch === ',')){
-        row.push(cur);
-        cur = "";
-        continue;
-      }
-
-      if (!inQ && (ch === '\n' || ch === '\r')){
-        if (ch === '\r' && next === '\n') i++;
-        row.push(cur);
-        rows.push(row);
-        row = [];
-        cur = "";
-        continue;
-      }
-
-      cur += ch;
-    }
-    // last cell
-    if (cur.length || row.length){
-      row.push(cur);
-      rows.push(row);
-    }
-    return rows;
-  }
-
-  async function loadSvg(){
-    const res = await fetch(SVG_FILE, { cache:"no-store" });
-    if(!res.ok) throw new Error("Could not load SVG file: " + SVG_FILE);
-    const text = await res.text();
-
-    const wrap = document.getElementById("plan");
-    wrap.innerHTML = text;
-
-    svgRoot = wrap.querySelector("svg");
-    if(!svgRoot) throw new Error("SVG root not found.");
-
-    stands = discoverStandGroups(svgRoot);
-    stands.sort(naturalSort);    // Public view reads from Google Sheet (shared data)
-    let sheetData = null;
-    try {
-      sheetData = await loadDataFromSheet();
-    } catch (e) {
-      console.warn(e);
-    }
-    data = sheetData || {};
-    ensureDefaults();
-
-    buildFillOverlays();
-    applyAllToPlan();
-
-  svgReady = true;
-  if (pendingSheetData){
-    data = pendingSheetData;
-    pendingSheetData = null;
-    ensureDefaults();
-    applyAllToPlan();
-  }
-
-    renderAdminTable();
-    hookStandHover();
-  }
-
-  function discoverStandGroups(svg){
-    const out = [];
-    const seen = new Set();
-
-    // Stands are exported as layer groups with IDs like A1, AA3, SB12, etc (uppercase prefix + digits)
-    const groups = svg.querySelectorAll("g[id]");
-    for(const g of groups){
-      const id = (g.getAttribute("id") || "").trim();
-      const m = id.match(/^([A-Z]+)(\d+)$/);
-      if(!m) continue;
-
-      const prefix = m[1];
-      if(EXCLUDE_PREFIXES.has(prefix)) continue;
-
-      // Filter out Illustrator's weird utility groups if any
-      if(prefix.length > 3 && prefix !== "SB") continue;
-
-      if(!seen.has(id)){
-        seen.add(id);
-        out.push(id);
-      }
-    }
-    return out;
-  }
-
-
-  // -----------------------
-  // Fill overlays for stroke-only stand outlines
-  // -----------------------
-  let fillLayer = null;
-  const overlayNeeded = new Set();
-
-  function ensureFillOverlayLayer(){
-    if (fillLayer) return fillLayer;
-    fillLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    fillLayer.setAttribute("id", "FILL_OVERLAYS_LAYER");
-    // Put it near the end so fills appear on top of background but below strokes.
-    // pointer-events are disabled so hover still hits the stands.
-    svgRoot.appendChild(fillLayer);
-    return fillLayer;
-  }
-
-  function standNeedsOverlay(standEl){
-    // If the stand contains any fill-capable closed shape, we can rely on CSS fills.
-    // Otherwise (only lines/polylines), create a rectangle overlay using the stand bbox.
-    const closed = standEl.querySelector("path, polygon, rect, circle, ellipse");
-    return !closed;
-  }
-
-  function buildFillOverlays(){
-    ensureFillOverlayLayer();
-    overlayNeeded.clear();
-    while (fillLayer.firstChild) fillLayer.removeChild(fillLayer.firstChild);
-
-    for (const id of stands){
-      const standEl = getById(id);
-      if (!standEl) continue;
-
-      if (!standNeedsOverlay(standEl)) continue;
-
-      // Try to find a closed outline polyline to use as an exact fill shape
-      const polylines = Array.from(standEl.querySelectorAll("polyline"));
-      let best = null; // {pts:[[x,y],...], area:number}
-
-      function parsePoints(str){
-        // supports "x,y x,y" or "x y x y"
-        const nums = (str || "").trim().replace(/,/g," ").split(/\s+/).filter(Boolean).map(Number);
-        const pts = [];
-        for (let i=0;i+1<nums.length;i+=2){
-          const x = nums[i], y = nums[i+1];
-          if (Number.isFinite(x) && Number.isFinite(y)) pts.push([x,y]);
-        }
-        return pts;
-      }
-      function closeIfNeeded(pts){
-        if (pts.length < 3) return pts;
-        const [x0,y0] = pts[0];
-        const [xn,yn] = pts[pts.length-1];
-        if (Math.hypot(xn-x0, yn-y0) > 0.001) pts = pts.concat([[x0,y0]]);
-        return pts;
-      }
-      function polygonArea(pts){
-        let a = 0;
-        for (let i=0;i<pts.length-1;i++){
-          const [x1,y1] = pts[i];
-          const [x2,y2] = pts[i+1];
-          a += (x1*y2 - x2*y1);
-        }
-        return a/2;
-      }
-
-      for (const pl of polylines){
-        const pts0 = parsePoints(pl.getAttribute("points"));
-        if (pts0.length < 3) continue;
-        const pts = closeIfNeeded(pts0);
-        const a = polygonArea(pts);
-        const absA = Math.abs(a);
-        if (absA < 10) continue;
-        if (!best || absA > Math.abs(best.area)){
-          best = { pts, area: a };
-        }
-      }
-
-      if (best){
-        const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-        poly.setAttribute("id", `fill-${id}`);
-        poly.setAttribute("class", "stand-fill-overlay available");
-        poly.setAttribute("points", best.pts.map(p => `${p[0]},${p[1]}`).join(" "));
-        fillLayer.appendChild(poly);
-        overlayNeeded.add(id);
-        continue;
-      }
-
-      // Fallback: inset bbox rectangle
-      let bb;
-      try { bb = standEl.getBBox(); } catch { continue; }
-      const inset = Math.max(1, Math.min(bb.width, bb.height) * 0.02);
-      const x = bb.x + inset;
-      const y = bb.y + inset;
-      const w = Math.max(1, bb.width - inset * 2);
-      const h = Math.max(1, bb.height - inset * 2);
-
-      const r = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-      r.setAttribute("id", `fill-${id}`);
-      r.setAttribute("class", "stand-fill-overlay available");
-      r.setAttribute("x", x);
-      r.setAttribute("y", y);
-      r.setAttribute("width", w);
-      r.setAttribute("height", h);
-      fillLayer.appendChild(r);
-
-      overlayNeeded.add(id);
-    }
-  }
-
-  function updateFillOverlay(id, status){
-    if (!overlayNeeded.has(id)) return;
-    const r = getById(`fill-${id}`);
-    if (!r) return;
-    r.classList.toggle("sold", status === "sold");
-    r.classList.toggle("available", status !== "sold");
-  }
-
-
-  function applyAllToPlan(){
-    for(const id of stands) applyStandToPlan(id);
-  }
-
-  function applyStandToPlan(id){
-    const row = data[id] || { status:"available", company:"" };
-    const standEl = getById(id);
-    if(standEl){
-      standEl.classList.add("stand-available");
-      standEl.classList.toggle("stand-sold", row.status === "sold");
-    }
-    updateFillOverlay(id, row.status);
-  }
-
-
-
-  // -----------------------
-  // Popup behaviour
-  // -----------------------
-  const popupEl = () => document.getElementById("popup");
-  let popupTimer = null;
-
-  function escapeHtml(s){
-    return String(s ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-  }
-
-  function showPopupAt(clientX, clientY, title, body, status){
-    const el = popupEl();
-    if(!el) return;
-
-    const dotColor = status === "sold" ? "var(--sold)" : "var(--available)";
-    const badgeText = status === "sold" ? "Sold" : "Available";
-
-    el.innerHTML = `
-      <div class="line1">${escapeHtml(title)}</div>
-      <div class="line2">${escapeHtml(body)}</div>
-      <div class="badge"><span class="dot" style="background:${dotColor}"></span>${badgeText}</div>
-    `;
-
-    el.style.display = "block";
-
-    const pad = 12;
-    const rect = el.getBoundingClientRect();
-    let x = clientX + 14;
-    let y = clientY + 14;
-    if (x + rect.width + pad > window.innerWidth) x = clientX - rect.width - 14;
-    if (y + rect.height + pad > window.innerHeight) y = clientY - rect.height - 14;
-    x = Math.max(pad, Math.min(window.innerWidth - rect.width - pad, x));
-    y = Math.max(pad, Math.min(window.innerHeight - rect.height - pad, y));
-    el.style.left = x + "px";
-    el.style.top = y + "px";
-
-    if(popupTimer) clearTimeout(popupTimer);
-    popupTimer = setTimeout(hidePopup, 4500);
-  }
-
-  function hidePopup(){
-    const el = popupEl();
-    if(!el) return;
-    el.style.display = "none";
-  }
-
-  function standPopupText(id){
-    const row = data[id] || { status:"available", company:"" };
-    const status = row.status === "sold" ? "sold" : "available";
-    const company = (row.company || "").trim();
-
-    if(status === "sold"){
-      return { title: id, body: company ? company : "Sold", status };
-    }
-    return { title: id, body: "Available", status };
-  }
-
-  function hookStandHover(){
-    const standsSet = new Set(stands);
-    let currentId = null;
-
-    function findStandIdFromTarget(t){
-      let el = t;
-      while (el && el !== svgRoot){
-        if (el.tagName && el.tagName.toLowerCase() === "g"){
-          const id = (el.getAttribute("id") || "").trim();
-          if (standsSet.has(id)) return id;
-        }
-        el = el.parentNode;
-      }
-      return null;
-    }
-
-    svgRoot.addEventListener("pointermove", (ev) => {
-      const id = findStandIdFromTarget(ev.target);
-      if (!id){
-        currentId = null;
-        hidePopup();
-        return;
-      }
-      if (id !== currentId){
-        currentId = id;
-      }
-      const info = standPopupText(id);
-      showPopupAt(ev.clientX, ev.clientY, info.title, info.body, info.status);
-    });
-
-    svgRoot.addEventListener("pointerleave", () => {
-      currentId = null;
-      hidePopup();
-    });
-
-    // Escape closes it
-    document.addEventListener("keydown", (ev) => {
-      if(ev.key === "Escape") hidePopup();
-    });
-  }
-
-
-  function renderAdminTable(){
-    const tbody = document.getElementById("adminBody");
-    const q = (document.getElementById("search").value || "").trim().toLowerCase();
-    tbody.innerHTML = "";
-
-    for(const id of stands){
-      const row = data[id];
-      const matches = !q ||
-        id.toLowerCase().includes(q) ||
-        (row.company||"").toLowerCase().includes(q) ||
-        (row.status||"").toLowerCase().includes(q);
-      if(!matches) continue;
-
-      const tr = document.createElement("tr");
-      if(row.status === "sold") tr.classList.add("rowSold");
-
-      const tdId = document.createElement("td");
-      tdId.innerHTML = `<span class="standId">${id}</span>`;
-      tr.appendChild(tdId);
-
-      const tdStatus = document.createElement("td");
-      const sel = document.createElement("select");
-      sel.innerHTML = `<option value="available">available</option><option value="sold">sold</option>`;
-      sel.value = row.status || "available";
-      sel.addEventListener("change", () => {
-        data[id].status = sel.value;
-        saveData();
-        applyStandToPlan(id);
-        renderAdminTable();
-      });
-      tdStatus.appendChild(sel);
-      tr.appendChild(tdStatus);
-
-      const tdCompany = document.createElement("td");
-      const ta = document.createElement("textarea");
-      ta.placeholder = "Company name…";
-      ta.rows = 2;
-      ta.value = row.company || "";
-      ta.style.width = "min(560px, 100%)";
-      ta.addEventListener("input", () => {
-        data[id].company = ta.value;
-        saveData();
-        applyStandToPlan(id);
-      });
-      tdCompany.appendChild(ta);
-      tr.appendChild(tdCompany);
-
-      const tdFont = document.createElement("td");
-      const fs = document.createElement("select");
-      fs.innerHTML = `
-        <option value="auto">auto</option>
-        <option value="4">4</option>
-        <option value="5">5</option>
-        <option value="6">6</option>
-        <option value="7">7</option>
-        <option value="8">8</option>
-        <option value="9">9</option>
-        <option value="10">10</option>
-        <option value="11">11</option>
-        <option value="12">12</option>
-        <option value="14">14</option>
-        <option value="16">16</option>
-        <option value="18">18</option>
-        <option value="20">20</option>
-        <option value="22">22</option>
-      `;
-      fs.value = (row.fontSize ?? "auto").toString();
-      fs.addEventListener("change", () => {
-        data[id].fontSize = (fs.value === "auto") ? "auto" : Number(fs.value);
-        saveData();
-        applyStandToPlan(id);
-      });
-      tdFont.appendChild(fs);
-      tr.appendChild(tdFont);
-
-      tbody.appendChild(tr);
-    }
-  }
-
-  function exportExcel(){
-    const rows = [];
-    rows.push(["Stand","Status","Company","FontSize"]);
-    for(const id of stands){
-      const r = data[id] || { status:"available", company:"", fontSize:"auto" };
-      rows.push([id, r.status || "available", r.company || "", (r.fontSize ?? "auto").toString()]);
-    }
-    const esc = (s)=>String(s)
-      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
-      .replace(/"/g,"&quot;").replace(/'/g,"&apos;");
-
-    const xml =
-`<?xml version="1.0"?>
-<?mso-application progid="Excel.Sheet"?>
-<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
- xmlns:o="urn:schemas-microsoft-com:office:office"
- xmlns:x="urn:schemas-microsoft-com:office:excel"
- xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
- xmlns:html="http://www.w3.org/TR/REC-html40">
-  <Worksheet ss:Name="Stands">
-    <Table>
-      ${rows.map(r => `<Row>${r.map(c => `<Cell><Data ss:Type="String">${esc(c)}</Data></Cell>`).join("")}</Row>`).join("\n")}
-    </Table>
-  </Worksheet>
-</Workbook>`;
-
-    const blob = new Blob([xml], { type:"application/vnd.ms-excel" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "stand-status.xml";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(a.href);
-  }
-
-  async function importExcel(file){
-    const name = (file.name||"").toLowerCase();
-    const text = await file.text();
-
-    if(name.endsWith(".csv")){
-      const lines = text.split(/\r?\n/).filter(l => l.trim().length);
-      const parsed = lines.map(l => {
-        const out=[]; let cur=""; let inQ=false;
-        for(let i=0;i<l.length;i++){
-          const ch=l[i];
-          if(ch === '"'){ inQ=!inQ; continue; }
-          if(ch === ',' && !inQ){ out.push(cur); cur=""; continue; }
-          cur += ch;
-        }
-        out.push(cur);
-        return out.map(x => x.trim());
-      });
-      for(let i=1;i<parsed.length;i++){
-        const [id,status,company,fontSize] = parsed[i];
-        if(!id || !stands.includes(id)) continue;
-        data[id] = {
-          status: (status === "sold") ? "sold" : "available",
-          company: company || "",
-          fontSize: (!fontSize || fontSize === "auto") ? "auto" : Number(fontSize)
-        };
-      }
-    } else {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(text, "application/xml");
-      const rows = Array.from(doc.getElementsByTagName("Row"));
-      const getCellText = (cell) => {
-        const d = cell.getElementsByTagName("Data")[0];
-        return d ? (d.textContent || "").trim() : "";
-      };
-      for(let i=1;i<rows.length;i++){
-        const cells = Array.from(rows[i].getElementsByTagName("Cell"));
-        const vals = cells.map(getCellText);
-        const id = vals[0];
-        if(!id || !stands.includes(id)) continue;
-        const status = vals[1];
-        const company = vals[2] || "";
-        const fontSize = vals[3] || "auto";
-        data[id] = {
-          status: (status === "sold") ? "sold" : "available",
-          company,
-          fontSize: (fontSize === "auto" || fontSize === "") ? "auto" : Number(fontSize)
-        };
-      }
-    }
-
-    ensureDefaults();
-    applyAllToPlan();
-    renderAdminTable();
-    hookStandHover();
-  }
-
-  function clearAll(){
-    for(const id of stands) data[id] = { status:"available", company:"", fontSize:"auto" };
-    saveData();
-    applyAllToPlan();
-    renderAdminTable();
-    hookStandHover();
-  }
-
-  function setAdminMode(isAdmin){
-    // Public view: admin controls disabled
-    document.getElementById("adminWrap").style.display = "none";
-    document.getElementById("planWrap").style.height = "calc(100vh - 90px)";
-  }
-
-  (function init(){
-    const btn = document.getElementById("toggleAdminBtn"); // may be null in public view
-    const search = document.getElementById("search");
-    if (btn) {
-      btn.addEventListener("click", () => {
-        const adminVisible = document.getElementById("adminWrap").style.display === "block";
-        setAdminMode(!adminVisible);
-      });
-    }
-search.addEventListener("input", renderAdminTable);
-    document.getElementById("exportBtn").addEventListener("click", exportExcel);
-    document.getElementById("importFile").addEventListener("change", async (e) => {
-      const f = e.target.files?.[0];
-      if(!f) return;
-      try { await importExcel(f); }
-      finally { e.target.value = ""; }
-    });
-    document.getElementById("clearBtn").addEventListener("click", () => {
-      if(confirm("Clear all stand statuses and company names in this browser?")) clearAll();
-    });
-
-    const params = new URLSearchParams(location.search);
-    setAdminMode(false);
-
-    loadSvg().catch(err => {
-      console.error(err);
-      document.getElementById("plan").innerHTML =
-        `<div style="padding:14px;color:#b00;">
-          <strong>Error:</strong> ${err.message}<br>
-          Make sure <code>${SVG_FILE}</code> is in the same folder as <code>index.html</code>.
-        </div>`;
-    });
-  })();
-
-
-  // Auto-refresh public view every 30 seconds
-  setInterval(() => {
-    loadDataFromSheet().then((sheetData) => {
-    if (sheetData) {
-      if (!svgReady) {
-        pendingSheetData = sheetData;
-        return;
-      }
-      data = sheetData;
-      ensureDefaults();
-      applyAllToPlan();
-    }
-  }).catch((e)=>console.warn(e));
-  }, 30000);
-
-  document.getElementById("refreshNow")?.addEventListener("click", () => {
-    loadDataFromSheet().then((sheetData) => {
-      if (!sheetData) return;
-      if (!svgReady) { pendingSheetData = sheetData; return; }
-      data = sheetData;
-      ensureDefaults();
-      applyAllToPlan();
-    }).catch(console.warn);
+<div id="svg-container"></div>
+
+<script>
+const SCRIPT_URL =
+  "https://script.google.com/macros/s/AKfycbxEq83BUYJ-oewP_2lPFL0tyol4veM2mhukSTTMCaKCZgEJS5m-f8Jqy1EO_bDc3q3a/exec";
+
+let svgRoot = null;
+let svgReady = false;
+let pendingSheetData = null;
+
+/* =========================
+   SVG LOAD
+   ========================= */
+fetch("event_plan.svg")
+  .then(r => r.text())
+  .then(svg => {
+    document.getElementById("svg-container").innerHTML = svg;
+    svgRoot = document.querySelector("svg");
+    svgReady = true;
+    if (pendingSheetData) applyData(pendingSheetData);
   });
 
-async function refreshFromSheet(){
-  try{
-    const sheetData = await window.loadDataFromSheet();
-    if (!sheetData) return;
-    if (!svgReady) { pendingSheetData = sheetData; return; }
-    data = sheetData;
-    ensureDefaults();
-    applyAllToPlan();
-  }catch(e){}
+/* =========================
+   JSONP LOAD
+   ========================= */
+function loadDataFromSheet() {
+  return new Promise(resolve => {
+    const cb = "cb_" + Date.now();
+    window[cb] = data => {
+      delete window[cb];
+      script.remove();
+      resolve(data);
+    };
+
+    const script = document.createElement("script");
+    script.src = `${SCRIPT_URL}?callback=${cb}`;
+    document.body.appendChild(script);
+  });
 }
-setTimeout(refreshFromSheet, 1200);
-setInterval(refreshFromSheet, 30000);
+
+async function refresh() {
+  const data = await loadDataFromSheet();
+  if (!svgReady) {
+    pendingSheetData = data;
+  } else {
+    applyData(data);
+  }
+}
+
+/* =========================
+   APPLY COLOURS
+   ========================= */
+function applyData(data) {
+  if (!svgRoot || !Array.isArray(data)) return;
+
+  data.forEach(row => {
+    const stand = findStand(row.standId);
+    if (!stand) return;
+
+    stand.classList.remove("stand-available", "stand-sold");
+    stand.classList.add(
+      row.status === "sold" ? "stand-sold" : "stand-available"
+    );
+
+    stand.onmouseenter = () => {
+      stand.title = row.status === "sold"
+        ? row.company
+        : "Available";
+    };
+  });
+}
+
+/* =========================
+   STAND RESOLVER
+   ========================= */
+function findStand(id) {
+  return [...svgRoot.querySelectorAll("[id],[data-name]")]
+    .find(el =>
+      el.getAttribute("data-name") === id ||
+      el.id === id
+    );
+}
+
+/* =========================
+   POLL
+   ========================= */
+refresh();
+setInterval(refresh, 30000);
 </script>
+
 </body>
 </html>
