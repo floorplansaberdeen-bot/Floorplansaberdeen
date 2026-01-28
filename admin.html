@@ -207,6 +207,8 @@
   text-decoration:underline;
   background:transparent;
 }
+
+.stand-row-pinned{ position:relative; }
 </style>
 
 </head>
@@ -298,7 +300,7 @@
   const APPS_SCRIPT_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxEq83BUYJ-oewP_2lPFL0tyol4veM2mhukSTTMCaKCZgEJS5m-f8Jqy1EO_bDc3q3a/exec";
   const SVG_FILE = "event_plan.svg";
   
-const ADMIN_PASSWORD = "FLOORPASS"; // set your password (simple client-side lock)
+const ADMIN_PASSWORD = "CHANGE_ME"; // set your password (simple client-side lock)
 const ADMIN_AUTH_KEY = "stand_admin_authed_v1";
 
 function requireAdminAuth(){
@@ -1081,11 +1083,26 @@ function undoLastChange(){
 function focusStandRow(standId){
   const row = document.getElementById("row-" + standId);
   if (!row) return;
+
+  // Clear previous highlight/pin
   document.querySelectorAll(".stand-row-highlight").forEach(el => el.classList.remove("stand-row-highlight"));
+  document.querySelectorAll(".stand-row-pinned").forEach(el => el.classList.remove("stand-row-pinned"));
+
+  // Pin this row to the top
+  const tbody = getStandTableBody();
+  if (tbody && row.parentNode === tbody){
+    tbody.insertBefore(row, tbody.firstElementChild);
+    row.classList.add("stand-row-pinned");
+  }
+
+  // Highlight + scroll to top area
   row.classList.add("stand-row-highlight");
-  row.scrollIntoView({ behavior:"smooth", block:"center" });
-  const inp = row.querySelector("textarea, input");
-  if (inp) inp.focus();
+  row.scrollIntoView({ behavior:"smooth", block:"start" });
+
+  // Focus company field if present
+  const companyField = row.querySelector("textarea");
+  const firstField = row.querySelector("textarea, input, select");
+  (companyField || firstField)?.focus();
 }
 
 async function autoRefreshAdminFromSheet(){
@@ -1107,6 +1124,12 @@ window.addEventListener("load", () => requireAdminAuth());
 document.getElementById("logoutBtn")?.addEventListener("click", () => {
   logoutAdmin();
 });
+
+function getStandTableBody(){
+  const table = document.querySelector("table");
+  if (!table) return null;
+  return (table.tBodies && table.tBodies[0]) ? table.tBodies[0] : table.querySelector("tbody");
+}
 </script>
 </body>
 </html>
