@@ -334,7 +334,7 @@
   const APPS_SCRIPT_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxEq83BUYJ-oewP_2lPFL0tyol4veM2mhukSTTMCaKCZgEJS5m-f8Jqy1EO_bDc3q3a/exec";
   const SVG_FILE = "event_plan.svg";
   
-const ADMIN_PASSWORD = "FLOORPASS1"; // set your password (simple client-side lock)
+const ADMIN_PASSWORD = "CHANGE_ME"; // set your password (simple client-side lock)
 const ADMIN_AUTH_KEY = "stand_admin_authed_v1";
 
 function requireAdminAuth(){
@@ -1192,6 +1192,45 @@ document.getElementById("pinnedClearBtn")?.addEventListener("click", () => clear
 document.getElementById("pinnedGoBtn")?.addEventListener("click", () => { if (pinnedStandId) focusStandRow(pinnedStandId); });
 document.getElementById("pinnedSaveBtn")?.addEventListener("click", () => savePinned());
 document.getElementById("pinnedStatus")?.addEventListener("change", () => savePinned());
+
+function getStandIdFromElement(el){
+  let node = el;
+  for (let i=0; i<10 && node; i++){
+    if (node.getAttribute){
+      const id = (node.getAttribute("id") || "").trim();
+      const dn = (node.getAttribute("data-name") || "").trim();
+      const idOk = /^[A-Z]{1,2}\d+$/.test(id);
+      const dnOk = /^[A-Z]{1,2}\d+$/.test(dn);
+
+      if (dnOk){
+        if (!idOk) return dn;
+        if (dn !== id && dn.length < id.length) return dn;
+        if (typeof data === "object" && data){
+          if (!(id in data) && (dn in data)) return dn;
+        }
+      }
+      if (idOk) return id;
+      if (dnOk) return dn;
+    }
+    node = node.parentNode;
+  }
+  return null;
+}
+
+function attachStandClickDelegation(){
+  const container = document.getElementById("svgContainer") || document.querySelector(".svg-container") || document.querySelector("main") || document.body;
+  if (!container) return;
+
+  if (container.__standClickBound) return;
+  container.__standClickBound = true;
+
+  container.addEventListener("click", (ev) => {
+    const standId = getStandIdFromElement(ev.target);
+    if (!standId) return;
+    try { pinStand(standId); } catch(e){}
+    try { focusStandRow(standId); } catch(e){}
+  });
+}
 </script>
 </body>
 </html>
