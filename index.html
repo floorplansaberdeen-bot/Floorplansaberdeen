@@ -5,19 +5,21 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Exhibition Floorplan</title>
 <style>
-body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#111}
-header{padding:12px 14px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#fff;z-index:10}
-header h1{margin:0;font-size:16px}
-#syncStatus{font-size:13px;color:#555}
-#svgHost{padding:12px}
-.legend{padding:10px 14px 14px;border-top:1px solid #e5e7eb;display:flex;gap:14px;flex-wrap:wrap}
-.chip{display:flex;gap:8px;align-items:center;font-size:13px;color:#333}
-.dot{width:10px;height:10px;border-radius:50%;border:1px solid rgba(0,0,0,.25)}
-.dot.sold{background:#e53935}
-.dot.avail{background:#2e7d32}
-svg{max-width:100%;height:auto;display:block}
-svg text,svg tspan{pointer-events:none;user-select:none;-webkit-user-select:none}
-#tooltip{position:fixed;pointer-events:none;z-index:9999;background:rgba(255,255,255,.96);border:1px solid rgba(0,0,0,.15);box-shadow:0 8px 18px rgba(0,0,0,.15);border-radius:10px;padding:8px 10px;font-size:13px;line-height:1.35;white-space:pre-wrap;display:none;max-width:min(340px,85vw)}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#fff;color:#111;}
+  header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #e5e7eb;}
+  header h1{margin:0;font-size:18px;}
+  #syncStatus{font-size:13px;color:#b91c1c;}
+  .wrap{padding:14px 16px 24px;}
+  .card{border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;background:#fff;}
+  .legend{display:flex;gap:14px;align-items:center;padding:10px 12px;border-top:1px solid #e5e7eb;font-size:13px;}
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px;border:1px solid rgba(0,0,0,.15);}
+  .sold{background:#ef4444;}
+  .avail{background:#22c55e;}
+  #tooltip{position:fixed;z-index:9999;pointer-events:none;display:none;white-space:pre-wrap;
+    background:rgba(17,24,39,.95);color:#fff;border-radius:10px;padding:8px 10px;font-size:13px;
+    box-shadow:0 10px 26px rgba(0,0,0,.25);max-width:min(320px,80vw);}
+  /* Prevent SVG text from capturing hover/click */
+  #svgHost svg text, #svgHost svg tspan { pointer-events:none; user-select:none; }
 </style>
 </head>
 <body>
@@ -25,140 +27,161 @@ svg text,svg tspan{pointer-events:none;user-select:none;-webkit-user-select:none
   <h1>Exhibition Floorplan</h1>
   <div id="syncStatus">Loading…</div>
 </header>
-
-<div id="svgHost"></div>
-<div class="legend">
-  <div class="chip"><span class="dot sold"></span> Sold</div>
-  <div class="chip"><span class="dot avail"></span> Available</div>
+<div class="wrap">
+  <div class="card">
+    <div id="svgHost"></div>
+    <div class="legend">
+      <span><span class="dot sold"></span>Sold</span>
+      <span><span class="dot avail"></span>Available</span>
+    </div>
+  </div>
 </div>
-
 <div id="tooltip"></div>
 
 <script>
 (() => {
   const SHEET_API_URL = 'https://script.google.com/macros/s/AKfycbxEq83BUYJ-oewP_2lPFL0tyol4veM2mhukSTTMCaKCZgEJS5m-f8Jqy1EO_bDc3q3a/exec';
   const SVG_URL = './event_plan.svg';
+  const COLOR_SOLD = '#ef4444';
+  const COLOR_AVAILABLE = '#22c55e';
 
-  const syncStatus = document.getElementById('syncStatus');
   const svgHost = document.getElementById('svgHost');
+  const syncStatus = document.getElementById('syncStatus');
   const tooltip = document.getElementById('tooltip');
 
-  const COLOR_SOLD = '#e53935';
-  const COLOR_AVAILABLE = '#2e7d32';
-  const STAND_TAGS = new Set(['path','rect','polygon','circle','ellipse']);
-
   let svgRoot = null;
-  let byId = new Map();
 
   function setStatus(text, isError=false){
     syncStatus.textContent = text;
-    syncStatus.style.color = isError ? '#b91c1c' : '#555';
+    syncStatus.style.color = isError ? '#b91c1c' : '#374151';
   }
+
   function normalizeStatus(v){
     v = String(v||'').toLowerCase().trim();
     return v === 'sold' ? 'sold' : 'available';
   }
+
   function tooltipText(standId, status, company){
     const s = normalizeStatus(status);
-    const lines = [String(standId||'').trim(), (s==='sold'?'Sold':'Available')];
+    const lines = [String(standId||'').trim(), s==='sold'?'Sold':'Available'];
     if (s==='sold' && company) lines.push(String(company).trim());
     return lines.join('\n');
   }
-  function isStandElement(el){
-    if (!el || !el.id) return false;
-    const tag = (el.tagName||'').toLowerCase();
-    if (!STAND_TAGS.has(tag)) return false;
-    const id = String(el.id).trim();
-    if (!id) return false;
-    if (id.length > 32) return false;
-    if (id.toLowerCase().includes('layer')) return false;
-    return true;
-  }
-  function applyStandStyle(el, status){
-    const s = normalizeStatus(status);
-    el.style.cursor = 'pointer';
-    el.style.fill = (s==='sold') ? COLOR_SOLD : COLOR_AVAILABLE;
-    el.style.fillOpacity = '0.5';
-    el.style.stroke = 'rgba(0,0,0,.5)';
-    el.style.strokeWidth = '1';
-    el.style.strokeOpacity = '0.9';
-  }
-  function attachTooltip(el, standId){
-    el.addEventListener('mousemove', (evt) => {
-      const info = byId.get(standId) || {standId, status:'available', company:''};
-      tooltip.textContent = tooltipText(info.standId, info.status, info.company);
-      tooltip.style.left = (evt.clientX + 12) + 'px';
-      tooltip.style.top  = (evt.clientY + 12) + 'px';
-      tooltip.style.display = 'block';
-    });
-    el.addEventListener('mouseleave', ()=> tooltip.style.display='none');
-  }
-  function applyStandData(data){
-    byId = new Map();
-    (Array.isArray(data)?data:[]).forEach(r=>{
-      if(!r||!r.standId) return;
-      byId.set(String(r.standId).trim(), {
-        standId:String(r.standId).trim(),
-        status:normalizeStatus(r.status),
-        company:String(r.company||'').trim()
-      });
-    });
-    if(!svgRoot) return;
-    Array.from(svgRoot.querySelectorAll('[id]')).filter(isStandElement).forEach(el=>{
-      const id = String(el.id).trim();
-      const info = byId.get(id) || {standId:id, status:'available', company:''};
-      applyStandStyle(el, info.status);
-    });
-  }
 
-  function jsonp(url, timeoutMs=15000){
-    return new Promise((resolve, reject) => {
-      const cbName = 'cb_' + Math.random().toString(36).slice(2);
+  function jsonp(url, timeoutMs=12000){
+    return new Promise((resolve,reject)=>{
+      const cb = 'cb_' + Math.random().toString(36).slice(2);
       const script = document.createElement('script');
+      let done = false;
 
-      const timer = setTimeout(() => cleanup(new Error('JSONP callback not invoked (check Apps Script deployment / doGet)')), timeoutMs);
+      const timer = setTimeout(()=>finish(new Error('JSONP timeout')), timeoutMs);
 
-      function cleanup(err, data){
+      function finish(err, data){
+        if (done) return;
+        done = true;
         clearTimeout(timer);
         script.remove();
-        try{ delete window[cbName]; }catch(e){ window[cbName] = undefined; }
-        if(err) reject(err); else resolve(data);
+        try { delete window[cb]; } catch(e) { window[cb]=undefined; }
+        err ? reject(err) : resolve(data);
       }
 
-      window[cbName] = (data) => cleanup(null, data);
-      script.onerror = () => cleanup(new Error('JSONP network error (blocked/failed to load)'));
+      window[cb] = (data)=>finish(null,data);
 
       const sep = url.includes('?') ? '&' : '?';
-      script.src = url + sep + 'callback=' + cbName + '&_=' + Date.now();
+      script.src = url + sep + 'callback=' + cb + '&_=' + Date.now();
+      script.onerror = () => finish(new Error('JSONP network error (failed to load script)'));
       document.head.appendChild(script);
     });
   }
 
+  function applyPaintToElement(el, status){
+    const s = normalizeStatus(status);
+    const fill = (s==='sold') ? COLOR_SOLD : COLOR_AVAILABLE;
+    // Apply to shapes only
+    const shapes = el.matches('path,rect,polygon,circle,ellipse') ? [el]
+      : Array.from(el.querySelectorAll('path,rect,polygon,circle,ellipse'));
+    shapes.forEach(sh => {
+      sh.style.fill = fill;
+      sh.style.fillOpacity = '0.5';
+      sh.style.stroke = 'rgba(0,0,0,.55)';
+      sh.style.strokeWidth = '1';
+      sh.style.strokeOpacity = '0.9';
+      sh.style.cursor = 'pointer';
+    });
+  }
+
+  function attachTooltipToElement(el, infoGetter){
+    // attach to the element itself (usually <g id="A1"> or a shape)
+    el.addEventListener('mousemove', (evt)=>{
+      const info = infoGetter();
+      tooltip.textContent = tooltipText(info.standId, info.status, info.company);
+      tooltip.style.left = (evt.clientX + 12) + 'px';
+      tooltip.style.top = (evt.clientY + 12) + 'px';
+      tooltip.style.display = 'block';
+    });
+    el.addEventListener('mouseleave', ()=> tooltip.style.display='none');
+  }
+
+  function buildMap(data){
+    const map = new Map();
+    (Array.isArray(data)?data:[]).forEach(r=>{
+      if (!r || !r.standId) return;
+      map.set(String(r.standId).trim(), {
+        standId: String(r.standId).trim(),
+        status: normalizeStatus(r.status),
+        company: String(r.company||'').trim()
+      });
+    });
+    return map;
+  }
+
+  function applyStandData(data){
+    if (!svgRoot) return;
+    const map = buildMap(data);
+
+    // For every stand in sheet, find matching element by id and paint it
+    map.forEach((info, id)=>{
+      const el = svgRoot.querySelector('#' + CSS.escape(id));
+      if (!el) return;
+      applyPaintToElement(el, info.status);
+      // Tooltip should not attach to <text>; if id is on a <text> ignore
+      if (el.matches('text,tspan')) return;
+      attachTooltipToElement(el, ()=>map.get(id) || info);
+    });
+  }
+
   async function loadSvg(){
-    const res = await fetch(SVG_URL, {cache:'no-store'});
-    if(!res.ok) throw new Error('Failed to load SVG: ' + res.status);
+    const res = await fetch(SVG_URL, { cache:'no-store' });
+    if (!res.ok) throw new Error('Failed to load SVG: ' + res.status);
     svgHost.innerHTML = await res.text();
     svgRoot = svgHost.querySelector('svg');
-    if(!svgRoot) throw new Error('SVG root not found');
-    Array.from(svgRoot.querySelectorAll('[id]')).filter(isStandElement).forEach(el=>{
-      attachTooltip(el, String(el.id).trim());
-    });
+    if (!svgRoot) throw new Error('SVG root not found');
   }
 
   async function syncOnce(){
     const data = await jsonp(SHEET_API_URL);
     applyStandData(data);
-    setStatus('Synced: ' + new Date().toLocaleString());
-  }
-  async function loop(){
-    try{ await syncOnce(); }
-    catch(err){ setStatus('Sync error: ' + err.message, true); }
-    finally{ setTimeout(loop, 5000); }
+    setStatus('Synced: ' + new Date().toLocaleString(), false);
   }
 
-  (async () => {
-    try{ await loadSvg(); await loop(); }
-    catch(err){ setStatus('Load error: ' + err.message, true); }
+  async function loop(){
+    try {
+      await syncOnce();
+    } catch(err) {
+      setStatus('Sync error: ' + err.message, true);
+      console.error('JSONP sync failed. Check that SHEET_API_URL is correct and deployment is public.', err);
+    } finally {
+      setTimeout(loop, 5000);
+    }
+  }
+
+  (async()=>{
+    try {
+      await loadSvg();
+      await loop();
+    } catch(err) {
+      setStatus('Load error: ' + err.message, true);
+    }
   })();
 })();
 </script>
