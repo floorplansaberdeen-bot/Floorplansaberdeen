@@ -1,236 +1,361 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Floorplan Admin</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-  body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#111}
-  header{padding:12px 16px;border-bottom:1px solid #ddd;display:flex;justify-content:space-between;align-items:center}
-  #status{font-size:13px;color:#555}
-  #layout{display:grid;grid-template-columns:2fr 1fr;gap:12px;padding:12px}
-  #svgHost{border:1px solid #ddd;min-height:240px}
-  svg text, svg tspan{pointer-events:none;user-select:none}
-  label{font-size:12px;color:#444}
-  input,select,button{width:100%;padding:8px;margin-top:4px;box-sizing:border-box}
-  button{cursor:pointer}
-  #tooltip{position:fixed;display:none;background:rgba(0,0,0,.85);color:#fff;padding:8px 10px;border-radius:6px;font-size:13px;white-space:pre-line;pointer-events:none;z-index:10000}
-  .row{margin-bottom:10px}
+  :root{--border:#d9d9d9;--muted:#666;--row:#fafafa;--row2:#f3f6ff;--sold:#e53935;--avail:#2ecc71;}
+  body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#111;}
+  header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  header .right{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  #status{font-size:13px;color:var(--muted);}
+  .btn{padding:8px 10px;border:1px solid var(--border);background:#f7f7f7;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px;}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+  .btn.green{background:#ecfff3;border-color:#bfe9cf;}
+  .btn.red{background:#fff0f0;border-color:#f1bcbc;}
+  .layout{display:grid;grid-template-columns:2.2fr 1.1fr;gap:12px;padding:12px;}
+  @media (max-width:1000px){.layout{grid-template-columns:1fr;}}
+  .card{border:1px solid var(--border);background:#fff;border-radius:8px;overflow:hidden;}
+  .card h2{margin:0;padding:10px 12px;border-bottom:1px solid var(--border);font-size:14px;color:#333;}
+  #svgHost{min-height:420px;overflow:auto;}
+  #svgHost svg{width:100%;height:auto;display:block;}
+  svg text, svg tspan{pointer-events:none;user-select:none;}
+  .form{padding:12px;display:grid;gap:10px;}
+  label{font-size:12px;color:#444;}
+  input,select{width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .help{font-size:12px;color:var(--muted);line-height:1.35;}
+  .pill{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:#222;border:1px solid var(--border);padding:6px 8px;border-radius:999px;background:#fff;}
+  .dot{width:10px;height:10px;border-radius:50%;}
+  .dot.sold{background:var(--sold);} .dot.avail{background:var(--avail);}
+  #tooltip{position:fixed;display:none;z-index:9999;pointer-events:none;background:rgba(0,0,0,.85);color:#fff;padding:8px 10px;border-radius:8px;font-size:13px;white-space:pre-line;max-width:min(360px,85vw);}
+  .listWrap{padding:10px 12px;display:grid;gap:10px;}
+  .listTop{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  #search{flex:1;min-width:180px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  thead th{text-align:left;padding:8px 8px;background:#f5f5f5;border-top:1px solid var(--border);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:1;}
+  tbody td{padding:7px 8px;border-bottom:1px solid #eee;vertical-align:top;}
+  tbody tr{cursor:pointer;}
+  tbody tr:nth-child(odd){background:var(--row);}
+  tbody tr.selected{background:var(--row2)!important;outline:2px solid #b8c7ff;}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-weight:700;font-size:12px;line-height:1.6;border:1px solid transparent;}
+  .badge.sold{background:#fff0f0;border-color:#f1bcbc;color:#a11414;}
+  .badge.avail{background:#ecfff3;border-color:#bfe9cf;color:#0f6a2f;}
 </style>
 </head>
 <body>
 <header>
   <strong>Floorplan Admin</strong>
-  <div id="status">Loading…</div>
+  <div class="right">
+    <span id="status">Loading…</span>
+    <button class="btn" id="btnToggleSync" title="Pause/resume automatic syncing">Pause sync</button>
+    <button class="btn" id="btnExport">Export CSV</button>
+    <label class="btn" style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;">
+      Import CSV <input id="fileImport" type="file" accept=".csv,text/csv" style="display:none;">
+    </label>
+  </div>
 </header>
 
-<div id="layout">
-  <div id="svgHost"></div>
+<div class="layout">
+  <div class="card">
+    <h2>Plan</h2>
+    <div id="svgHost"></div>
+    <div style="padding:10px 12px;display:flex;gap:10px;flex-wrap:wrap;border-top:1px solid var(--border);">
+      <span class="pill"><span class="dot sold"></span>Sold</span>
+      <span class="pill"><span class="dot avail"></span>Available</span>
+    </div>
+  </div>
 
-  <div>
-    <div class="row">
-      <label>Stand ID</label>
-      <input id="standId" readonly>
+  <div class="card">
+    <h2>Selected Stand</h2>
+    <div class="form">
+      <div><label>Stand ID</label><input id="standId" readonly></div>
+      <div class="row2">
+        <div><label>Status</label>
+          <select id="statusSel"><option value="available">Available</option><option value="sold">Sold</option></select>
+        </div>
+        <div><label>Company (sold only)</label><input id="company" placeholder="Company name…"></div>
+      </div>
+      <div class="row2">
+        <button class="btn green" id="btnSave" disabled>Save</button>
+        <button class="btn red" id="btnClear" disabled>Mark Available</button>
+      </div>
+      <div class="help">Click a stand on the plan or in the list to edit it. Auto-sync won’t overwrite your form while you’re typing.</div>
     </div>
 
-    <div class="row">
-      <label>Status</label>
-      <select id="statusSel">
-        <option value="available">Available</option>
-        <option value="sold">Sold</option>
-      </select>
-    </div>
+    <h2>Stands</h2>
+    <div class="listWrap">
+      <div class="listTop">
+        <input id="search" type="text" placeholder="Search stand or company…">
+        <span class="help" id="count"></span>
+      </div>
 
-    <div class="row">
-      <label>Company</label>
-      <input id="company" placeholder="Company name…">
+      <div style="max-height:420px;overflow:auto;border:1px solid var(--border);border-radius:8px;">
+        <table>
+          <thead><tr><th style="width:90px;">Stand</th><th style="width:110px;">Status</th><th>Company</th></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
     </div>
-
-    <button id="save" disabled>Save</button>
   </div>
 </div>
 
 <div id="tooltip"></div>
 
 <script>
-const API_BASE = 'https://floorplansaberdeen.floorplansaberdeen.workers.dev';
-const SVG_URL  = './event_plan.svg';
-const FILL_OPACITY = 0.75;
+(() => {
+  const API_BASE = 'https://floorplansaberdeen.floorplansaberdeen.workers.dev';
+  const SVG_URL = './event_plan.svg';
+  const FILL_OPACITY = 0.75;
+  const SYNC_INTERVAL_MS = 10000;
+  const SOLD = '#e53935';
+  const AVAIL = '#2ecc71';
 
-const statusEl = document.getElementById('status');
-const svgHost  = document.getElementById('svgHost');
-const tooltip  = document.getElementById('tooltip');
+  const elStatus = document.getElementById('status');
+  const svgHost = document.getElementById('svgHost');
+  const tooltip = document.getElementById('tooltip');
 
-const standIdEl = document.getElementById('standId');
-const statusSel = document.getElementById('statusSel');
-const companyEl = document.getElementById('company');
-const saveBtn   = document.getElementById('save');
+  const standIdEl = document.getElementById('standId');
+  const statusSel = document.getElementById('statusSel');
+  const companyEl = document.getElementById('company');
+  const btnSave = document.getElementById('btnSave');
+  const btnClear = document.getElementById('btnClear');
 
-function setStatus(msg, isError=false){
-  statusEl.textContent = msg;
-  statusEl.style.color = isError ? '#b91c1c' : '#555';
-}
+  const btnToggleSync = document.getElementById('btnToggleSync');
+  const btnExport = document.getElementById('btnExport');
+  const fileImport = document.getElementById('fileImport');
 
-function normalizeStatus(v){
-  return String(v||'').toLowerCase().trim()==='sold' ? 'sold' : 'available';
-}
+  const searchEl = document.getElementById('search');
+  const tbody = document.getElementById('tbody');
+  const countEl = document.getElementById('count');
 
-function tooltipText(d){
-  const status = normalizeStatus(d.status);
-  const lines = [String(d.standId||'').trim(), status==='sold'?'Sold':'Available'];
-  if(status==='sold' && d.company) lines.push(String(d.company).trim());
-  return lines.join('\n');
-}
+  let svgRoot = null;
+  let byId = new Map();
+  let selectedId = '';
+  let autoSyncEnabled = true;
+  let dirty = false;
 
-function isStandId(id){ return /^[A-Za-z]{1,3}\d{1,3}$/.test(id); }
-
-function standTargets(svg){
-  const groups = Array.from(svg.querySelectorAll('g[id]')).filter(g => isStandId(g.id));
-  if(groups.length) return groups;
-  const shapes = Array.from(svg.querySelectorAll('path[id],rect[id],polygon[id],circle[id],ellipse[id]')).filter(el => isStandId(el.id));
-  return shapes;
-}
-
-function paintElementOrGroup(node, status){
-  const fill = status==='sold' ? '#e53935' : '#2ecc71';
-  const targets = (node.matches && node.matches('path,rect,polygon,circle,ellipse'))
-    ? [node]
-    : Array.from(node.querySelectorAll('path,rect,polygon,circle,ellipse'));
-  targets.forEach(el=>{
-    el.style.fill = fill;
-    el.style.fillOpacity = String(FILL_OPACITY);
-    el.style.stroke = '#000';
-    el.style.strokeOpacity = '0.35';
-  });
-}
-
-function attachTooltip(node, dataProvider){
-  node.addEventListener('mousemove', e=>{
-    const d = dataProvider();
-    tooltip.textContent = tooltipText(d);
-    tooltip.style.left = (e.clientX+12)+'px';
-    tooltip.style.top  = (e.clientY+12)+'px';
-    tooltip.style.display='block';
-  });
-  node.addEventListener('mouseleave', ()=> tooltip.style.display='none');
-}
-
-async function loadSvg(){
-  setStatus('Loading plan…');
-  const res = await fetch(SVG_URL, {cache:'no-store'});
-  if(!res.ok){
-    throw new Error('SVG not found at '+SVG_URL+' (HTTP '+res.status+'). Make sure event_plan.svg is in the same folder as admin.html');
+  function setStatus(text, isError=false){ elStatus.textContent = text; elStatus.style.color = isError ? '#b00020' : '#555'; }
+  function normalizeStatus(v){ return String(v||'').toLowerCase().trim()==='sold'?'sold':'available'; }
+  function tooltipText(info){
+    const s = normalizeStatus(info.status);
+    const lines=[info.standId, s==='sold'?'Sold':'Available'];
+    if (s==='sold' && info.company) lines.push(info.company);
+    return lines.join('\n');
   }
-  const text = await res.text();
-  svgHost.innerHTML = text;
-  const svg = svgHost.querySelector('svg');
-  if(!svg) throw new Error('SVG loaded but <svg> root not found.');
-  return svg;
-}
-
-async function fetchStands(){
-  const res = await fetch(API_BASE + '/stands', {cache:'no-store'});
-  if(!res.ok) throw new Error('API /stands failed (HTTP '+res.status+').');
-  return await res.json();
-}
-
-async function saveStand(payload){
-  const res = await fetch(API_BASE + '/stand', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify(payload)
-  });
-  const text = await res.text();
-  let json = null; try{ json = JSON.parse(text);}catch(e){}
-  if(!res.ok || (json && json.success===false)){
-    throw new Error((json && json.error) ? json.error : ('Save failed (HTTP '+res.status+')'));
+  async function fetchJson(url){
+    const res = await fetch(url,{cache:'no-store'});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    return await res.json();
   }
-  return json || {success:true};
-}
-
-let svg = null;
-let dataMap = new Map();
-let selectedId = null;
-
-function applyData(){
-  if(!svg) return;
-  standTargets(svg).forEach(node=>{
-    const id = node.id;
-    const d = dataMap.get(id) || {standId:id,status:'available',company:''};
-    paintElementOrGroup(node, normalizeStatus(d.status));
-  });
-}
-
-async function syncOnce(){
-  const list = await fetchStands();
-  dataMap = new Map((Array.isArray(list)?list:[]).map(d=>[String(d.standId).trim(), {
-    standId:String(d.standId).trim(),
-    status:normalizeStatus(d.status),
-    company:String(d.company||'').trim()
-  }]));
-  applyData();
-  setStatus('Synced: ' + new Date().toLocaleTimeString());
-
-  if(selectedId && dataMap.has(selectedId)){
-    const d = dataMap.get(selectedId);
-    standIdEl.value = d.standId;
-    statusSel.value = d.status;
-    companyEl.value = d.company || '';
+  async function postJson(url,payload){
+    const res = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const text = await res.text();
+    let json=null; try{json=JSON.parse(text);}catch{}
+    if(!res.ok || (json && json.success===false)) throw new Error((json&&json.error)?json.error:(text||('HTTP '+res.status)));
+    return json||{success:true};
   }
-}
-
-function wireInteractions(){
-  if(!svg) return;
-  standTargets(svg).forEach(node=>{
-    const id = node.id;
-
-    attachTooltip(node, ()=> dataMap.get(id) || {standId:id,status:'available',company:''});
-
-    node.style.cursor='pointer';
-    node.addEventListener('click', ()=>{
-      selectedId = id;
-      const d = dataMap.get(id) || {standId:id,status:'available',company:''};
-      standIdEl.value = d.standId;
-      statusSel.value = d.status;
-      companyEl.value = d.company || '';
-      saveBtn.disabled = false;
+  async function loadSvg(){
+    const res = await fetch(SVG_URL,{cache:'no-store'});
+    if(!res.ok) throw new Error('SVG not found at '+SVG_URL+' (HTTP '+res.status+')');
+    svgHost.innerHTML = await res.text();
+    svgRoot = svgHost.querySelector('svg');
+    if(!svgRoot) throw new Error('SVG root <svg> not found');
+    svgRoot.style.userSelect='none';
+  }
+  function getStandNodes(){
+    const groups = Array.from(svgRoot.querySelectorAll('g[id]')).filter(g=>g.id && !g.id.toLowerCase().includes('layer'));
+    const shapes = Array.from(svgRoot.querySelectorAll('path[id],rect[id],polygon[id],circle[id],ellipse[id]'));
+    return groups.length?groups:shapes;
+  }
+  function paintNode(node,status){
+    const s=normalizeStatus(status);
+    const color = s==='sold'?SOLD:AVAIL;
+    const targets = (node.tagName.toLowerCase()==='g') ? node.querySelectorAll('path,rect,polygon,circle,ellipse') : [node];
+    targets.forEach(el=>{
+      el.style.fill=color;
+      el.style.fillOpacity=String(FILL_OPACITY);
+      el.style.stroke='rgba(0,0,0,0.45)';
+      el.style.strokeOpacity='0.6';
+      el.style.cursor='pointer';
     });
-  });
-}
-
-saveBtn.addEventListener('click', async ()=>{
-  if(!selectedId) return;
-
-  const payload = {
-    standId: standIdEl.value.trim(),
-    status: normalizeStatus(statusSel.value),
-    company: normalizeStatus(statusSel.value)==='sold' ? companyEl.value.trim() : ''
-  };
-
-  setStatus('Saving…');
-  saveBtn.disabled = true;
-  try{
-    await saveStand(payload);
-    await syncOnce();
-    setStatus('Saved: ' + new Date().toLocaleTimeString());
-  }catch(err){
-    console.error(err);
-    setStatus('Save error: ' + err.message, true);
-  }finally{
-    saveBtn.disabled = false;
   }
-});
+  function bindNodeEvents(node){
+    const standId=String(node.id||'').trim(); if(!standId) return;
+    const getInfo=()=>byId.get(standId)||{standId, status:'available', company:''};
 
-(async ()=>{
-  try{
-    svg = await loadSvg();
-    wireInteractions();
-    await syncOnce();
-    setInterval(()=> syncOnce().catch(err=>{ console.error(err); setStatus('Sync error: '+err.message, true); }), 5000);
-  }catch(err){
-    console.error(err);
-    setStatus('Load error: '+err.message, true);
+    node.addEventListener('mousemove',e=>{
+      const info=getInfo();
+      tooltip.textContent=tooltipText(info);
+      tooltip.style.left=(e.clientX+12)+'px';
+      tooltip.style.top=(e.clientY+12)+'px';
+      tooltip.style.display='block';
+    });
+    node.addEventListener('mouseleave',()=>tooltip.style.display='none');
+    node.addEventListener('click',()=>selectStand(standId,true));
   }
+  function renderPlan(){
+    getStandNodes().forEach(node=>{
+      const id=String(node.id||'').trim(); if(!id) return;
+      const info=byId.get(id)||{standId:id,status:'available',company:''};
+      paintNode(node,info.status);
+    });
+  }
+  function renderList(){
+    const q=String(searchEl.value||'').toLowerCase().trim();
+    const items=Array.from(byId.values()).sort((a,b)=>a.standId.localeCompare(b.standId,undefined,{numeric:true}));
+    const filtered = q ? items.filter(r=>r.standId.toLowerCase().includes(q) || (r.company||'').toLowerCase().includes(q) || normalizeStatus(r.status).includes(q)) : items;
+
+    tbody.innerHTML='';
+    filtered.forEach(r=>{
+      const tr=document.createElement('tr');
+      if(r.standId===selectedId) tr.classList.add('selected');
+
+      const tdId=document.createElement('td'); tdId.textContent=r.standId;
+      const tdSt=document.createElement('td');
+      const badge=document.createElement('span');
+      const sold = normalizeStatus(r.status)==='sold';
+      badge.className='badge '+(sold?'sold':'avail');
+      badge.textContent=sold?'Sold':'Available';
+      tdSt.appendChild(badge);
+
+      const tdCo=document.createElement('td');
+      tdCo.textContent = sold ? (r.company||'') : '';
+
+      tr.appendChild(tdId); tr.appendChild(tdSt); tr.appendChild(tdCo);
+      tr.addEventListener('click',()=>selectStand(r.standId,false));
+      tbody.appendChild(tr);
+    });
+    countEl.textContent = filtered.length+' / '+items.length;
+  }
+  function selectStand(standId,scrollToRow){
+    const info=byId.get(standId)||{standId,status:'available',company:''};
+    selectedId=standId;
+    dirty=false;
+    standIdEl.value=info.standId;
+    statusSel.value=normalizeStatus(info.status);
+    companyEl.value=info.company||'';
+    btnSave.disabled=false; btnClear.disabled=false;
+    renderList();
+    if(scrollToRow){
+      const row=Array.from(tbody.querySelectorAll('tr')).find(tr=>tr.firstChild && tr.firstChild.textContent===standId);
+      if(row) row.scrollIntoView({block:'center'});
+    }
+  }
+  function setDirty(){ if(selectedId) dirty=true; }
+
+  async function syncOnce(){
+    if(!autoSyncEnabled) return;
+    try{
+      const data=await fetchJson(API_BASE+'/stands?ts='+Date.now());
+      byId=new Map((Array.isArray(data)?data:[]).map(r=>[String(r.standId).trim(), {standId:String(r.standId).trim(), status:normalizeStatus(r.status), company:String(r.company||'').trim()}]));
+      renderPlan();
+      renderList();
+      if(selectedId && !dirty){
+        const info=byId.get(selectedId);
+        if(info){ standIdEl.value=info.standId; statusSel.value=normalizeStatus(info.status); companyEl.value=info.company||''; }
+      }
+      setStatus('Synced: '+new Date().toLocaleTimeString());
+    }catch(e){ setStatus('Sync error: '+e.message,true); console.error(e); }
+  }
+
+  function toCsvRow(values){
+    return values.map(v=>{
+      const s=String(v??'');
+      return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+    }).join(',');
+  }
+  function exportCsv(){
+    const rows=[['standId','status','company']];
+    const items=Array.from(byId.values()).sort((a,b)=>a.standId.localeCompare(b.standId,undefined,{numeric:true}));
+    items.forEach(r=>rows.push([r.standId, normalizeStatus(r.status), r.company||'']));
+    const csv=rows.map(toCsvRow).join('\n');
+    const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='floorplan-stands-'+new Date().toISOString().replace(/[:.]/g,'-')+'.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+  async function parseCsv(text){
+    const rows=[]; let i=0,field='',row=[],inQuotes=false;
+    while(i<text.length){
+      const c=text[i];
+      if(inQuotes){
+        if(c==='"'){ if(text[i+1]==='"'){ field+='"'; i+=2; continue; } inQuotes=false; i++; continue; }
+        field+=c; i++; continue;
+      }else{
+        if(c==='"'){ inQuotes=true; i++; continue; }
+        if(c===','){ row.push(field); field=''; i++; continue; }
+        if(c==='\r'){ i++; continue; }
+        if(c==='\n'){ row.push(field); rows.push(row); row=[]; field=''; i++; continue; }
+        field+=c; i++; continue;
+      }
+    }
+    row.push(field); rows.push(row);
+    return rows.filter(r=>r.some(x=>String(x||'').trim()!=='')); 
+  }
+  async function importCsvFile(file){
+    const text=await file.text();
+    const rows=await parseCsv(text);
+    if(!rows.length) throw new Error('CSV is empty');
+    const header=rows[0].map(h=>String(h||'').trim().toLowerCase());
+    const idxStand=header.indexOf('standid');
+    const idxStatus=header.indexOf('status');
+    const idxCompany=header.indexOf('company');
+    if(idxStand===-1 || idxStatus===-1) throw new Error('CSV must have headers: standId,status,company');
+
+    const prev=autoSyncEnabled;
+    autoSyncEnabled=false; btnToggleSync.textContent='Resume sync';
+    try{
+      for(let r=1;r<rows.length;r++){
+        const rr=rows[r];
+        const standId=String(rr[idxStand]||'').trim(); if(!standId) continue;
+        const status=normalizeStatus(rr[idxStatus]);
+        const company=(status==='sold')?String((idxCompany>=0?rr[idxCompany]:'')||'').trim():'';
+        await postJson(API_BASE+'/stand',{standId,status,company});
+      }
+      await syncOnce();
+      setStatus('Import complete: '+new Date().toLocaleTimeString());
+    }finally{
+      autoSyncEnabled=prev; btnToggleSync.textContent=autoSyncEnabled?'Pause sync':'Resume sync';
+    }
+  }
+
+  async function saveCurrent(statusOverride=null){
+    if(!selectedId) return;
+    const standId=standIdEl.value.trim();
+    const status=normalizeStatus(statusOverride??statusSel.value);
+    const company=(status==='sold')?companyEl.value.trim():'';
+    btnSave.disabled=true; btnClear.disabled=true;
+    try{
+      setStatus('Saving…');
+      await postJson(API_BASE+'/stand',{standId,status,company});
+      dirty=false;
+      await syncOnce();
+      setStatus('Saved: '+new Date().toLocaleTimeString());
+    }catch(e){ setStatus('Save error: '+e.message,true); console.error(e); }
+    finally{ btnSave.disabled=false; btnClear.disabled=false; }
+  }
+
+  statusSel.addEventListener('change',setDirty);
+  companyEl.addEventListener('input',setDirty);
+  btnSave.addEventListener('click',()=>saveCurrent(null));
+  btnClear.addEventListener('click',()=>saveCurrent('available'));
+  btnToggleSync.addEventListener('click',()=>{ autoSyncEnabled=!autoSyncEnabled; btnToggleSync.textContent=autoSyncEnabled?'Pause sync':'Resume sync'; if(autoSyncEnabled) syncOnce(); });
+  btnExport.addEventListener('click',exportCsv);
+  fileImport.addEventListener('change',async e=>{ const f=e.target.files&&e.target.files[0]; if(!f) return; try{ setStatus('Importing…'); await importCsvFile(f);}catch(err){ setStatus('Import error: '+err.message,true); console.error(err);} finally{ fileImport.value=''; }});
+  searchEl.addEventListener('input',renderList);
+
+  (async()=>{
+    try{
+      setStatus('Loading…');
+      await loadSvg();
+      getStandNodes().forEach(bindNodeEvents);
+      await syncOnce();
+      setInterval(syncOnce, SYNC_INTERVAL_MS);
+    }catch(e){ setStatus('Load error: '+e.message,true); console.error(e); }
+  })();
 })();
 </script>
 </body>
