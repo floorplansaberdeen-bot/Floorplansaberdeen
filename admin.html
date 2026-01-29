@@ -32,7 +32,8 @@
   #tooltip{position:fixed;display:none;z-index:9999;pointer-events:none;background:rgba(0,0,0,.85);color:#fff;padding:8px 10px;border-radius:8px;font-size:13px;white-space:pre-line;max-width:min(360px,85vw);}
   .listWrap{padding:10px 12px;display:grid;gap:10px;}
   .listTop{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
-  #search{flex:1;min-width:180px;}
+  #search{flex:1;min-width:160px;}
+  #filterStatus{width:150px;}
   table{width:100%;border-collapse:collapse;font-size:13px;}
   thead th{text-align:left;padding:8px 8px;background:#f5f5f5;border-top:1px solid var(--border);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:1;}
   tbody td{padding:7px 8px;border-bottom:1px solid #eee;vertical-align:top;}
@@ -42,6 +43,15 @@
   .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-weight:700;font-size:12px;line-height:1.6;border:1px solid transparent;}
   .badge.sold{background:#fff0f0;border-color:#f1bcbc;color:#a11414;}
   .badge.avail{background:#ecfff3;border-color:#bfe9cf;color:#0f6a2f;}
+
+  .preview{
+    border:1px solid var(--border); border-radius:10px; padding:10px 12px; background:#fff;
+    display:grid; gap:6px;
+  }
+  .previewTop{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+  .previewId{font-size:18px;font-weight:800;letter-spacing:.2px;}
+  .previewCompany{font-size:13px;color:#222;}
+  .previewHint{font-size:12px;color:var(--muted);}
 </style>
 </head>
 <body>
@@ -70,6 +80,15 @@
   <div class="card">
     <h2>Selected Stand</h2>
     <div class="form">
+      <div class="preview" id="preview">
+        <div class="previewTop">
+          <div class="previewId" id="previewId">None</div>
+          <span class="badge avail" id="previewBadge">Available</span>
+        </div>
+        <div class="previewCompany" id="previewCompany">—</div>
+        <div class="previewHint" id="previewHint">Click a stand to preview & edit.</div>
+      </div>
+
       <div><label>Stand ID</label><input id="standId" readonly></div>
       <div class="row2">
         <div><label>Status</label>
@@ -81,13 +100,18 @@
         <button class="btn green" id="btnSave" disabled>Save</button>
         <button class="btn red" id="btnClear" disabled>Mark Available</button>
       </div>
-      <div class="help">Click a stand on the plan or in the list to edit it. Auto-sync won’t overwrite your form while you’re typing.</div>
+      <div class="help">Auto-sync won’t overwrite your form while you’re typing. Use “Pause sync” if you prefer.</div>
     </div>
 
     <h2>Stands</h2>
     <div class="listWrap">
       <div class="listTop">
         <input id="search" type="text" placeholder="Search stand or company…">
+        <select id="filterStatus">
+          <option value="all">All</option>
+          <option value="available">Available only</option>
+          <option value="sold">Sold only</option>
+        </select>
         <span class="help" id="count"></span>
       </div>
 
@@ -116,6 +140,11 @@
   const svgHost = document.getElementById('svgHost');
   const tooltip = document.getElementById('tooltip');
 
+  const previewId = document.getElementById('previewId');
+  const previewBadge = document.getElementById('previewBadge');
+  const previewCompany = document.getElementById('previewCompany');
+  const previewHint = document.getElementById('previewHint');
+
   const standIdEl = document.getElementById('standId');
   const statusSel = document.getElementById('statusSel');
   const companyEl = document.getElementById('company');
@@ -127,6 +156,7 @@
   const fileImport = document.getElementById('fileImport');
 
   const searchEl = document.getElementById('search');
+  const filterStatusEl = document.getElementById('filterStatus');
   const tbody = document.getElementById('tbody');
   const countEl = document.getElementById('count');
 
@@ -138,12 +168,32 @@
 
   function setStatus(text, isError=false){ elStatus.textContent = text; elStatus.style.color = isError ? '#b00020' : '#555'; }
   function normalizeStatus(v){ return String(v||'').toLowerCase().trim()==='sold'?'sold':'available'; }
+  function isStandId(id){ return /^[A-Za-z]{1,4}\d+$/.test(id); } // A1, AA1, SB10, AD18 etc.
+
   function tooltipText(info){
     const s = normalizeStatus(info.status);
     const lines=[info.standId, s==='sold'?'Sold':'Available'];
     if (s==='sold' && info.company) lines.push(info.company);
     return lines.join('\n');
   }
+
+  function setPreview(info){
+    if(!info){
+      previewId.textContent = 'None';
+      previewBadge.className = 'badge avail';
+      previewBadge.textContent = 'Available';
+      previewCompany.textContent = '—';
+      previewHint.textContent = 'Click a stand to preview & edit.';
+      return;
+    }
+    const s = normalizeStatus(info.status);
+    previewId.textContent = info.standId;
+    previewBadge.className = 'badge ' + (s==='sold'?'sold':'avail');
+    previewBadge.textContent = (s==='sold'?'Sold':'Available');
+    previewCompany.textContent = (s==='sold' ? (info.company||'') : '') || '—';
+    previewHint.textContent = s==='sold' ? 'Sold stand details' : 'Available stand';
+  }
+
   async function fetchJson(url){
     const res = await fetch(url,{cache:'no-store'});
     if(!res.ok) throw new Error('HTTP '+res.status);
@@ -156,6 +206,7 @@
     if(!res.ok || (json && json.success===false)) throw new Error((json&&json.error)?json.error:(text||('HTTP '+res.status)));
     return json||{success:true};
   }
+
   async function loadSvg(){
     const res = await fetch(SVG_URL,{cache:'no-store'});
     if(!res.ok) throw new Error('SVG not found at '+SVG_URL+' (HTTP '+res.status+')');
@@ -164,15 +215,21 @@
     if(!svgRoot) throw new Error('SVG root <svg> not found');
     svgRoot.style.userSelect='none';
   }
+
   function getStandNodes(){
-    const groups = Array.from(svgRoot.querySelectorAll('g[id]')).filter(g=>g.id && !g.id.toLowerCase().includes('layer'));
-    const shapes = Array.from(svgRoot.querySelectorAll('path[id],rect[id],polygon[id],circle[id],ellipse[id]'));
-    return groups.length?groups:shapes;
+    const groups = Array.from(svgRoot.querySelectorAll('g[id]')).filter(g=>isStandId(g.id));
+    const shapes = Array.from(svgRoot.querySelectorAll('path[id],rect[id],polygon[id],circle[id],ellipse[id],polyline[id],line[id]'))
+      .filter(el=>isStandId(el.id));
+    const map = new Map();
+    groups.forEach(g=>map.set(g.id,g));
+    shapes.forEach(s=>{ if(!map.has(s.id)) map.set(s.id,s); });
+    return Array.from(map.values());
   }
+
   function paintNode(node,status){
     const s=normalizeStatus(status);
     const color = s==='sold'?SOLD:AVAIL;
-    const targets = (node.tagName.toLowerCase()==='g') ? node.querySelectorAll('path,rect,polygon,circle,ellipse') : [node];
+    const targets = (node.tagName.toLowerCase()==='g') ? node.querySelectorAll('path,rect,polygon,circle,ellipse,polyline,line') : [node];
     targets.forEach(el=>{
       el.style.fill=color;
       el.style.fillOpacity=String(FILL_OPACITY);
@@ -181,6 +238,7 @@
       el.style.cursor='pointer';
     });
   }
+
   function bindNodeEvents(node){
     const standId=String(node.id||'').trim(); if(!standId) return;
     const getInfo=()=>byId.get(standId)||{standId, status:'available', company:''};
@@ -195,6 +253,7 @@
     node.addEventListener('mouseleave',()=>tooltip.style.display='none');
     node.addEventListener('click',()=>selectStand(standId,true));
   }
+
   function renderPlan(){
     getStandNodes().forEach(node=>{
       const id=String(node.id||'').trim(); if(!id) return;
@@ -202,10 +261,18 @@
       paintNode(node,info.status);
     });
   }
+
   function renderList(){
     const q=String(searchEl.value||'').toLowerCase().trim();
+    const filter = String(filterStatusEl.value||'all');
+
     const items=Array.from(byId.values()).sort((a,b)=>a.standId.localeCompare(b.standId,undefined,{numeric:true}));
-    const filtered = q ? items.filter(r=>r.standId.toLowerCase().includes(q) || (r.company||'').toLowerCase().includes(q) || normalizeStatus(r.status).includes(q)) : items;
+    const filtered = items.filter(r=>{
+      const s = normalizeStatus(r.status);
+      if(filter!=='all' && s!==filter) return false;
+      if(!q) return true;
+      return r.standId.toLowerCase().includes(q) || (r.company||'').toLowerCase().includes(q) || s.includes(q);
+    });
 
     tbody.innerHTML='';
     filtered.forEach(r=>{
@@ -224,40 +291,66 @@
       tdCo.textContent = sold ? (r.company||'') : '';
 
       tr.appendChild(tdId); tr.appendChild(tdSt); tr.appendChild(tdCo);
-      tr.addEventListener('click',()=>selectStand(r.standId,false));
+      tr.addEventListener('click',()=>selectStand(r.standId,true));
       tbody.appendChild(tr);
     });
     countEl.textContent = filtered.length+' / '+items.length;
   }
+
   function selectStand(standId,scrollToRow){
     const info=byId.get(standId)||{standId,status:'available',company:''};
     selectedId=standId;
     dirty=false;
+
+    setPreview(info);
+
     standIdEl.value=info.standId;
     statusSel.value=normalizeStatus(info.status);
     companyEl.value=info.company||'';
+
     btnSave.disabled=false; btnClear.disabled=false;
     renderList();
+
     if(scrollToRow){
       const row=Array.from(tbody.querySelectorAll('tr')).find(tr=>tr.firstChild && tr.firstChild.textContent===standId);
       if(row) row.scrollIntoView({block:'center'});
     }
   }
-  function setDirty(){ if(selectedId) dirty=true; }
+
+  function setDirty(){
+    if(!selectedId) return;
+    dirty=true;
+    // Update preview live as you edit
+    const info = { standId: standIdEl.value.trim(), status: statusSel.value, company: companyEl.value.trim() };
+    setPreview(info);
+  }
 
   async function syncOnce(){
     if(!autoSyncEnabled) return;
     try{
       const data=await fetchJson(API_BASE+'/stands?ts='+Date.now());
-      byId=new Map((Array.isArray(data)?data:[]).map(r=>[String(r.standId).trim(), {standId:String(r.standId).trim(), status:normalizeStatus(r.status), company:String(r.company||'').trim()}]));
+      byId=new Map((Array.isArray(data)?data:[]).map(r=>[
+        String(r.standId).trim(),
+        {standId:String(r.standId).trim(), status:normalizeStatus(r.status), company:String(r.company||'').trim()}
+      ]));
       renderPlan();
       renderList();
+
       if(selectedId && !dirty){
         const info=byId.get(selectedId);
-        if(info){ standIdEl.value=info.standId; statusSel.value=normalizeStatus(info.status); companyEl.value=info.company||''; }
+        if(info){
+          standIdEl.value=info.standId;
+          statusSel.value=normalizeStatus(info.status);
+          companyEl.value=info.company||'';
+          setPreview(info);
+        }
       }
+
       setStatus('Synced: '+new Date().toLocaleTimeString());
-    }catch(e){ setStatus('Sync error: '+e.message,true); console.error(e); }
+    }catch(e){
+      setStatus('Sync error: '+e.message,true);
+      console.error(e);
+    }
   }
 
   function toCsvRow(values){
@@ -315,6 +408,7 @@
         const company=(status==='sold')?String((idxCompany>=0?rr[idxCompany]:'')||'').trim():'';
         await postJson(API_BASE+'/stand',{standId,status,company});
       }
+      dirty=false;
       await syncOnce();
       setStatus('Import complete: '+new Date().toLocaleTimeString());
     }finally{
@@ -334,27 +428,46 @@
       dirty=false;
       await syncOnce();
       setStatus('Saved: '+new Date().toLocaleTimeString());
-    }catch(e){ setStatus('Save error: '+e.message,true); console.error(e); }
-    finally{ btnSave.disabled=false; btnClear.disabled=false; }
+    }catch(e){
+      setStatus('Save error: '+e.message,true);
+      console.error(e);
+    }finally{
+      btnSave.disabled=false; btnClear.disabled=false;
+    }
   }
 
   statusSel.addEventListener('change',setDirty);
   companyEl.addEventListener('input',setDirty);
   btnSave.addEventListener('click',()=>saveCurrent(null));
   btnClear.addEventListener('click',()=>saveCurrent('available'));
-  btnToggleSync.addEventListener('click',()=>{ autoSyncEnabled=!autoSyncEnabled; btnToggleSync.textContent=autoSyncEnabled?'Pause sync':'Resume sync'; if(autoSyncEnabled) syncOnce(); });
+  btnToggleSync.addEventListener('click',()=>{
+    autoSyncEnabled=!autoSyncEnabled;
+    btnToggleSync.textContent=autoSyncEnabled?'Pause sync':'Resume sync';
+    if(autoSyncEnabled) syncOnce();
+  });
   btnExport.addEventListener('click',exportCsv);
-  fileImport.addEventListener('change',async e=>{ const f=e.target.files&&e.target.files[0]; if(!f) return; try{ setStatus('Importing…'); await importCsvFile(f);}catch(err){ setStatus('Import error: '+err.message,true); console.error(err);} finally{ fileImport.value=''; }});
+  fileImport.addEventListener('change',async e=>{
+    const f=e.target.files&&e.target.files[0];
+    if(!f) return;
+    try{ setStatus('Importing…'); await importCsvFile(f); }
+    catch(err){ setStatus('Import error: '+err.message,true); console.error(err); }
+    finally{ fileImport.value=''; }
+  });
   searchEl.addEventListener('input',renderList);
+  filterStatusEl.addEventListener('change',renderList);
 
   (async()=>{
     try{
       setStatus('Loading…');
       await loadSvg();
       getStandNodes().forEach(bindNodeEvents);
+      setPreview(null);
       await syncOnce();
       setInterval(syncOnce, SYNC_INTERVAL_MS);
-    }catch(e){ setStatus('Load error: '+e.message,true); console.error(e); }
+    }catch(e){
+      setStatus('Load error: '+e.message,true);
+      console.error(e);
+    }
   })();
 })();
 </script>
