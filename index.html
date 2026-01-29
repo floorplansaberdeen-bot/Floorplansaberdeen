@@ -54,6 +54,9 @@
       <div style="font-weight:700;">Plan</div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
         <button id="btnClearPins" style="padding:8px 10px;border:1px solid var(--border);background:#fff;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;">Clear pins</button>
+        <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);user-select:none;"><span>Event</span><input id="eventName" type="text" value="Exhibition Floorplan" style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;min-width:220px;"></label>
+<label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);user-select:none;"><input id="chkPinsPdf" type="checkbox" checked style="width:16px;height:16px;">Include pins</label>
+<label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);user-select:none;"><input id="chkSoldListPdf" type="checkbox" style="width:16px;height:16px;">Print sold list</label>
         <button id="btnExportPdf" style="padding:8px 10px;border:1px solid var(--border);background:#f7f7f7;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;">Export PDF</button>
       </div>
     </div>
@@ -96,6 +99,9 @@
   const soldSearchEl = document.getElementById('soldSearch');
   const btnClearPins = document.getElementById('btnClearPins');
   const btnExportPdf = document.getElementById('btnExportPdf');
+  const chkPinsPdf = document.getElementById('chkPinsPdf');
+  const chkSoldListPdf = document.getElementById('chkSoldListPdf');
+  const eventNameEl = document.getElementById('eventName');
 
   let svgRoot = null;
   let byId = new Map(); // standId -> {standId,status,company}
@@ -125,7 +131,36 @@
     return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
 
-  async function fetchJson(url){
+  
+  function splitLines(text, maxChars){
+    const s = String(text || '').trim();
+    if (!s) return [''];
+    const words = s.split(/\s+/);
+    const lines = [];
+    let cur = '';
+    for (const w of words){
+      if (!cur){
+        cur = w;
+      } else if ((cur + ' ' + w).length <= maxChars){
+        cur += ' ' + w;
+      } else {
+        lines.push(cur);
+        cur = w;
+      }
+    }
+    if (cur) lines.push(cur);
+    // hard-break very long single words
+    const out = [];
+    for (const ln of lines){
+      if (ln.length <= maxChars) out.push(ln);
+      else{
+        for (let i=0;i<ln.length;i+=maxChars) out.push(ln.slice(i,i+maxChars));
+      }
+    }
+    return out.slice(0, 3); // keep labels compact
+  }
+
+async function fetchJson(url){
     const res = await fetch(url, { cache:'no-store' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     return await res.json();
@@ -258,14 +293,40 @@
       calloutLayer.appendChild(line);
 
       const g = svgEl('g', {});
-      const text = svgEl('text', {x:labelX,y:labelY,'font-size':18,'font-family':'Arial, Helvetica, sans-serif','font-weight':'700',fill:'#111'});
-      text.textContent = p.info.company;
+      const lines = splitLines(p.info.company, 26);
+      const baseFont = (p.info.company.length > 28) ? 15 : 18;
+
+      const text = svgEl('text', {
+        x: labelX,
+        y: labelY,
+        'font-size': baseFont,
+        'font-family': 'Arial, Helvetica, sans-serif',
+        'font-weight': '700',
+        fill: '#111'
+      });
+
+      // multi-line using tspans
+      lines.forEach((ln, i) => {
+        const t = svgEl('tspan', { x: labelX, dy: i === 0 ? 0 : (baseFont + 4) });
+        t.textContent = ln;
+        text.appendChild(t);
+      });
+
       g.appendChild(text);
       calloutLayer.appendChild(g);
 
       const pad = 14;
       const tb = text.getBBox();
-      const rect = svgEl('rect', {x:tb.x-pad,y:tb.y-pad,width:tb.width+pad*2,height:tb.height+pad*2,rx:10,ry:10,fill:'#fff',stroke:'#111','stroke-width':2});
+      const rect = svgEl('rect', {
+        x: tb.x - pad,
+        y: tb.y - pad,
+        width: tb.width + pad * 2,
+        height: tb.height + pad * 2,
+        rx: 10, ry: 10,
+        fill: '#fff',
+        stroke: '#111',
+        'stroke-width': 2
+      });
       rect.style.opacity = '0.92';
       g.insertBefore(rect, text);
     });
@@ -353,42 +414,119 @@
       getStandNodes().forEach(bindNodeEvents);
 
       soldSearchEl.addEventListener('input', renderSoldList);
+
+      // Persist event name
+      try{
+        const saved = localStorage.getItem('fp_eventName');
+        if (saved && eventNameEl) eventNameEl.value = saved;
+        eventNameEl?.addEventListener('input', () => {
+          localStorage.setItem('fp_eventName', eventNameEl.value || '');
+        });
+      }catch{}
+
       btnClearPins?.addEventListener('click', () => { clearPins(); renderSoldList(); });
+      
+      
       
       btnExportPdf?.addEventListener('click', () => {
         if (!svgRoot) return;
+
+        const includePins = !!(chkPinsPdf && chkPinsPdf.checked);
+        const includeSoldList = !!(chkSoldListPdf && chkSoldListPdf.checked);
+
+        const rawEventName = (eventNameEl && eventNameEl.value) ? eventNameEl.value : 'Exhibition Floorplan';
+        const eventName = String(rawEventName).trim() || 'Exhibition Floorplan';
+
+        const d = new Date();
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth()+1).padStart(2,'0');
+        const dd = String(d.getDate()).padStart(2,'0');
+        const dateStr = `${yyyy}-${mm}-${dd}`;
+        const suggested = `${eventName.replace(/\s+/g,' ').trim()} ${dateStr}`;
+
         const w = window.open('', '_blank');
-        const svgHtml = svgRoot.outerHTML;
+
+        // Clone SVG so we can optionally remove pins for PDF
+        const clone = svgRoot.cloneNode(true);
+        if (!includePins){
+          const pins = clone.querySelector('#callouts');
+          if (pins) pins.remove();
+        }
+
+        // Make sure SVG scales well in print (vector = high-res)
+        clone.removeAttribute('width');
+        clone.removeAttribute('height');
+        clone.setAttribute('preserveAspectRatio','xMidYMid meet');
+        clone.style.width = '100%';
+        clone.style.height = 'auto';
+
+        const svgHtml = clone.outerHTML;
+
+        // Build sold list HTML (optional)
+        let soldHtml = '';
+        if (includeSoldList){
+          const sold = Array.from(byId.values())
+            .filter(r => normalizeStatus(r.status)==='sold' && r.company)
+            .sort((a,b)=>a.company.localeCompare(b.company));
+
+          if (sold.length){
+            const rows = sold.map(r => `<div class="sRow"><div class="sName">${escapeHtml(r.company)}</div><div class="sStand">Stand ${escapeHtml(r.standId)}</div></div>`).join('');
+            soldHtml = `<div class="soldBox">
+              <div class="soldTitle">Sold exhibitors</div>
+              ${rows}
+            </div>`;
+          }
+        }
+
         w.document.write(`<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
-<title>Floorplan PDF</title>
+<title>${suggested}</title>
 <style>
-  body{margin:0;font-family:Arial,Helvetica,sans-serif;}
-  .top{padding:12px;border-bottom:1px solid #ccc;display:flex;justify-content:space-between;align-items:center;}
-  button{padding:10px 14px;font-size:14px;font-weight:700;border-radius:8px;border:1px solid #ccc;cursor:pointer;}
-  .wrap{padding:10px;}
-  svg{width:100%;height:auto;}
+  body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#111;}
+  .top{padding:12px;border-bottom:1px solid #ccc;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
+  button{padding:10px 14px;font-size:14px;font-weight:800;border-radius:10px;border:1px solid #ccc;cursor:pointer;background:#f7f7f7;}
+  .meta{font-size:13px;color:#444;}
+  .wrap{padding:12px;}
+  .frame{max-width:1400px;margin:0 auto;display:grid;grid-template-columns: 1fr;gap:12px;}
+  svg{width:100%;height:auto;display:block;}
+
+  .soldBox{border:1px solid #ddd;border-radius:10px;padding:10px 12px;}
+  .soldTitle{font-weight:900;margin-bottom:8px;}
+  .sRow{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid #eee;}
+  .sRow:last-child{border-bottom:none;}
+  .sName{font-weight:700;font-size:12px;}
+  .sStand{font-size:12px;color:#444;white-space:nowrap;}
+
+  @page{ size: A4 landscape; margin: 10mm; }
   @media print{
     .top{display:none;}
-    body{margin:0;}
+    .wrap{padding:0;}
+    .frame{max-width:none;}
   }
 </style>
 </head>
 <body>
   <div class="top">
-    <strong>Export floorplan</strong>
+    <div>
+      <div style="font-weight:900;">Export floorplan</div>
+      <div class="meta">Suggested filename: <strong>${suggested}.pdf</strong></div>
+      <div class="meta">Pins in PDF: <strong>${includePins ? 'Included' : 'Excluded'}</strong> • Sold list: <strong>${includeSoldList ? 'Included' : 'Excluded'}</strong></div>
+    </div>
     <button onclick="window.print()">Save as PDF</button>
   </div>
-  <div class="wrap">${svgHtml}</div>
+  <div class="wrap">
+    <div class="frame">
+      ${svgHtml}
+      ${soldHtml}
+    </div>
+  </div>
 </body>
 </html>`);
         w.document.close();
       });
-    
-
-      await syncOnce();
+await syncOnce();
       setInterval(syncOnce, SYNC_INTERVAL_MS);
     }catch(e){
       setStatus('Load error: ' + e.message, true);
