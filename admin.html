@@ -75,6 +75,12 @@
       <span class="pill"><span class="dot sold"></span>Sold</span>
       <span class="pill"><span class="dot avail"></span>Available</span>
     </div>
+
+    <div style="border-top:1px solid var(--border);padding:10px 12px;">
+      <div style="font-weight:700;font-size:13px;margin-bottom:8px;">Zoom</div>
+      <div id="zoomHost" style="border:1px solid var(--border);border-radius:8px;overflow:hidden;height:240px;background:#fff;"></div>
+      <div class="help" style="margin-top:6px;">Select a stand to zoom in.</div>
+    </div>
   </div>
 
   <div class="card">
@@ -140,6 +146,8 @@
   const svgHost = document.getElementById('svgHost');
   const tooltip = document.getElementById('tooltip');
 
+  const zoomHost = document.getElementById('zoomHost');
+
   const previewId = document.getElementById('previewId');
   const previewBadge = document.getElementById('previewBadge');
   const previewCompany = document.getElementById('previewCompany');
@@ -161,6 +169,7 @@
   const countEl = document.getElementById('count');
 
   let svgRoot = null;
+  let zoomSvgRoot = null;
   let byId = new Map();
   let selectedId = '';
   let autoSyncEnabled = true;
@@ -315,6 +324,54 @@
       const row=Array.from(tbody.querySelectorAll('tr')).find(tr=>tr.firstChild && tr.firstChild.textContent===standId);
       if(row) row.scrollIntoView({block:'center'});
     }
+  }
+
+  function initZoomSvg(){
+    if (!zoomHost || !svgRoot) return;
+    zoomHost.innerHTML = '';
+    zoomSvgRoot = svgRoot.cloneNode(true);
+    // make zoom SVG non-interactive
+    zoomSvgRoot.querySelectorAll('*').forEach(el => { el.style.pointerEvents = 'none'; });
+    zoomSvgRoot.style.width = '100%';
+    zoomSvgRoot.style.height = '100%';
+    zoomSvgRoot.setAttribute('preserveAspectRatio','xMidYMid meet');
+    zoomHost.appendChild(zoomSvgRoot);
+  }
+
+  function updateZoom(standId){
+    if (!zoomSvgRoot || !svgRoot || !standId) return;
+
+    const srcNode = svgRoot.querySelector(`#${CSS.escape(standId)}`);
+    const zoomNode = zoomSvgRoot.querySelector(`#${CSS.escape(standId)}`);
+    if (!srcNode || !zoomNode) return;
+
+    let bb;
+    try { bb = srcNode.getBBox(); } catch { return; }
+
+    const pad = Math.max(20, Math.max(bb.width, bb.height) * 0.6);
+    const x = bb.x - pad;
+    const y = bb.y - pad;
+    const w = bb.width + pad*2;
+    const h = bb.height + pad*2;
+
+    zoomSvgRoot.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
+
+    // add a subtle outline highlight in zoom
+    zoomSvgRoot.querySelectorAll('.__zoomHighlight').forEach(n=>n.remove());
+    const ns = 'http://www.w3.org/2000/svg';
+    const hi = document.createElementNS(ns,'rect');
+    hi.setAttribute('class','__zoomHighlight');
+    hi.setAttribute('x', bb.x - 2);
+    hi.setAttribute('y', bb.y - 2);
+    hi.setAttribute('width', bb.width + 4);
+    hi.setAttribute('height', bb.height + 4);
+    hi.setAttribute('fill','none');
+    hi.setAttribute('stroke','#111');
+    hi.setAttribute('stroke-width','3');
+    hi.setAttribute('rx','6');
+    hi.setAttribute('ry','6');
+    hi.style.opacity = '0.8';
+    zoomSvgRoot.appendChild(hi);
   }
 
   function setDirty(){

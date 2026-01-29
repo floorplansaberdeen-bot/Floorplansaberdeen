@@ -17,7 +17,17 @@
   .pill{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border);padding:6px 8px;border-radius:999px;background:#fff;}
   .dot{width:10px;height:10px;border-radius:50%;}
   .dot.sold{background:var(--sold);} .dot.avail{background:var(--avail);}
-  #tooltip{position:fixed;display:none;z-index:9999;pointer-events:none;background:rgba(0,0,0,.85);color:#fff;padding:8px 10px;border-radius:8px;font-size:13px;white-space:pre-line;max-width:min(360px,85vw);}
+  #tooltip{position:fixed;display:none;z-index:9999;pointer-events:none;background:rgba(0,0,0,.85);color:#fff;padding:8px 10px;border-radius:8px;font-size:13px;white-space:pre-line;max-width:min(360px,85vw);} 
+.soldSection{margin-top:14px;border:1px solid var(--border);border-radius:8px;padding:10px 12px;background:#fff;}
+.soldHeader{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px;}
+#soldSearch{flex:1;min-width:200px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:14px;}
+.soldList{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px;}
+.soldItem{display:flex;gap:8px;align-items:center;border:1px solid #eee;border-radius:8px;padding:8px 10px;background:#fafafa;cursor:pointer;}
+.soldItem:hover{background:#f0f3ff;border-color:#d7ddff;}
+.soldItem.active{background:#eaf0ff;border-color:#b8c7ff;}
+.soldName{font-weight:700;font-size:13px;line-height:1.2;}
+.soldMeta{font-size:12px;color:var(--muted);}
+.soldHint{margin-top:8px;font-size:12px;color:var(--muted);}
 </style>
 </head>
 <body>
@@ -32,6 +42,16 @@
     <span class="pill"><span class="dot sold"></span>Sold</span>
     <span class="pill"><span class="dot avail"></span>Available</span>
   </div>
+
+  <div class="soldSection">
+    <div class="soldHeader">
+      <strong>Sold exhibitors</strong>
+      <input id="soldSearch" type="text" placeholder="Search company…" />
+    </div>
+    <div class="soldList" id="soldList"></div>
+    <div class="soldHint">Click a company to highlight its stand with a label and pointer line.</div>
+  </div>
+
 </div>
 
 <div id="tooltip"></div>
@@ -49,9 +69,13 @@
   const elStatus = document.getElementById('status');
   const svgHost = document.getElementById('svgHost');
   const tooltip = document.getElementById('tooltip');
+  const soldListEl = document.getElementById('soldList');
+  const soldSearchEl = document.getElementById('soldSearch');
 
   let svgRoot = null;
   let byId = new Map();
+  let calloutLayer = null;
+  let activeCalloutStand = '';
 
   function setStatus(text, isError=false){
     elStatus.textContent = text;
@@ -65,7 +89,149 @@
     const lines=[info.standId, s==='sold'?'Sold':'Available'];
     if (s==='sold' && info.company) lines.push(info.company);
     return lines.join('\n');
+  
+  function svgEl(tag, attrs={}){
+    const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (const [k,v] of Object.entries(attrs)) el.setAttribute(k, String(v));
+    return el;
   }
+
+  function ensureCalloutLayer(){
+    if (!svgRoot) return;
+    if (!calloutLayer){
+      calloutLayer = svgEl('g', { id:'callouts' });
+      svgRoot.appendChild(calloutLayer);
+    }
+  }
+
+  function clearCallout(){
+    activeCalloutStand = '';
+    if (calloutLayer) calloutLayer.innerHTML = '';
+    // clear active highlight in list
+    if (soldListEl){
+      soldListEl.querySelectorAll('.soldItem.active').forEach(x=>x.classList.remove('active'));
+    }
+  }
+
+  function showCalloutFor(standId){
+    ensureCalloutLayer();
+    if (!calloutLayer) return;
+
+    const info = byId.get(standId);
+    if (!info) return;
+
+    // Only meaningful for sold stands with a company name
+    if (normalizeStatus(info.status) !== 'sold' || !info.company){
+      clearCallout();
+      return;
+    }
+
+    const node = svgRoot.querySelector(`#${CSS.escape(standId)}`);
+    if (!node) return;
+
+    let bbox;
+    try { bbox = node.getBBox(); } catch { return; }
+    const cx = bbox.x + bbox.width/2;
+    const cy = bbox.y + bbox.height/2;
+
+    // get overall bounds for safe label placement
+    let vb = svgRoot.viewBox && svgRoot.viewBox.baseVal ? svgRoot.viewBox.baseVal : null;
+    let bounds = vb && vb.width ? {x:vb.x,y:vb.y,w:vb.width,h:vb.height} : null;
+    if (!bounds){
+      try{
+        const b = svgRoot.getBBox();
+        bounds = {x:b.x,y:b.y,w:b.width,h:b.height};
+      }catch{
+        bounds = {x:0,y:0,w:1000,h:1000};
+      }
+    }
+
+    // choose label position (right by default, else left)
+    const pad = 18;
+    const labelXRight = bbox.x + bbox.width + 40;
+    const labelXLeft  = bbox.x - 240;
+    const labelY = Math.max(bounds.y + 20, Math.min(cy, bounds.y + bounds.h - 20));
+
+    const labelX = (labelXRight + 220 <= bounds.x + bounds.w) ? labelXRight : Math.max(bounds.x + 20, labelXLeft);
+
+    calloutLayer.innerHTML = '';
+
+    // pointer line
+    const line = svgEl('line', { x1:cx, y1:cy, x2:labelX, y2:labelY, stroke:'#111', 'stroke-width':2, 'stroke-linecap':'round' });
+    line.style.opacity = '0.85';
+
+    // label group
+    const g = svgEl('g', {});
+    const text = svgEl('text', { x:labelX, y:labelY, 'font-size':18, 'font-family':'Arial, Helvetica, sans-serif', 'font-weight':'700', fill:'#111' });
+    text.textContent = info.company;
+
+    // Add first so we can measure
+    g.appendChild(text);
+    calloutLayer.appendChild(line);
+    calloutLayer.appendChild(g);
+
+    const tb = text.getBBox();
+    const rect = svgEl('rect', {
+      x: tb.x - pad,
+      y: tb.y - pad,
+      width: tb.width + pad*2,
+      height: tb.height + pad*2,
+      rx: 10, ry: 10,
+      fill: '#ffffff',
+      stroke: '#111',
+      'stroke-width': 2
+    });
+    rect.style.opacity = '0.92';
+
+    // Put rect behind text
+    g.insertBefore(rect, text);
+
+    activeCalloutStand = standId;
+
+    // mark active in list
+    if (soldListEl){
+      soldListEl.querySelectorAll('.soldItem').forEach(it=>{
+        it.classList.toggle('active', it.dataset.standId === standId);
+      });
+    }
+  }
+
+  function renderSoldList(){
+    if (!soldListEl) return;
+
+    const q = String(soldSearchEl?.value || '').toLowerCase().trim();
+    const sold = Array.from(byId.values())
+      .filter(r => normalizeStatus(r.status)==='sold' && r.company)
+      .sort((a,b)=>a.company.localeCompare(b.company));
+
+    const filtered = q ? sold.filter(r => r.company.toLowerCase().includes(q) || r.standId.toLowerCase().includes(q)) : sold;
+
+    soldListEl.innerHTML = '';
+    if (!filtered.length){
+      soldListEl.innerHTML = '<div style="color:#666;font-size:13px;padding:6px 2px;">No sold companies yet.</div>';
+      return;
+    }
+
+    filtered.forEach(r=>{
+      const item = document.createElement('div');
+      item.className = 'soldItem' + (r.standId===activeCalloutStand ? ' active' : '');
+      item.dataset.standId = r.standId;
+      item.innerHTML = `<div>
+          <div class="soldName">${escapeHtml(r.company)}</div>
+          <div class="soldMeta">Stand ${escapeHtml(r.standId)}</div>
+        </div>`;
+      item.addEventListener('click', ()=>{
+        if (activeCalloutStand === r.standId) clearCallout();
+        else showCalloutFor(r.standId);
+      });
+      soldListEl.appendChild(item);
+    });
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+}
 
   async function fetchJson(url){
     const res = await fetch(url,{cache:'no-store'});
@@ -139,6 +305,9 @@
         {standId:String(r.standId).trim(), status:normalizeStatus(r.status), company:String(r.company||'').trim()}
       ]));
       renderPlan();
+      renderSoldList();
+      // re-render callout if active (e.g. company/status changed)
+      if (activeCalloutStand) showCalloutFor(activeCalloutStand);
       setStatus('Synced: '+new Date().toLocaleTimeString());
     }catch(e){
       setStatus('Sync error: '+e.message, true);
@@ -150,6 +319,8 @@
     try{
       setStatus('Loading…');
       await loadSvg();
+      ensureCalloutLayer();
+      if (soldSearchEl) soldSearchEl.addEventListener('input', renderSoldList);
       getStandNodes().forEach(bindNodeEvents);
       await syncOnce();
       setInterval(syncOnce, SYNC_INTERVAL_MS);
