@@ -32,6 +32,14 @@
   .soldItem.active{background:#eaf0ff;outline:2px solid #b8c7ff;outline-offset:-2px;}
   .soldName{font-weight:700;font-size:13px;line-height:1.2;}
   .soldMeta{font-size:12px;color:var(--muted);white-space:nowrap;}
+
+@media print{
+  header, .soldSection{display:none !important;}
+  .wrap{padding:0;}
+  .card{border:none;border-radius:0;}
+  .legend{border-top:none;}
+  #svgHost{min-height:auto;}
+}
 </style>
 </head>
 <body>
@@ -44,7 +52,10 @@
   <div class="card">
     <div class="cardHead">
       <div style="font-weight:700;">Plan</div>
-      <div style="font-size:13px;color:var(--muted);">Click a sold company below to locate it</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+        <button id="btnClearPins" style="padding:8px 10px;border:1px solid var(--border);background:#fff;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;">Clear pins</button>
+        <button id="btnExportPdf" style="padding:8px 10px;border:1px solid var(--border);background:#f7f7f7;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;">Export PDF</button>
+      </div>
     </div>
 
     <div id="svgHost"></div>
@@ -83,11 +94,13 @@
   const tooltip = document.getElementById('tooltip');
   const soldListEl = document.getElementById('soldList');
   const soldSearchEl = document.getElementById('soldSearch');
+  const btnClearPins = document.getElementById('btnClearPins');
+  const btnExportPdf = document.getElementById('btnExportPdf');
 
   let svgRoot = null;
   let byId = new Map(); // standId -> {standId,status,company}
   let calloutLayer = null;
-  let activeCalloutStand = '';
+  let pinned = new Set();
 
   // Stand IDs look like: A1, AA1, AB2, AD10, SB20, C6 etc.
   const STAND_ID_RE = /^([A-Z]{1,3})(\d{1,3})$/;
@@ -171,34 +184,42 @@
     }
   }
 
-  function clearCallout(){
-    activeCalloutStand = '';
+  function clearPins(){
+    pinned.clear();
     if (calloutLayer) calloutLayer.innerHTML = '';
     soldListEl?.querySelectorAll('.soldItem.active').forEach(x=>x.classList.remove('active'));
   }
 
-  function showCalloutFor(standId){
+  function togglePin(standId){
+    if (pinned.has(standId)) pinned.delete(standId);
+    else pinned.add(standId);
+    renderPins();
+    renderSoldList();
+  }
+
+  function renderPins(){
     ensureCalloutLayer();
-    const info = byId.get(standId);
-    if (!info || normalizeStatus(info.status) !== 'sold' || !info.company){
-      clearCallout();
+    if (!calloutLayer) return;
+    calloutLayer.innerHTML = '';
+    if (!pinned.size) return;
+
+    // Build list of pin infos (sold with company only)
+    const pins = Array.from(pinned)
+      .map(id => byId.get(id))
+      .filter(info => info && normalizeStatus(info.status)==='sold' && info.company);
+
+    if (!pins.length){
+      pinned.clear();
       return;
     }
 
-    const node = svgRoot.querySelector('#' + CSS.escape(standId));
-    if (!node) return;
-
-    let bbox;
-    try { bbox = node.getBBox(); } catch { return; }
-    const cx = bbox.x + bbox.width/2;
-    const cy = bbox.y + bbox.height/2;
-
-    // determine usable bounds
+    // Create callouts; try to keep labels readable by stacking them in a column at the side.
+    // Column selection: right side if there is space, else left.
     let bounds;
-    try {
+    try{
       const vb = svgRoot.viewBox && svgRoot.viewBox.baseVal ? svgRoot.viewBox.baseVal : null;
       if (vb && vb.width) bounds = {x:vb.x,y:vb.y,w:vb.width,h:vb.height};
-    } catch {}
+    }catch{}
     if (!bounds){
       try{
         const b = svgRoot.getBBox();
@@ -208,40 +229,47 @@
       }
     }
 
-    // Choose a label position with fallback
     const labelWGuess = 260;
-    const rightX = bbox.x + bbox.width + 40;
-    const leftX = bbox.x - (labelWGuess + 40);
-    const labelX = (rightX + labelWGuess <= bounds.x + bounds.w) ? rightX : Math.max(bounds.x + 20, leftX);
-    const labelY = Math.max(bounds.y + 24, Math.min(cy, bounds.y + bounds.h - 24));
+    const rightColX = bounds.x + bounds.w - (labelWGuess + 30);
+    const leftColX  = bounds.x + 30;
+    const useRight = true;
 
-    calloutLayer.innerHTML = '';
+    // Sort pins by stand position (top-to-bottom) for nicer stacking
+    const pinsWithBox = [];
+    for (const info of pins){
+      const node = svgRoot.querySelector('#' + CSS.escape(info.standId));
+      if (!node) continue;
+      try{
+        const bb = node.getBBox();
+        pinsWithBox.push({info, bb, cx: bb.x + bb.width/2, cy: bb.y + bb.height/2});
+      }catch{}
+    }
+    pinsWithBox.sort((a,b)=>a.cy-b.cy);
 
-    const line = svgEl('line', {x1:cx,y1:cy,x2:labelX,y2:labelY,stroke:'#111','stroke-width':2,'stroke-linecap':'round'});
-    line.style.opacity = '0.85';
+    const startY = bounds.y + 40;
+    const stepY = 44;
 
-    const g = svgEl('g', {});
-    const text = svgEl('text', {x:labelX,y:labelY,'font-size':18,'font-family':'Arial, Helvetica, sans-serif','font-weight':'700',fill:'#111'});
-    text.textContent = info.company;
+    pinsWithBox.forEach((p, idx) => {
+      const labelX = useRight ? rightColX : leftColX;
+      const labelY = Math.max(bounds.y + 30, Math.min(startY + idx*stepY, bounds.y + bounds.h - 30));
 
-    g.appendChild(text);
-    calloutLayer.appendChild(line);
-    calloutLayer.appendChild(g);
+      const line = svgEl('line', {x1:p.cx,y1:p.cy,x2:labelX,y2:labelY,stroke:'#111','stroke-width':2,'stroke-linecap':'round'});
+      line.style.opacity = '0.85';
+      calloutLayer.appendChild(line);
 
-    const pad = 14;
-    const tb = text.getBBox();
-    const rect = svgEl('rect', {x:tb.x-pad,y:tb.y-pad,width:tb.width+pad*2,height:tb.height+pad*2,rx:10,ry:10,fill:'#fff',stroke:'#111','stroke-width':2});
-    rect.style.opacity = '0.92';
-    g.insertBefore(rect, text);
+      const g = svgEl('g', {});
+      const text = svgEl('text', {x:labelX,y:labelY,'font-size':18,'font-family':'Arial, Helvetica, sans-serif','font-weight':'700',fill:'#111'});
+      text.textContent = p.info.company;
+      g.appendChild(text);
+      calloutLayer.appendChild(g);
 
-    activeCalloutStand = standId;
-
-    // highlight active item
-    soldListEl?.querySelectorAll('.soldItem').forEach(it=>{
-      it.classList.toggle('active', it.dataset.standId === standId);
+      const pad = 14;
+      const tb = text.getBBox();
+      const rect = svgEl('rect', {x:tb.x-pad,y:tb.y-pad,width:tb.width+pad*2,height:tb.height+pad*2,rx:10,ry:10,fill:'#fff',stroke:'#111','stroke-width':2});
+      rect.style.opacity = '0.92';
+      g.insertBefore(rect, text);
     });
   }
-
   function bindNodeEvents(node){
     const standId = String(node.id||'').trim();
     if (!standId) return;
@@ -258,10 +286,7 @@
     node.addEventListener('click', () => {
       const info = byId.get(standId);
       if (info && normalizeStatus(info.status)==='sold' && info.company){
-        if (activeCalloutStand === standId) clearCallout();
-        else showCalloutFor(standId);
-      } else {
-        clearCallout();
+        togglePin(standId);
       }
     });
   }
@@ -285,12 +310,11 @@
     soldListEl.innerHTML = '';
     filtered.forEach(r => {
       const div = document.createElement('div');
-      div.className = 'soldItem' + (r.standId===activeCalloutStand ? ' active' : '');
+      div.className = 'soldItem' + (pinned.has(r.standId) ? ' active' : '');
       div.dataset.standId = r.standId;
       div.innerHTML = `<div class="soldName">${escapeHtml(r.company)}</div><div class="soldMeta">Stand ${escapeHtml(r.standId)}</div>`;
       div.addEventListener('click', () => {
-        if (activeCalloutStand === r.standId) clearCallout();
-        else showCalloutFor(r.standId);
+        togglePin(r.standId);
       });
       soldListEl.appendChild(div);
     });
@@ -312,10 +336,7 @@
       renderPlan();
       renderSoldList();
 
-      if (activeCalloutStand){
-        // keep callout updated (e.g. company changed)
-        showCalloutFor(activeCalloutStand);
-      }
+      renderPins();
 
       setStatus('Synced: ' + new Date().toLocaleTimeString());
     }catch(e){
@@ -332,6 +353,8 @@
       getStandNodes().forEach(bindNodeEvents);
 
       soldSearchEl.addEventListener('input', renderSoldList);
+      btnClearPins?.addEventListener('click', () => { clearPins(); renderSoldList(); });
+      btnExportPdf?.addEventListener('click', () => { window.print(); });
 
       await syncOnce();
       setInterval(syncOnce, SYNC_INTERVAL_MS);
