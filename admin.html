@@ -2,1014 +2,493 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Exhibition Floorplan – Admin</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Floorplan Admin</title>
   <style>
-    :root {
-      --sold: #e53935;
-      --avail: #43a047;
-      --ink: #111827;
-      --muted: #6b7280;
-      --bg: #ffffff;
-      --panel: #f9fafb;
-      --border: #e5e7eb;
-      --focus: #2563eb;
-      --shadow: 0 10px 30px rgba(0,0,0,0.08);
+    :root { --bg:#0b0f16; --card:#111827; --text:#e5e7eb; --muted:#9ca3af; --ok:#16a34a; --warn:#f59e0b; --bad:#ef4444; }
+    body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif; background:var(--bg); color:var(--text); }
+    header { padding:14px 16px; display:flex; gap:12px; align-items:center; justify-content:space-between; background:rgba(17,24,39,.8); position:sticky; top:0; backdrop-filter: blur(10px); z-index:10; }
+    header h1 { margin:0; font-size:16px; font-weight:600; letter-spacing:.2px; }
+    .status { font-size:13px; color:var(--muted); }
+    .wrap { padding:14px 16px 24px; display:grid; gap:14px; grid-template-columns: 1.25fr .75fr; }
+    @media (max-width: 980px) { .wrap { grid-template-columns: 1fr; } }
+    .card { background:rgba(17,24,39,.85); border:1px solid rgba(255,255,255,.08); border-radius:14px; overflow:hidden; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+    .card h2 { margin:0; padding:12px 12px 0; font-size:14px; color:var(--muted); font-weight:600; letter-spacing:.2px;}
+    #svgHost { width:100%; height:auto; }
+    .panel { padding:12px; display:grid; gap:10px; }
+    label { font-size:12px; color:var(--muted); }
+    input[type="text"], select {
+      width:100%;
+      padding:10px 10px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(2,6,23,.5);
+      color:var(--text);
+      outline:none;
     }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-      color: var(--ink);
-      background: var(--bg);
+    .row { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+    .btnrow { display:flex; gap:10px; flex-wrap:wrap; }
+    button {
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.06);
+      color:var(--text);
+      padding:10px 12px;
+      border-radius:12px;
+      cursor:pointer;
+      font-weight:600;
+      font-size:13px;
     }
-    header {
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      padding: 12px 16px;
-      border-bottom: 1px solid var(--border);
-      background: var(--panel);
-    }
-    .topbar {
-      display:flex;
-      align-items:center;
-      justify-content: space-between;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-    h1 {
-      font-size: 16px;
-      margin: 0;
-      font-weight: 700;
-      letter-spacing: 0.01em;
-    }
-    .links {
-      display:flex;
-      gap: 10px;
-      align-items:center;
-      flex-wrap: wrap;
-      font-size: 12px;
-      color: var(--muted);
-    }
-    .links a {
-      color: var(--muted);
-      text-decoration: none;
-      border-bottom: 1px dotted rgba(0,0,0,0.25);
-    }
-    .links a:hover { border-bottom-style: solid; }
-    .logout {
-      margin-left: 10px;
-      color: var(--muted);
-      background: none;
-      border: none;
-      text-decoration: underline;
-      cursor: pointer;
-      padding: 0;
-      font-size: 12px;
-    }
-    .legend {
-      display:flex;
-      align-items:center;
-      gap: 10px;
-      font-size: 13px;
-      color: var(--muted);
-      flex-wrap: wrap;
-      padding-top: 8px;
-    }
-    .swatch {
-      width: 10px; height: 10px; border-radius: 2px; display:inline-block; margin-right: 6px;
-      border: 1px solid rgba(0,0,0,0.08);
-    }
-    .wrap {
-      padding: 10px 10px 18px;
-      max-width: 1600px;
-      margin: 0 auto;
-      display: grid;
-      grid-template-columns: 1.2fr 1fr;
-      gap: 12px;
-    }
-    @media (max-width: 980px) {
-      .wrap { grid-template-columns: 1fr; }
-    }
+    button.primary { background: rgba(34,197,94,.18); border-color: rgba(34,197,94,.35); }
+    button.danger  { background: rgba(239,68,68,.16); border-color: rgba(239,68,68,.35); }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    .help { font-size:12px; color:var(--muted); line-height:1.35; }
+    .legend { display:flex; gap:10px; flex-wrap:wrap; padding:10px 12px; border-top:1px solid rgba(255,255,255,.08); color:var(--muted); font-size:13px; }
+    .chip { display:flex; gap:8px; align-items:center; }
+    .dot { width:10px; height:10px; border-radius:50%; background:#999; border:1px solid rgba(255,255,255,.25); }
+    .dot.sold { background:#ef4444; }
+    .dot.avail { background:#22c55e; }
 
-    #svgHost {
-      width: 100%;
-      overflow: auto;
-      -webkit-overflow-scrolling: touch;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      background: #fff;
-      position: relative;
-      min-height: 320px;
-      box-shadow: var(--shadow);
-    }
-    #svgHost svg { width: 100%; height: auto; display:block; }
-
+    /* Tooltip */
     #tooltip {
       position: fixed;
       pointer-events: none;
-      background: rgba(17, 24, 39, 0.92);
-      color: #fff;
-      padding: 6px 8px;
-      border-radius: 10px;
-      font-size: 12px;
-      transform: translate(10px, 10px);
-      display: none;
-      max-width: 320px;
-      line-height: 1.25;
-      box-shadow: 0 14px 40px rgba(0,0,0,0.25);
       z-index: 9999;
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-size: 13px;
+      line-height: 1.35;
+      background: rgba(17,24,39,.92);
+      border: 1px solid rgba(255,255,255,.12);
+      box-shadow: 0 10px 26px rgba(0,0,0,.35);
+      color: var(--text);
       white-space: pre-wrap;
-    }
-
-    .panel {
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 12px;
-      background: var(--panel);
-      box-shadow: var(--shadow);
-    }
-    .panel h2 {
-      font-size: 12px;
-      margin: 0 0 10px 0;
-      color: var(--muted);
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-    }
-    .row {
-      display:flex;
-      gap: 10px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-    label {
-      font-size: 12px;
-      color: var(--muted);
-      min-width: 90px;
-    }
-    select, textarea, input[type="text"] {
-      font: inherit;
-      padding: 8px 10px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: #fff;
-      min-width: 220px;
-    }
-    textarea {
-      width: 100%;
-      min-height: 70px;
-      resize: vertical;
-    }
-    button {
-      font: inherit;
-      padding: 8px 12px;
-      border-radius: 10px;
-      border: 1px solid var(--border);
-      background: #fff;
-      cursor: pointer;
-    }
-    button.primary {
-      border-color: var(--focus);
-      color: #fff;
-      background: var(--focus);
-    }
-    button.ghost {
-      background: transparent;
-    }
-    button:disabled {
-      opacity: 0.55;
-      cursor: not-allowed;
-    }
-    .badge {
-      display:inline-flex;
-      align-items:center;
-      gap: 8px;
-      padding: 6px 10px;
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      background: #fff;
-      box-shadow: 0 6px 18px rgba(0,0,0,0.06);
-    }
-    .dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      background: var(--muted);
-    }
-    .dot.ok { background: var(--avail); }
-    .dot.err { background: var(--sold); }
-
-    .small {
-      font-size: 12px;
-      color: var(--muted);
-    }
-    .error {
-      margin-top: 10px;
-      padding: 10px;
-      border: 1px solid #fecaca;
-      background: #fef2f2;
-      color: #991b1b;
-      border-radius: 12px;
       display:none;
-      font-size: 13px;
-      box-shadow: var(--shadow);
-      white-space: pre-wrap;
+      max-width:min(340px, 80vw);
     }
 
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background: #fff;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      overflow: hidden;
-    }
-    thead th {
-      font-size: 12px;
-      text-align: left;
-      color: var(--muted);
-      padding: 10px;
-      border-bottom: 1px solid var(--border);
-      background: #fff;
-      position: sticky;
-      top: 0;
-      z-index: 1;
-    }
-    tbody td {
-      padding: 8px 10px;
-      border-bottom: 1px solid var(--border);
-      vertical-align: top;
-      font-size: 13px;
-      white-space: pre-wrap;
-    }
-    tbody tr.highlight {
-      outline: 2px solid var(--focus);
-      outline-offset: -2px;
-      background: rgba(37, 99, 235, 0.06);
-    }
-    .toolbar {
+    .topbar {
       display:flex;
-      gap: 10px;
+      gap:10px;
+      flex-wrap:wrap;
       align-items:center;
-      flex-wrap: wrap;
-      justify-content: space-between;
-      margin-bottom: 10px;
+      justify-content:flex-end;
+      padding:10px 12px;
+      border-bottom:1px solid rgba(255,255,255,.08);
     }
-    .toolbar .left, .toolbar .right {
-      display:flex;
-      gap: 10px;
-      align-items:center;
-      flex-wrap: wrap;
-    }
-    .pill {
+    .file {
       display:inline-flex;
       align-items:center;
-      gap: 8px;
-      padding: 6px 10px;
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      background: #fff;
+      gap:10px;
     }
-
-    /* Login overlay */
-    #loginOverlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(17, 24, 39, 0.55);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-      z-index: 10000;
-    }
-    #loginCard {
-      width: min(460px, 100%);
-      background: #fff;
-      border-radius: 16px;
-      padding: 16px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
-      border: 1px solid rgba(0,0,0,0.08);
-    }
-    #loginCard h2 {
-      margin: 0 0 8px 0;
-      font-size: 16px;
-    }
-    #loginCard p {
-      margin: 0 0 12px 0;
-      color: var(--muted);
-      font-size: 13px;
-    }
-    #loginRow {
-      display:flex;
-      gap: 10px;
-      align-items:center;
-    }
-    #loginRow input {
-      flex: 1;
-      min-width: 0;
-    }
+    .file input[type="file"] { display:none; }
+    .file label { margin:0; }
   </style>
 </head>
 <body>
-  <div id="loginOverlay" aria-modal="true" role="dialog">
-    <div id="loginCard">
-      <h2>Admin login</h2>
-      <p>Enter the admin password to continue.</p>
-      <div id="loginRow">
-        <input id="pw" type="password" placeholder="Password" autocomplete="current-password" />
-        <button id="loginBtn" class="primary">Continue</button>
-      </div>
-      <div class="small" style="margin-top:10px;">
-        This is a simple client-side lock (sessionStorage). For real user accounts, use Google Workspace auth in Apps Script.
-      </div>
-    </div>
-  </div>
-
   <header>
-    <div class="topbar">
-      <h1>Exhibition Floorplan – Admin</h1>
-      <div class="links">
-        <a id="publicLink" href="./index.html">Public view</a>
-        <a id="sheetLink" href="#" target="_blank" rel="noreferrer">Open Google Sheet</a>
-        <a id="testLink" href="#" target="_blank" rel="noreferrer">Test Sync Endpoint</a>
-        <span class="badge" id="syncBadge">
-          <span class="dot" id="syncDot"></span>
-          <span id="syncLine">Sync: starting…</span>
-        </span>
-        <button id="refreshBtn" title="Refresh data from Google Sheet now">Refresh</button>
-        <button id="undoBtn" title="Undo (this browser only)">Undo</button>
-        <button class="logout" id="logoutBtn" title="Log out">Logout</button>
-      </div>
-    </div>
-    <div class="legend">
-      <span><i class="swatch" style="background: var(--sold)"></i>Sold</span>
-      <span><i class="swatch" style="background: var(--avail)"></i>Available</span>
-      <span class="small">Click a stand to edit it. The table can filter to show only the selected stand.</span>
-    </div>
+    <h1>Floorplan Admin</h1>
+    <div class="status" id="syncStatus">Loading…</div>
   </header>
 
   <div class="wrap">
-    <div>
-      <div id="svgHost" aria-label="Exhibition plan"></div>
-      <div id="tooltip" role="tooltip"></div>
-    </div>
-
-    <div style="display:grid; gap:12px;">
-      <div class="panel">
-        <h2>Selected stand</h2>
-        <div class="row" style="justify-content: space-between;">
-          <div class="pill"><strong id="selectedId">None</strong></div>
-          <div class="row">
-            <button id="showOnlyBtn" class="ghost" disabled title="Show only this stand in the list">Show only this stand</button>
-            <button id="showAllBtn" class="ghost" disabled title="Show all stands again">Show all</button>
-          </div>
-        </div>
-
-        <div style="height:10px;"></div>
-
-        <div class="row">
-          <label for="selectedStatus">Status</label>
-          <select id="selectedStatus">
-            <option value="available">available</option>
-            <option value="sold">sold</option>
-          </select>
-        </div>
-
-        <div style="height:10px;"></div>
-
-        <div class="row" style="align-items:flex-start;">
-          <label for="selectedCompany" style="padding-top:8px;">Company</label>
-          <textarea id="selectedCompany" placeholder="Company name (multi-line supported)"></textarea>
-        </div>
-
-        <div style="height:10px;"></div>
-
-        <div class="row">
-          <button id="saveBtn" class="primary" disabled>Save</button>
-          <button id="clearBtn" disabled>Clear</button>
-          <button id="jumpBtn" disabled>Jump to row</button>
-        </div>
-
-        <div style="height:6px;"></div>
-        <div class="small" id="saveLine"></div>
-        <div class="error" id="errBox"></div>
+    <div class="card">
+      <div class="topbar">
+        <button id="btnExport">Export CSV</button>
+        <span class="file">
+          <label for="fileImport" style="cursor:pointer">
+            <button type="button" id="btnImport">Import CSV</button>
+          </label>
+          <input id="fileImport" type="file" accept=".csv,text/csv" />
+        </span>
       </div>
 
-      <div class="panel" style="background:#fff;">
-        <div class="toolbar">
-          <div class="left">
-            <h2 style="margin:0;">Stand list</h2>
-            <span class="small" id="filterLine">Showing: all stands</span>
+      <div id="svgHost"></div>
+      <div class="legend">
+        <div class="chip"><span class="dot sold"></span> Sold</div>
+        <div class="chip"><span class="dot avail"></span> Available</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Selected Stand</h2>
+      <div class="panel">
+        <div>
+          <label>Stand ID</label>
+          <input id="standId" type="text" readonly />
+        </div>
+
+        <div class="row">
+          <div>
+            <label>Status</label>
+            <select id="status">
+              <option value="available">Available</option>
+              <option value="sold">Sold</option>
+            </select>
           </div>
-          <div class="right">
-            <span class="small">Edits are live. Multiple admins can edit simultaneously; last write wins on the same stand.</span>
+          <div>
+            <label>Company (sold only)</label>
+            <input id="company" type="text" placeholder="Company name…" />
           </div>
         </div>
 
-        <div style="overflow:auto; border-radius:12px;">
-          <table id="standsTable" aria-label="Stands table">
-            <thead>
-              <tr>
-                <th style="width:120px;">Stand ID</th>
-                <th style="width:120px;">Status</th>
-                <th>Company</th>
-              </tr>
-            </thead>
-            <tbody id="standsTbody"></tbody>
-          </table>
+        <div class="btnrow">
+          <button class="primary" id="btnSave" disabled>Save</button>
+          <button class="danger" id="btnClear" disabled>Mark Available</button>
+        </div>
+
+        <div class="help" id="helpText">
+          Click a stand on the plan to edit it. Changes save to Google Sheets via Apps Script.
         </div>
       </div>
     </div>
   </div>
 
+  <div id="tooltip"></div>
+
 <script>
 (() => {
-  // ===== CONFIG =====
-  const ADMIN_PASSWORD = "FLOORPASS1";
-  const SHEET_API_URL = "https://script.google.com/macros/s/AKfycbxEq83BUYJ-oewP_2lPFL0tyol4veM2mhukSTTMCaKCZgEJS5m-f8Jqy1EO_bDc3q3a/exec";
+  const SHEET_API_URL = 'https://script.google.com/macros/s/AKfycbxEq83BUYJ-oewP_2lPFL0tyol4veM2mhukSTTMCaKCZgEJS5m-f8Jqy1EO_bDc3q3a/exec';
   const SVG_URL = './event_plan.svg';
-  const GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1tBeOwvL_396MVAxCznf18ecTe3R5tcnVOcPY-cU0r6M/edit?gid=0#gid=0"; // Optional: paste your full Google Sheet URL here for the toolbar button.
-  const POLL_MS = 30000;
 
-  // Accept stand IDs like: A1, AA1, SB12, AD10, etc.
-  const STAND_ID_RE = /^[A-Z]{1,3}\d{1,4}$/;
-
-  // ===== DOM =====
+  const syncStatus = document.getElementById('syncStatus');
   const svgHost = document.getElementById('svgHost');
   const tooltip = document.getElementById('tooltip');
 
-  const syncLine = document.getElementById('syncLine');
-  const syncDot = document.getElementById('syncDot');
+  const standIdEl = document.getElementById('standId');
+  const statusEl  = document.getElementById('status');
+  const companyEl = document.getElementById('company');
+  const btnSave   = document.getElementById('btnSave');
+  const btnClear  = document.getElementById('btnClear');
 
-  const errBox = document.getElementById('errBox');
-  const saveLine = document.getElementById('saveLine');
-  const filterLine = document.getElementById('filterLine');
+  const btnExport = document.getElementById('btnExport');
+  const fileImport = document.getElementById('fileImport');
+  const btnImport = document.getElementById('btnImport');
 
-  const selectedIdEl = document.getElementById('selectedId');
-  const selectedStatusEl = document.getElementById('selectedStatus');
-  const selectedCompanyEl = document.getElementById('selectedCompany');
+  const COLOR_SOLD = '#ef4444';
+  const COLOR_AVAILABLE = '#22c55e';
 
-  const saveBtn = document.getElementById('saveBtn');
-  const clearBtn = document.getElementById('clearBtn');
-  const jumpBtn = document.getElementById('jumpBtn');
-
-  const showOnlyBtn = document.getElementById('showOnlyBtn');
-  const showAllBtn = document.getElementById('showAllBtn');
-
-  const refreshBtn = document.getElementById('refreshBtn');
-  const undoBtn = document.getElementById('undoBtn');
-
-  const standsTbody = document.getElementById('standsTbody');
-
-  const loginOverlay = document.getElementById('loginOverlay');
-  const pwInput = document.getElementById('pw');
-  const loginBtn = document.getElementById('loginBtn');
-  const logoutBtn = document.getElementById('logoutBtn');
-
-  const sheetLink = document.getElementById('sheetLink');
-  const testLink = document.getElementById('testLink');
-
-  // ===== STATE =====
   let svgRoot = null;
-  let svgReady = false;
-  let pendingSheetData = null;
-
-  let standMap = new Map();   // standId -> {status, company}
-  let standOrder = [];        // preserve ordering from sheet
+  let currentData = [];          // latest sync snapshot
+  let byId = new Map();          // standId -> {standId,status,company}
+  let selectedId = null;
   let lastSyncAt = null;
 
-  let selectedStandId = null;
-  let selectedSnapshot = null; // Used for lightweight conflict detection
-  let filterStandId = null;    // When set, table shows only that stand
+  function setStatusOk(text) { syncStatus.textContent = text; syncStatus.style.color = '#9ca3af'; }
+  function setStatusErr(text){ syncStatus.textContent = text; syncStatus.style.color = '#fca5a5'; }
+  function setStatusWarn(text){ syncStatus.textContent = text; syncStatus.style.color = '#fdba74'; }
 
-  const UNDO_KEY = 'fp_admin_undo_stack_v2';
-  const UNDO_MAX = 30;
+  function jsonp(url, timeoutMs = 12000) {
+    return new Promise((resolve, reject) => {
+      const cbName = 'cb_' + Math.random().toString(36).slice(2);
+      const script = document.createElement('script');
+      const timer = setTimeout(() => cleanup(new Error('JSONP timeout')), timeoutMs);
 
-  function isValidStandId(s) {
-    const id = String(s || '').trim().toUpperCase();
-    return STAND_ID_RE.test(id);
-  }
-
-  function cssVar(name) {
-    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  }
-
-  // Robust stand resolver:
-  // - Walks up the SVG DOM
-  // - Prefers data-name if valid (avoids CAD id collisions)
-  // - Falls back to id
-  function resolveStandIdFromSvgTarget(targetEl) {
-    let el = targetEl;
-    while (el && el !== svgRoot) {
-      if (el.getAttribute) {
-        const dn = el.getAttribute('data-name');
-        if (dn && isValidStandId(dn)) return dn.trim().toUpperCase();
+      function cleanup(err, data) {
+        clearTimeout(timer);
+        script.remove();
+        try { delete window[cbName]; } catch (e) { window[cbName] = undefined; }
+        if (err) reject(err);
+        else resolve(data);
       }
-      if (el.id && isValidStandId(el.id)) return el.id.trim().toUpperCase();
-      el = el.parentNode;
-    }
-    return null;
+
+      window[cbName] = (data) => cleanup(null, data);
+      const sep = url.includes('?') ? '&' : '?';
+      script.src = url + sep + 'callback=' + cbName + '&_=' + Date.now();
+      script.onerror = () => cleanup(new Error('JSONP network error'));
+      document.head.appendChild(script);
+    });
   }
 
-  function setStandColor(standId, status) {
-    if (!svgRoot) return;
-    const sel = `[data-name="${standId}"], #${CSS.escape(standId)}`;
-    const nodes = svgRoot.querySelectorAll(sel);
-    const color = (status === 'sold') ? cssVar('--sold') : cssVar('--avail');
+  // POST helper that avoids CORS preflight by using a simple form-encoded request
+  async function postToSheet(payload) {
+    const body = new URLSearchParams(payload);
+    const res = await fetch(SHEET_API_URL, { method: 'POST', body });
+    const text = await res.text();
+    let json = null;
+    try { json = JSON.parse(text); } catch (e) {}
+    if (!res.ok || (json && json.success === false)) {
+      throw new Error((json && json.error) ? json.error : (text || 'Write failed'));
+    }
+    return json || { success: true };
+  }
 
-    nodes.forEach(node => {
-      const shapes = node.querySelectorAll('path, rect, polygon, circle, ellipse, line, polyline');
-      (shapes.length ? shapes : [node]).forEach(s => {
-        if (!s || !s.style) return;
-        const fill = s.getAttribute && s.getAttribute('fill');
-        if (fill !== 'none') s.style.fill = color;
-        const stroke = s.getAttribute && s.getAttribute('stroke');
-        if (stroke && stroke !== 'none') s.style.stroke = color;
+  function normalizeStatus(v) {
+    v = String(v || '').toLowerCase().trim();
+    return v === 'sold' ? 'sold' : 'available';
+  }
+
+  function tooltipText(standId, status, company) {
+    const s = normalizeStatus(status);
+    const lines = [String(standId || '').trim(), s === 'sold' ? 'Sold' : 'Available'];
+    if (s === 'sold' && company) lines.push(String(company).trim());
+    return lines.join('\n');
+  }
+
+  function findStandElements(root) {
+    const all = Array.from(root.querySelectorAll('[id]'));
+    return all.filter(el => {
+      const id = (el.id || '').trim();
+      if (!id) return false;
+      if (id.toLowerCase().includes('layer')) return false;
+      if (id.length > 24) return false;
+      return true;
+    });
+  }
+
+  function applyStandStyle(el, status) {
+    const s = normalizeStatus(status);
+    el.style.cursor = 'pointer';
+    el.style.fill = (s === 'sold') ? COLOR_SOLD : COLOR_AVAILABLE;
+    el.style.fillOpacity = '0.5';   // 50% transparent
+    el.style.stroke = 'rgba(0,0,0,.55)';
+    el.style.strokeWidth = '1';
+    el.style.strokeOpacity = '0.9';
+  }
+
+  function attachTooltip(el, infoGetter) {
+    el.addEventListener('mousemove', (evt) => {
+      const info = infoGetter();
+      tooltip.textContent = tooltipText(info.standId, info.status, info.company);
+      tooltip.style.left = (evt.clientX + 12) + 'px';
+      tooltip.style.top  = (evt.clientY + 12) + 'px';
+      tooltip.style.display = 'block';
+    });
+    el.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+  }
+
+  function renderAll() {
+    if (!svgRoot) return;
+    const stands = findStandElements(svgRoot);
+    stands.forEach(el => {
+      const id = String(el.id).trim();
+      const info = byId.get(id) || { standId:id, status:'available', company:'' };
+      applyStandStyle(el, info.status);
+    });
+  }
+
+  function wireClicks() {
+    if (!svgRoot) return;
+    const stands = findStandElements(svgRoot);
+
+    stands.forEach(el => {
+      const id = String(el.id).trim();
+
+      attachTooltip(el, () => (byId.get(id) || { standId:id, status:'available', company:'' }));
+
+      el.addEventListener('click', () => {
+        const info = byId.get(id) || { standId:id, status:'available', company:'' };
+        selectedId = id;
+
+        standIdEl.value = info.standId;
+        statusEl.value = normalizeStatus(info.status);
+        companyEl.value = info.company || '';
+
+        btnSave.disabled = false;
+        btnClear.disabled = false;
       });
     });
   }
 
-  function showTooltip(text, x, y) {
-    tooltip.textContent = text;
-    tooltip.style.left = (x + 10) + 'px';
-    tooltip.style.top = (y + 10) + 'px';
-    tooltip.style.display = 'block';
-  }
-  function hideTooltip() {
-    tooltip.style.display = 'none';
-  }
+  async function loadSvg() {
+    const res = await fetch(SVG_URL, { cache: 'no-store' });
+    if (!res.ok) throw new Error('Failed to load SVG: ' + res.status);
+    const text = await res.text();
+    svgHost.innerHTML = text;
 
-  function setStatusOk(text) {
-    syncDot.classList.remove('err');
-    syncDot.classList.add('ok');
-    syncLine.textContent = text;
-  }
-  function setStatusErr(text) {
-    syncDot.classList.remove('ok');
-    syncDot.classList.add('err');
-    syncLine.textContent = text;
+    svgRoot = svgHost.querySelector('svg');
+    if (!svgRoot) throw new Error('SVG root not found');
+
+    wireClicks();
   }
 
-  function showError(text) {
-    errBox.style.display = 'block';
-    errBox.textContent = text;
-  }
-  function clearError() {
-    errBox.style.display = 'none';
-    errBox.textContent = '';
-  }
-
-  // JSONP loader for GitHub Pages (avoids CORS)
-  function jsonp(url, timeoutMs = 15000) {
-    return new Promise((resolve, reject) => {
-      const cb = 'cb_' + Math.random().toString(36).slice(2);
-      const script = document.createElement('script');
-      const timer = setTimeout(() => {
-        cleanup();
-        reject(new Error('JSONP timeout'));
-      }, timeoutMs);
-
-      function cleanup() {
-        clearTimeout(timer);
-        script.remove();
-        try { delete window[cb]; } catch (e) { window[cb] = undefined; }
-      }
-
-      window[cb] = (data) => {
-        cleanup();
-        resolve(data);
-      };
-
-      const sep = url.includes('?') ? '&' : '?';
-      script.src = url + sep + 'callback=' + encodeURIComponent(cb) + '&_=' + Date.now();
-      script.onerror = () => {
-        cleanup();
-        reject(new Error('JSONP network error'));
-      };
-      document.head.appendChild(script);
+  function applyStandData(data) {
+    currentData = Array.isArray(data) ? data : [];
+    byId = new Map();
+    currentData.forEach(r => {
+      if (!r || !r.standId) return;
+      byId.set(String(r.standId).trim(), {
+        standId: String(r.standId).trim(),
+        status: normalizeStatus(r.status),
+        company: String(r.company || '').trim()
+      });
     });
+    renderAll();
+
+    // keep selection in sync
+    if (selectedId && byId.has(selectedId)) {
+      const info = byId.get(selectedId);
+      standIdEl.value = info.standId;
+      statusEl.value = info.status;
+      companyEl.value = info.company || '';
+    }
   }
 
   async function loadDataFromSheet() {
     const data = await jsonp(SHEET_API_URL);
     applyStandData(data);
-
     lastSyncAt = new Date();
-    setStatusOk('Sync: ' + lastSyncAt.toLocaleString());
-    return data;
-  }
-  globalThis.loadDataFromSheet = loadDataFromSheet;
-
-  function applyStandData(dataArr) {
-    standMap.clear();
-    standOrder = [];
-
-    (dataArr || []).forEach(r => {
-      const standId = String(r.standId || '').trim().toUpperCase();
-      if (!isValidStandId(standId)) return;
-      const status = (String(r.status || '').toLowerCase().trim() === 'sold') ? 'sold' : 'available';
-      const company = String(r.company || '').trim();
-
-      standMap.set(standId, { status, company });
-      standOrder.push(standId);
-    });
-
-    if (!svgReady) {
-      pendingSheetData = dataArr;
-      return;
-    }
-
-    // Color stands
-    standMap.forEach((v, k) => setStandColor(k, v.status));
-
-    // Render table with current filter
-    renderTable();
-
-    // If selected stand exists, refresh selection fields to match latest data
-    if (selectedStandId && standMap.has(selectedStandId)) {
-      const rec = standMap.get(selectedStandId);
-      selectedStatusEl.value = rec.status;
-      selectedCompanyEl.value = rec.company;
-
-      // Keep snapshot updated to what we last saw from the sheet
-      selectedSnapshot = { status: rec.status, company: rec.company };
-    }
+    setStatusOk('Synced: ' + lastSyncAt.toLocaleString());
   }
 
-  function renderTable() {
-    const frag = document.createDocumentFragment();
-
-    const ids = filterStandId ? [filterStandId] : standOrder;
-
-    ids.forEach(id => {
-      const rec = standMap.get(id);
-      if (!rec) return;
-
-      const tr = document.createElement('tr');
-      tr.dataset.standId = id;
-
-      const tdId = document.createElement('td');
-      tdId.textContent = id;
-
-      const tdStatus = document.createElement('td');
-      tdStatus.textContent = rec.status;
-
-      const tdCompany = document.createElement('td');
-      tdCompany.textContent = rec.company;
-
-      tr.appendChild(tdId);
-      tr.appendChild(tdStatus);
-      tr.appendChild(tdCompany);
-
-      tr.addEventListener('click', () => {
-        selectStand(id);
-      });
-
-      frag.appendChild(tr);
-    });
-
-    standsTbody.innerHTML = '';
-    standsTbody.appendChild(frag);
-
-    if (filterStandId) {
-      filterLine.textContent = 'Showing: ' + filterStandId;
-    } else {
-      filterLine.textContent = 'Showing: all stands';
-    }
-  }
-
-  function highlightRow(standId) {
-    standsTbody.querySelectorAll('tr.highlight').forEach(tr => tr.classList.remove('highlight'));
-    const tr = standsTbody.querySelector(`tr[data-stand-id="${standId}"]`);
-    if (tr) {
-      tr.classList.add('highlight');
-      tr.scrollIntoView({ block: 'nearest' });
-      setTimeout(() => tr.classList.remove('highlight'), 1600);
-    }
-  }
-
-  function setControlsEnabled(enabled) {
-    saveBtn.disabled = !enabled;
-    clearBtn.disabled = !enabled;
-    jumpBtn.disabled = !enabled;
-    showOnlyBtn.disabled = !enabled;
-    showAllBtn.disabled = !enabled;
-  }
-
-  function selectStand(standId) {
-    selectedStandId = standId;
-    selectedIdEl.textContent = standId;
-
-    const rec = standMap.get(standId) || { status: 'available', company: '' };
-    selectedStatusEl.value = rec.status;
-    selectedCompanyEl.value = rec.company;
-
-    selectedSnapshot = { status: rec.status, company: rec.company };
-
-    setControlsEnabled(true);
-    clearError();
-    saveLine.textContent = '';
-  }
-
-  function clearSelection() {
-    selectedStandId = null;
-    selectedSnapshot = null;
-    selectedIdEl.textContent = 'None';
-    selectedStatusEl.value = 'available';
-    selectedCompanyEl.value = '';
-    setControlsEnabled(false);
-    saveLine.textContent = '';
-    clearError();
-  }
-
-  function snapshotForUndo() {
-    // Snapshot the entire dataset (browser-local)
-    return standOrder.map(id => {
-      const rec = standMap.get(id);
-      return { standId: id, status: rec.status, company: rec.company };
-    });
-  }
-
-  function pushUndo(snapshot) {
-    try {
-      const stack = JSON.parse(localStorage.getItem(UNDO_KEY) || '[]');
-      stack.push({ t: Date.now(), data: snapshot });
-      while (stack.length > UNDO_MAX) stack.shift();
-      localStorage.setItem(UNDO_KEY, JSON.stringify(stack));
-    } catch (e) {
-      // ignore
-    }
-  }
-
-  function popUndo() {
-    try {
-      const stack = JSON.parse(localStorage.getItem(UNDO_KEY) || '[]');
-      const last = stack.pop();
-      localStorage.setItem(UNDO_KEY, JSON.stringify(stack));
-      return last ? last.data : null;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  async function saveSelected() {
-    if (!selectedStandId) return;
-
-    clearError();
-    saveLine.textContent = 'Saving…';
-    saveBtn.disabled = true;
-
-    // Multi-admin friendly behavior:
-    // 1) Refresh from sheet before write (reduces stale overwrites)
-    // 2) If the stand changed since selection, show a warning (non-blocking)
+  async function syncLoop() {
     try {
       await loadDataFromSheet();
-    } catch (e) {
-      // If refresh fails, still allow save attempt (but warn)
-      showError('Warning: Could not refresh before saving. ' + e.message);
-    }
-
-    const latest = standMap.get(selectedStandId);
-    if (latest && selectedSnapshot) {
-      const changedSinceSelect = (latest.status !== selectedSnapshot.status) || (latest.company !== selectedSnapshot.company);
-      if (changedSinceSelect) {
-        // Non-blocking warning: last write wins if two admins edit same stand
-        showError(
-          'Heads up: This stand was updated by someone else since you selected it.\n' +
-          'Latest in sheet: status=' + latest.status + ', company=' + (latest.company || '(blank)') + '\n' +
-          'Your edit will overwrite it if you save again.'
-        );
-      }
-    }
-
-    // Save undo snapshot before write
-    pushUndo(snapshotForUndo());
-
-    const standId = selectedStandId;
-    const status = selectedStatusEl.value;
-    const company = selectedCompanyEl.value;
-
-    try {
-      const res = await fetch(SHEET_API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ standId, status, company })
-      });
-
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json.success) {
-        throw new Error(json.error || 'Write failed');
-      }
-
-      saveLine.textContent = 'Saved ✔';
-      // Immediate refresh after write so all admins see the update on next poll (and this admin sees it now)
-      await loadDataFromSheet();
-
-    } catch (e) {
-      showError('Save error: ' + e.message);
-      saveLine.textContent = 'Save failed';
+    } catch (err) {
+      setStatusErr('Sync error: ' + err.message);
     } finally {
-      saveBtn.disabled = false;
+      setTimeout(syncLoop, 5000);
     }
   }
 
-  async function undoLast() {
-    const snap = popUndo();
-    if (!snap) {
-      saveLine.textContent = 'Undo: nothing to undo';
-      return;
-    }
-    clearError();
-    saveLine.textContent = 'Undoing…';
+  // Save handlers
+  btnSave.addEventListener('click', async () => {
+    if (!selectedId) return;
+    const standId = standIdEl.value.trim();
+    const status = normalizeStatus(statusEl.value);
+    const company = (status === 'sold') ? companyEl.value.trim() : '';
+
+    btnSave.disabled = true;
+    btnClear.disabled = true;
+    setStatusWarn('Saving…');
 
     try {
-      // Restore snapshot sequentially (simple & reliable)
-      for (const row of snap) {
-        await fetch(SHEET_API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(row)
-        });
-      }
-      await loadDataFromSheet();
-      saveLine.textContent = 'Undo complete ✔';
-    } catch (e) {
-      showError('Undo error: ' + e.message);
-      saveLine.textContent = 'Undo failed';
+      await postToSheet({ standId, status, company });
+      await loadDataFromSheet(); // refresh immediately
+      setStatusOk('Saved: ' + new Date().toLocaleString());
+    } catch (err) {
+      setStatusErr('Save error: ' + err.message);
+    } finally {
+      btnSave.disabled = false;
+      btnClear.disabled = false;
     }
-  }
-
-  function setFilterToSelected() {
-    if (!selectedStandId) return;
-    filterStandId = selectedStandId;
-    renderTable();
-    highlightRow(selectedStandId);
-  }
-
-  function clearFilter() {
-    filterStandId = null;
-    renderTable();
-    if (selectedStandId) highlightRow(selectedStandId);
-  }
-
-  async function loadSvg() {
-    setStatusOk('Sync: loading plan…');
-    const res = await fetch(SVG_URL, { cache: 'no-store' });
-    if (!res.ok) throw new Error('Failed to load SVG plan');
-    svgHost.innerHTML = await res.text();
-
-    svgRoot = svgHost.querySelector('svg');
-    if (!svgRoot) throw new Error('SVG root not found');
-
-    svgReady = true;
-
-    // Hover tooltip
-    svgRoot.addEventListener('mousemove', (e) => {
-      if (tooltip.style.display === 'block') {
-        tooltip.style.left = (e.clientX + 10) + 'px';
-        tooltip.style.top = (e.clientY + 10) + 'px';
-      }
-    });
-
-    svgRoot.addEventListener('mouseover', (e) => {
-      const standId = resolveStandIdFromSvgTarget(e.target);
-      if (!standId) return;
-      const rec = standMap.get(standId);
-      if (!rec) return;
-
-      const text = (rec.status === 'sold')
-        ? (rec.company ? rec.company : 'Sold')
-        : 'Available';
-
-      showTooltip(text, e.clientX, e.clientY);
-    });
-
-    svgRoot.addEventListener('mouseout', (e) => {
-      const standId = resolveStandIdFromSvgTarget(e.target);
-      if (standId) hideTooltip();
-    });
-
-    // Click delegation (Safari-safe): only selects stand; no scroll / heavy DOM operations here
-    svgRoot.addEventListener('click', (e) => {
-      const standId = resolveStandIdFromSvgTarget(e.target);
-      if (!standId) return;
-      selectStand(standId);
-
-      // Per your requirement: clicking a stand should make the list show only that stand.
-      setFilterToSelected();
-    });
-
-    if (pendingSheetData) {
-      applyStandData(pendingSheetData);
-      pendingSheetData = null;
-    }
-  }
-
-  /* ======================
-     AUTH (client-side)
-     ====================== */
-  function isAuthed() {
-    return sessionStorage.getItem('fp_admin_authed') === '1';
-  }
-  function showLogin() {
-    loginOverlay.style.display = 'flex';
-    pwInput.value = '';
-    pwInput.focus();
-  }
-  function hideLogin() {
-    loginOverlay.style.display = 'none';
-  }
-  function login() {
-    if (pwInput.value === ADMIN_PASSWORD) {
-      sessionStorage.setItem('fp_admin_authed', '1');
-      hideLogin();
-      start();
-    } else {
-      pwInput.value = '';
-      pwInput.placeholder = 'Wrong password';
-      pwInput.focus();
-    }
-  }
-  function logout() {
-    sessionStorage.removeItem('fp_admin_authed');
-    location.reload();
-  }
-
-  loginBtn.addEventListener('click', login);
-  pwInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') login();
   });
-  logoutBtn.addEventListener('click', logout);
 
-  /* ======================
-     UI actions
-     ====================== */
-  saveBtn.addEventListener('click', saveSelected);
-  clearBtn.addEventListener('click', clearSelection);
-  jumpBtn.addEventListener('click', () => {
-    if (!selectedStandId) return;
-    highlightRow(selectedStandId);
-  });
-  showOnlyBtn.addEventListener('click', setFilterToSelected);
-  showAllBtn.addEventListener('click', clearFilter);
+  btnClear.addEventListener('click', async () => {
+    if (!selectedId) return;
+    const standId = standIdEl.value.trim();
 
-  refreshBtn.addEventListener('click', async () => {
-    clearError();
-    saveLine.textContent = 'Refreshing…';
+    btnSave.disabled = true;
+    btnClear.disabled = true;
+    setStatusWarn('Saving…');
+
     try {
+      await postToSheet({ standId, status:'available', company:'' });
       await loadDataFromSheet();
-      saveLine.textContent = 'Refreshed ✔';
-    } catch (e) {
-      showError('Refresh error: ' + e.message);
-      saveLine.textContent = 'Refresh failed';
+      statusEl.value = 'available';
+      companyEl.value = '';
+      setStatusOk('Saved: ' + new Date().toLocaleString());
+    } catch (err) {
+      setStatusErr('Save error: ' + err.message);
+    } finally {
+      btnSave.disabled = false;
+      btnClear.disabled = false;
     }
   });
 
-  undoBtn.addEventListener('click', undoLast);
+  // Export CSV (Excel-friendly)
+  function toCsvRow(values) {
+    return values.map(v => {
+      const s = String(v ?? '');
+      if (/[",\n]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
+      return s;
+    }).join(',');
+  }
 
-  // Toolbar links
-  testLink.href = SHEET_API_URL + '?callback=test';
-  sheetLink.href = GOOGLE_SHEET_URL || '#';
-  sheetLink.addEventListener('click', (e) => {
-    if (!GOOGLE_SHEET_URL) {
-      e.preventDefault();
-      alert('Set GOOGLE_SHEET_URL in admin.html if you want this link to open your sheet.');
+  btnExport.addEventListener('click', () => {
+    const rows = [['standId','status','company']];
+    const list = Array.from(byId.values()).sort((a,b) => a.standId.localeCompare(b.standId, undefined, {numeric:true}));
+    list.forEach(r => rows.push([r.standId, r.status, r.company || '']));
+
+    const csv = rows.map(r => toCsvRow(r)).join('\n');
+    const blob = new Blob([csv], { type:'text/csv;charset=utf-8' });
+
+    const ts = new Date().toISOString().replace(/[:.]/g,'-');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `floorplan-stands-${ts}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  });
+
+  // Import CSV (bulk update)
+  async function parseCsv(text) {
+    // small CSV parser (handles quoted fields)
+    const rows = [];
+    let i=0, field='', row=[], inQuotes=false;
+
+    while (i < text.length) {
+      const c = text[i];
+      if (inQuotes) {
+        if (c === '"') {
+          if (text[i+1] === '"') { field += '"'; i += 2; continue; }
+          inQuotes = false; i++; continue;
+        }
+        field += c; i++; continue;
+      } else {
+        if (c === '"') { inQuotes = true; i++; continue; }
+        if (c === ',') { row.push(field); field=''; i++; continue; }
+        if (c === '\r') { i++; continue; }
+        if (c === '\n') { row.push(field); rows.push(row); row=[]; field=''; i++; continue; }
+        field += c; i++; continue;
+      }
+    }
+    row.push(field);
+    rows.push(row);
+    return rows.filter(r => r.some(x => String(x||'').trim() !== ''));
+  }
+
+  fileImport.addEventListener('change', async (evt) => {
+    const file = evt.target.files && evt.target.files[0];
+    if (!file) return;
+
+    btnImport.disabled = true;
+    btnExport.disabled = true;
+    setStatusWarn('Importing…');
+
+    try {
+      const text = await file.text();
+      const rows = await parseCsv(text);
+
+      const header = rows[0].map(h => String(h||'').trim().toLowerCase());
+      const idxStand = header.indexOf('standid');
+      const idxStatus = header.indexOf('status');
+      const idxCompany = header.indexOf('company');
+
+      if (idxStand === -1 || idxStatus === -1) {
+        throw new Error('CSV must include headers: standId,status,company');
+      }
+
+      // Bulk update sequentially (simple + reliable)
+      for (let r = 1; r < rows.length; r++) {
+        const row = rows[r];
+        const standId = String(row[idxStand] || '').trim();
+        if (!standId) continue;
+        const status = normalizeStatus(row[idxStatus]);
+        const company = status === 'sold' ? String(row[idxCompany] || '').trim() : '';
+        await postToSheet({ standId, status, company });
+      }
+
+      await loadDataFromSheet();
+      setStatusOk('Import complete: ' + new Date().toLocaleString());
+    } catch (err) {
+      setStatusErr('Import error: ' + err.message);
+    } finally {
+      btnImport.disabled = false;
+      btnExport.disabled = false;
+      fileImport.value = '';
     }
   });
 
-  async function start() {
+  (async () => {
     try {
       await loadSvg();
-    } catch (e) {
-      setStatusErr('Plan error: ' + e.message);
-      showError('Plan error: ' + e.message);
-      return;
+      await loadDataFromSheet();
+      syncLoop();
+    } catch (err) {
+      setStatusErr('Load error: ' + err.message);
     }
-
-    try {
-      await (globalThis.loadDataFromSheet ? globalThis.loadDataFromSheet() : Promise.resolve(null));
-    } catch (e) {
-      setStatusErr('Sync error: ' + e.message);
-      showError('Sync error: ' + e.message);
-    }
-
-    // Poll so multiple admins converge on the latest view
-    setInterval(async () => {
-      try {
-        await (globalThis.loadDataFromSheet ? globalThis.loadDataFromSheet() : Promise.resolve(null));
-      } catch (e) {
-        setStatusErr('Sync error: ' + e.message);
-      }
-    }, POLL_MS);
-  }
-
-  // Boot
-  if (isAuthed()) {
-    hideLogin();
-    start();
-  } else {
-    showLogin();
-  }
+  })();
 })();
 </script>
 </body>
