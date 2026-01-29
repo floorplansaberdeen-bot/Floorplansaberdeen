@@ -57,6 +57,7 @@
         <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);user-select:none;"><span>Event</span><input id="eventName" type="text" value="Exhibition Floorplan" style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;min-width:220px;"></label>
 <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);user-select:none;"><input id="chkPinsPdf" type="checkbox" checked style="width:16px;height:16px;">Include pins</label>
 <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);user-select:none;"><input id="chkSoldListPdf" type="checkbox" style="width:16px;height:16px;">Print sold list</label>
+<label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);user-select:none;"><input id="chkLegendPdf" type="checkbox" checked style="width:16px;height:16px;">Print legend</label>
         <button id="btnExportPdf" style="padding:8px 10px;border:1px solid var(--border);background:#f7f7f7;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;">Export PDF</button>
       </div>
     </div>
@@ -102,6 +103,7 @@
   const chkPinsPdf = document.getElementById('chkPinsPdf');
   const chkSoldListPdf = document.getElementById('chkSoldListPdf');
   const eventNameEl = document.getElementById('eventName');
+  const chkLegendPdf = document.getElementById('chkLegendPdf');
 
   let svgRoot = null;
   let byId = new Map(); // standId -> {standId,status,company}
@@ -433,6 +435,7 @@ async function fetchJson(url){
 
         const includePins = !!(chkPinsPdf && chkPinsPdf.checked);
         const includeSoldList = !!(chkSoldListPdf && chkSoldListPdf.checked);
+        const includeLegend = !!(chkLegendPdf && chkLegendPdf.checked);
 
         const rawEventName = (eventNameEl && eventNameEl.value) ? eventNameEl.value : 'Exhibition Floorplan';
         const eventName = String(rawEventName).trim() || 'Exhibition Floorplan';
@@ -463,6 +466,14 @@ async function fetchJson(url){
         const svgHtml = clone.outerHTML;
 
         // Build sold list HTML (optional)
+        let legendHtml = '';
+        if (includeLegend){
+          legendHtml = `<div class="legendBox">
+            <div class="lg"><span class="dot sold"></span><span>Sold</span></div>
+            <div class="lg"><span class="dot avail"></span><span>Available</span></div>
+          </div>`;
+        }
+
         let soldHtml = '';
         if (includeSoldList){
           const sold = Array.from(byId.values())
@@ -492,7 +503,12 @@ async function fetchJson(url){
   .frame{max-width:1400px;margin:0 auto;display:grid;grid-template-columns: 1fr;gap:12px;}
   svg{width:100%;height:auto;display:block;}
 
-  .soldBox{border:1px solid #ddd;border-radius:10px;padding:10px 12px;}
+  .legendBox{display:flex;gap:14px;align-items:center;border:1px solid #ddd;border-radius:10px;padding:8px 10px;justify-content:flex-start;}
+.lg{display:flex;gap:8px;align-items:center;font-size:12px;font-weight:800;}
+.dot{width:10px;height:10px;border-radius:50%;display:inline-block;}
+.dot.sold{background:#e53935;}
+.dot.avail{background:#2ecc71;}
+.soldBox{border:1px solid #ddd;border-radius:10px;padding:10px 12px;}
   .soldTitle{font-weight:900;margin-bottom:8px;}
   .sRow{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid #eee;}
   .sRow:last-child{border-bottom:none;}
@@ -512,13 +528,14 @@ async function fetchJson(url){
     <div>
       <div style="font-weight:900;">Export floorplan</div>
       <div class="meta">Suggested filename: <strong>${suggested}.pdf</strong></div>
-      <div class="meta">Pins in PDF: <strong>${includePins ? 'Included' : 'Excluded'}</strong> • Sold list: <strong>${includeSoldList ? 'Included' : 'Excluded'}</strong></div>
+      <div class="meta">Pins in PDF: <strong>${includePins ? 'Included' : 'Excluded'}</strong> • Legend: <strong>${includeLegend ? 'Included' : 'Excluded'}</strong> • Sold list: <strong>${includeSoldList ? 'Included' : 'Excluded'}</strong></div>
     </div>
     <button onclick="window.print()">Save as PDF</button>
   </div>
   <div class="wrap">
     <div class="frame">
       ${svgHtml}
+      ${legendHtml}
       ${soldHtml}
     </div>
   </div>
