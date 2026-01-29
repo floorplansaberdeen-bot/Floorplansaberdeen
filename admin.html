@@ -1,149 +1,92 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Floorplan Admin</title>
-  <style>
-    :root { --bg:#0b0f16; --card:#111827; --text:#e5e7eb; --muted:#9ca3af; --ok:#16a34a; --warn:#f59e0b; --bad:#ef4444; }
-    body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif; background:var(--bg); color:var(--text); }
-    header { padding:14px 16px; display:flex; gap:12px; align-items:center; justify-content:space-between; background:rgba(17,24,39,.8); position:sticky; top:0; backdrop-filter: blur(10px); z-index:10; }
-    header h1 { margin:0; font-size:16px; font-weight:600; letter-spacing:.2px; }
-    .status { font-size:13px; color:var(--muted); }
-    .wrap { padding:14px 16px 24px; display:grid; gap:14px; grid-template-columns: 1.25fr .75fr; }
-    @media (max-width: 980px) { .wrap { grid-template-columns: 1fr; } }
-    .card { background:rgba(17,24,39,.85); border:1px solid rgba(255,255,255,.08); border-radius:14px; overflow:hidden; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
-    .card h2 { margin:0; padding:12px 12px 0; font-size:14px; color:var(--muted); font-weight:600; letter-spacing:.2px;}
-    #svgHost { width:100%; height:auto; }
-    .panel { padding:12px; display:grid; gap:10px; }
-    label { font-size:12px; color:var(--muted); }
-    input[type="text"], select {
-      width:100%;
-      padding:10px 10px;
-      border-radius:12px;
-      border:1px solid rgba(255,255,255,.12);
-      background:rgba(2,6,23,.5);
-      color:var(--text);
-      outline:none;
-    }
-    .row { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
-    .btnrow { display:flex; gap:10px; flex-wrap:wrap; }
-    button {
-      border:1px solid rgba(255,255,255,.12);
-      background:rgba(255,255,255,.06);
-      color:var(--text);
-      padding:10px 12px;
-      border-radius:12px;
-      cursor:pointer;
-      font-weight:600;
-      font-size:13px;
-    }
-    button.primary { background: rgba(34,197,94,.18); border-color: rgba(34,197,94,.35); }
-    button.danger  { background: rgba(239,68,68,.16); border-color: rgba(239,68,68,.35); }
-    button:disabled { opacity:.55; cursor:not-allowed; }
-    .help { font-size:12px; color:var(--muted); line-height:1.35; }
-    .legend { display:flex; gap:10px; flex-wrap:wrap; padding:10px 12px; border-top:1px solid rgba(255,255,255,.08); color:var(--muted); font-size:13px; }
-    .chip { display:flex; gap:8px; align-items:center; }
-    .dot { width:10px; height:10px; border-radius:50%; background:#999; border:1px solid rgba(255,255,255,.25); }
-    .dot.sold { background:#ef4444; }
-    .dot.avail { background:#22c55e; }
-
-    /* Tooltip */
-    #tooltip {
-      position: fixed;
-      pointer-events: none;
-      z-index: 9999;
-      padding: 10px 12px;
-      border-radius: 12px;
-      font-size: 13px;
-      line-height: 1.35;
-      background: rgba(17,24,39,.92);
-      border: 1px solid rgba(255,255,255,.12);
-      box-shadow: 0 10px 26px rgba(0,0,0,.35);
-      color: var(--text);
-      white-space: pre-wrap;
-      display:none;
-      max-width:min(340px, 80vw);
-    }
-
-    .topbar {
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      align-items:center;
-      justify-content:flex-end;
-      padding:10px 12px;
-      border-bottom:1px solid rgba(255,255,255,.08);
-    }
-    .file {
-      display:inline-flex;
-      align-items:center;
-      gap:10px;
-    }
-    .file input[type="file"] { display:none; }
-    .file label { margin:0; }
-  </style>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Floorplan Admin</title>
+<style>
+body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#111}
+header{padding:12px 14px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:#fff;z-index:10}
+header h1{margin:0;font-size:16px}
+#syncStatus{font-size:13px;color:#555}
+.wrap{display:grid;grid-template-columns:1.2fr .8fr;gap:14px;padding:12px}
+@media(max-width:980px){.wrap{grid-template-columns:1fr}}
+.card{border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;background:#fff}
+.card h2{margin:0;font-size:14px;padding:12px 12px 0;color:#333}
+#svgHost{padding:12px}
+svg{max-width:100%;height:auto;display:block}
+svg text,svg tspan{pointer-events:none;user-select:none;-webkit-user-select:none}
+.panel{padding:12px;display:grid;gap:10px}
+label{font-size:12px;color:#444}
+input[type=text],select{width:100%;padding:9px 10px;border:1px solid #d1d5db;border-radius:10px;background:#fff;color:#111}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btnrow{display:flex;gap:10px;flex-wrap:wrap}
+button{padding:10px 12px;border-radius:10px;border:1px solid #d1d5db;background:#f9fafb;cursor:pointer;font-weight:600}
+button.primary{background:#e8f5e9;border-color:#b7e1c1}
+button.danger{background:#ffebee;border-color:#f3b7b7}
+button:disabled{opacity:.6;cursor:not-allowed}
+.topbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:flex-end;padding:10px 12px;border-bottom:1px solid #e5e7eb}
+.legend{padding:10px 12px;border-top:1px solid #e5e7eb;display:flex;gap:14px;flex-wrap:wrap}
+.chip{display:flex;gap:8px;align-items:center;font-size:13px}
+.dot{width:10px;height:10px;border-radius:50%;border:1px solid rgba(0,0,0,.25)}
+.dot.sold{background:#e53935}
+.dot.avail{background:#2e7d32}
+#tooltip{position:fixed;pointer-events:none;z-index:9999;background:rgba(255,255,255,.96);border:1px solid rgba(0,0,0,.15);box-shadow:0 8px 18px rgba(0,0,0,.15);border-radius:10px;padding:8px 10px;font-size:13px;line-height:1.35;white-space:pre-wrap;display:none;max-width:min(360px,85vw)}
+</style>
 </head>
 <body>
-  <header>
-    <h1>Floorplan Admin</h1>
-    <div class="status" id="syncStatus">Loading…</div>
-  </header>
+<header>
+  <h1>Floorplan Admin</h1>
+  <div id="syncStatus">Loading…</div>
+</header>
 
-  <div class="wrap">
-    <div class="card">
-      <div class="topbar">
-        <button id="btnExport">Export CSV</button>
-        <span class="file">
-          <label for="fileImport" style="cursor:pointer">
-            <button type="button" id="btnImport">Import CSV</button>
-          </label>
-          <input id="fileImport" type="file" accept=".csv,text/csv" />
-        </span>
-      </div>
-
-      <div id="svgHost"></div>
-      <div class="legend">
-        <div class="chip"><span class="dot sold"></span> Sold</div>
-        <div class="chip"><span class="dot avail"></span> Available</div>
-      </div>
+<div class="wrap">
+  <div class="card">
+    <div class="topbar">
+      <button id="btnExport">Export CSV</button>
+      <button id="btnImport" type="button">Import CSV</button>
+      <input id="fileImport" type="file" accept=".csv,text/csv" style="display:none">
     </div>
-
-    <div class="card">
-      <h2>Selected Stand</h2>
-      <div class="panel">
-        <div>
-          <label>Stand ID</label>
-          <input id="standId" type="text" readonly />
-        </div>
-
-        <div class="row">
-          <div>
-            <label>Status</label>
-            <select id="status">
-              <option value="available">Available</option>
-              <option value="sold">Sold</option>
-            </select>
-          </div>
-          <div>
-            <label>Company (sold only)</label>
-            <input id="company" type="text" placeholder="Company name…" />
-          </div>
-        </div>
-
-        <div class="btnrow">
-          <button class="primary" id="btnSave" disabled>Save</button>
-          <button class="danger" id="btnClear" disabled>Mark Available</button>
-        </div>
-
-        <div class="help" id="helpText">
-          Click a stand on the plan to edit it. Changes save to Google Sheets via Apps Script.
-        </div>
-      </div>
+    <div id="svgHost"></div>
+    <div class="legend">
+      <div class="chip"><span class="dot sold"></span> Sold</div>
+      <div class="chip"><span class="dot avail"></span> Available</div>
     </div>
   </div>
 
-  <div id="tooltip"></div>
+  <div class="card">
+    <h2>Selected Stand</h2>
+    <div class="panel">
+      <div>
+        <label>Stand ID</label>
+        <input id="standId" type="text" readonly>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Status</label>
+          <select id="status">
+            <option value="available">Available</option>
+            <option value="sold">Sold</option>
+          </select>
+        </div>
+        <div>
+          <label>Company (sold only)</label>
+          <input id="company" type="text" placeholder="Company name…">
+        </div>
+      </div>
+
+      <div class="btnrow">
+        <button class="primary" id="btnSave" disabled>Save</button>
+        <button class="danger" id="btnClear" disabled>Mark Available</button>
+      </div>
+
+      <div style="font-size:12px;color:#555">Click a stand to edit. Hover shows stand, status, and company (if sold).</div>
+    </div>
+  </div>
+</div>
+
+<div id="tooltip"></div>
 
 <script>
 (() => {
@@ -161,333 +104,270 @@
   const btnClear  = document.getElementById('btnClear');
 
   const btnExport = document.getElementById('btnExport');
-  const fileImport = document.getElementById('fileImport');
   const btnImport = document.getElementById('btnImport');
+  const fileImport = document.getElementById('fileImport');
 
-  const COLOR_SOLD = '#ef4444';
-  const COLOR_AVAILABLE = '#22c55e';
+  const COLOR_SOLD = '#e53935';
+  const COLOR_AVAILABLE = '#2e7d32';
+  const STAND_TAGS = new Set(['path','rect','polygon','circle','ellipse']);
 
   let svgRoot = null;
-  let currentData = [];          // latest sync snapshot
-  let byId = new Map();          // standId -> {standId,status,company}
+  let byId = new Map();
   let selectedId = null;
-  let lastSyncAt = null;
 
-  function setStatusOk(text) { syncStatus.textContent = text; syncStatus.style.color = '#9ca3af'; }
-  function setStatusErr(text){ syncStatus.textContent = text; syncStatus.style.color = '#fca5a5'; }
-  function setStatusWarn(text){ syncStatus.textContent = text; syncStatus.style.color = '#fdba74'; }
-
-  function jsonp(url, timeoutMs = 12000) {
-    return new Promise((resolve, reject) => {
+  function setStatus(text, mode='ok'){
+    syncStatus.textContent = text;
+    syncStatus.style.color = (mode==='err') ? '#b91c1c' : (mode==='warn' ? '#b45309' : '#555');
+  }
+  function normalizeStatus(v){
+    v = String(v||'').toLowerCase().trim();
+    return v === 'sold' ? 'sold' : 'available';
+  }
+  function tooltipText(standId, status, company){
+    const s = normalizeStatus(status);
+    const lines = [String(standId||'').trim(), (s==='sold'?'Sold':'Available')];
+    if (s==='sold' && company) lines.push(String(company).trim());
+    return lines.join('\n');
+  }
+  function isStandElement(el){
+    if(!el || !el.id) return false;
+    const tag = (el.tagName||'').toLowerCase();
+    if(!STAND_TAGS.has(tag)) return false;
+    const id = String(el.id).trim();
+    if(!id) return false;
+    if(id.length > 32) return false;
+    if(id.toLowerCase().includes('layer')) return false;
+    return true;
+  }
+  function applyStandStyle(el, status){
+    const s = normalizeStatus(status);
+    el.style.cursor='pointer';
+    el.style.fill = (s==='sold') ? COLOR_SOLD : COLOR_AVAILABLE;
+    el.style.fillOpacity='0.5';
+    el.style.stroke='rgba(0,0,0,.5)';
+    el.style.strokeWidth='1';
+    el.style.strokeOpacity='0.9';
+  }
+  function attachTooltip(el, standId){
+    el.addEventListener('mousemove', (evt)=>{
+      const info = byId.get(standId) || {standId, status:'available', company:''};
+      tooltip.textContent = tooltipText(info.standId, info.status, info.company);
+      tooltip.style.left = (evt.clientX+12)+'px';
+      tooltip.style.top  = (evt.clientY+12)+'px';
+      tooltip.style.display='block';
+    });
+    el.addEventListener('mouseleave', ()=> tooltip.style.display='none');
+  }
+  function jsonp(url, timeoutMs=15000){
+    return new Promise((resolve, reject)=>{
       const cbName = 'cb_' + Math.random().toString(36).slice(2);
       const script = document.createElement('script');
-      const timer = setTimeout(() => cleanup(new Error('JSONP timeout')), timeoutMs);
+      const timer = setTimeout(()=>cleanup(new Error('JSONP callback not invoked (check Apps Script deployment / doGet)')), timeoutMs);
 
-      function cleanup(err, data) {
+      function cleanup(err, data){
         clearTimeout(timer);
         script.remove();
-        try { delete window[cbName]; } catch (e) { window[cbName] = undefined; }
-        if (err) reject(err);
-        else resolve(data);
+        try{ delete window[cbName]; }catch(e){ window[cbName]=undefined; }
+        if(err) reject(err); else resolve(data);
       }
 
-      window[cbName] = (data) => cleanup(null, data);
+      window[cbName] = (data)=>cleanup(null,data);
+      script.onerror = ()=>cleanup(new Error('JSONP network error (blocked/failed to load)'));
+
       const sep = url.includes('?') ? '&' : '?';
       script.src = url + sep + 'callback=' + cbName + '&_=' + Date.now();
-      script.onerror = () => cleanup(new Error('JSONP network error'));
       document.head.appendChild(script);
     });
   }
 
-  // POST helper that avoids CORS preflight by using a simple form-encoded request
-  async function postToSheet(payload) {
-    const body = new URLSearchParams(payload);
-    const res = await fetch(SHEET_API_URL, { method: 'POST', body });
+  async function postToSheet(payload){
+    const body = new URLSearchParams(payload); // avoids CORS preflight
+    const res = await fetch(SHEET_API_URL, {method:'POST', body});
     const text = await res.text();
-    let json = null;
-    try { json = JSON.parse(text); } catch (e) {}
-    if (!res.ok || (json && json.success === false)) {
+    let json=null; try{ json=JSON.parse(text);}catch(e){}
+    if(!res.ok || (json && json.success===false)){
       throw new Error((json && json.error) ? json.error : (text || 'Write failed'));
     }
-    return json || { success: true };
+    return json || {success:true};
   }
 
-  function normalizeStatus(v) {
-    v = String(v || '').toLowerCase().trim();
-    return v === 'sold' ? 'sold' : 'available';
-  }
+  async function loadSvg(){
+    const res = await fetch(SVG_URL, {cache:'no-store'});
+    if(!res.ok) throw new Error('Failed to load SVG: ' + res.status);
+    svgHost.innerHTML = await res.text();
+    svgRoot = svgHost.querySelector('svg');
+    if(!svgRoot) throw new Error('SVG root not found');
 
-  function tooltipText(standId, status, company) {
-    const s = normalizeStatus(status);
-    const lines = [String(standId || '').trim(), s === 'sold' ? 'Sold' : 'Available'];
-    if (s === 'sold' && company) lines.push(String(company).trim());
-    return lines.join('\n');
-  }
-
-  function findStandElements(root) {
-    const all = Array.from(root.querySelectorAll('[id]'));
-    return all.filter(el => {
-      const id = (el.id || '').trim();
-      if (!id) return false;
-      if (id.toLowerCase().includes('layer')) return false;
-      if (id.length > 24) return false;
-      return true;
-    });
-  }
-
-  function applyStandStyle(el, status) {
-    const s = normalizeStatus(status);
-    el.style.cursor = 'pointer';
-    el.style.fill = (s === 'sold') ? COLOR_SOLD : COLOR_AVAILABLE;
-    el.style.fillOpacity = '0.5';   // 50% transparent
-    el.style.stroke = 'rgba(0,0,0,.55)';
-    el.style.strokeWidth = '1';
-    el.style.strokeOpacity = '0.9';
-  }
-
-  function attachTooltip(el, infoGetter) {
-    el.addEventListener('mousemove', (evt) => {
-      const info = infoGetter();
-      tooltip.textContent = tooltipText(info.standId, info.status, info.company);
-      tooltip.style.left = (evt.clientX + 12) + 'px';
-      tooltip.style.top  = (evt.clientY + 12) + 'px';
-      tooltip.style.display = 'block';
-    });
-    el.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
-  }
-
-  function renderAll() {
-    if (!svgRoot) return;
-    const stands = findStandElements(svgRoot);
-    stands.forEach(el => {
+    Array.from(svgRoot.querySelectorAll('[id]')).filter(isStandElement).forEach(el=>{
       const id = String(el.id).trim();
-      const info = byId.get(id) || { standId:id, status:'available', company:'' };
+      attachTooltip(el, id);
+      el.addEventListener('click', ()=>selectStand(id));
+    });
+  }
+
+  function applyStandData(data){
+    byId = new Map();
+    (Array.isArray(data)?data:[]).forEach(r=>{
+      if(!r||!r.standId) return;
+      byId.set(String(r.standId).trim(), {
+        standId:String(r.standId).trim(),
+        status:normalizeStatus(r.status),
+        company:String(r.company||'').trim()
+      });
+    });
+
+    if(!svgRoot) return;
+    Array.from(svgRoot.querySelectorAll('[id]')).filter(isStandElement).forEach(el=>{
+      const id = String(el.id).trim();
+      const info = byId.get(id) || {standId:id, status:'available', company:''};
       applyStandStyle(el, info.status);
     });
-  }
 
-  function wireClicks() {
-    if (!svgRoot) return;
-    const stands = findStandElements(svgRoot);
-
-    stands.forEach(el => {
-      const id = String(el.id).trim();
-
-      attachTooltip(el, () => (byId.get(id) || { standId:id, status:'available', company:'' }));
-
-      el.addEventListener('click', () => {
-        const info = byId.get(id) || { standId:id, status:'available', company:'' };
-        selectedId = id;
-
-        standIdEl.value = info.standId;
-        statusEl.value = normalizeStatus(info.status);
-        companyEl.value = info.company || '';
-
-        btnSave.disabled = false;
-        btnClear.disabled = false;
-      });
-    });
-  }
-
-  async function loadSvg() {
-    const res = await fetch(SVG_URL, { cache: 'no-store' });
-    if (!res.ok) throw new Error('Failed to load SVG: ' + res.status);
-    const text = await res.text();
-    svgHost.innerHTML = text;
-
-    svgRoot = svgHost.querySelector('svg');
-    if (!svgRoot) throw new Error('SVG root not found');
-
-    wireClicks();
-  }
-
-  function applyStandData(data) {
-    currentData = Array.isArray(data) ? data : [];
-    byId = new Map();
-    currentData.forEach(r => {
-      if (!r || !r.standId) return;
-      byId.set(String(r.standId).trim(), {
-        standId: String(r.standId).trim(),
-        status: normalizeStatus(r.status),
-        company: String(r.company || '').trim()
-      });
-    });
-    renderAll();
-
-    // keep selection in sync
-    if (selectedId && byId.has(selectedId)) {
-      const info = byId.get(selectedId);
+    if(selectedId){
+      const info = byId.get(selectedId) || {standId:selectedId, status:'available', company:''};
       standIdEl.value = info.standId;
       statusEl.value = info.status;
       companyEl.value = info.company || '';
     }
   }
 
-  async function loadDataFromSheet() {
+  function selectStand(id){
+    selectedId = id;
+    const info = byId.get(id) || {standId:id, status:'available', company:''};
+    standIdEl.value = info.standId;
+    statusEl.value = info.status;
+    companyEl.value = info.company || '';
+    btnSave.disabled=false;
+    btnClear.disabled=false;
+  }
+
+  async function loadData(){
     const data = await jsonp(SHEET_API_URL);
     applyStandData(data);
-    lastSyncAt = new Date();
-    setStatusOk('Synced: ' + lastSyncAt.toLocaleString());
+    setStatus('Synced: ' + new Date().toLocaleString(), 'ok');
   }
 
-  async function syncLoop() {
-    try {
-      await loadDataFromSheet();
-    } catch (err) {
-      setStatusErr('Sync error: ' + err.message);
-    } finally {
-      setTimeout(syncLoop, 5000);
-    }
+  async function loop(){
+    try{ await loadData(); }
+    catch(err){ setStatus('Sync error: ' + err.message, 'err'); }
+    finally{ setTimeout(loop, 5000); }
   }
 
-  // Save handlers
-  btnSave.addEventListener('click', async () => {
-    if (!selectedId) return;
+  btnSave.addEventListener('click', async ()=>{
+    if(!selectedId) return;
     const standId = standIdEl.value.trim();
     const status = normalizeStatus(statusEl.value);
-    const company = (status === 'sold') ? companyEl.value.trim() : '';
+    const company = (status==='sold') ? companyEl.value.trim() : '';
 
-    btnSave.disabled = true;
-    btnClear.disabled = true;
-    setStatusWarn('Saving…');
-
-    try {
-      await postToSheet({ standId, status, company });
-      await loadDataFromSheet(); // refresh immediately
-      setStatusOk('Saved: ' + new Date().toLocaleString());
-    } catch (err) {
-      setStatusErr('Save error: ' + err.message);
-    } finally {
-      btnSave.disabled = false;
-      btnClear.disabled = false;
+    btnSave.disabled=true; btnClear.disabled=true;
+    setStatus('Saving…','warn');
+    try{
+      await postToSheet({standId, status, company});
+      await loadData();
+      setStatus('Saved: ' + new Date().toLocaleString(),'ok');
+    }catch(err){
+      setStatus('Save error: ' + err.message,'err');
+    }finally{
+      btnSave.disabled=false; btnClear.disabled=false;
     }
   });
 
-  btnClear.addEventListener('click', async () => {
-    if (!selectedId) return;
+  btnClear.addEventListener('click', async ()=>{
+    if(!selectedId) return;
     const standId = standIdEl.value.trim();
 
-    btnSave.disabled = true;
-    btnClear.disabled = true;
-    setStatusWarn('Saving…');
-
-    try {
-      await postToSheet({ standId, status:'available', company:'' });
-      await loadDataFromSheet();
-      statusEl.value = 'available';
-      companyEl.value = '';
-      setStatusOk('Saved: ' + new Date().toLocaleString());
-    } catch (err) {
-      setStatusErr('Save error: ' + err.message);
-    } finally {
-      btnSave.disabled = false;
-      btnClear.disabled = false;
+    btnSave.disabled=true; btnClear.disabled=true;
+    setStatus('Saving…','warn');
+    try{
+      await postToSheet({standId, status:'available', company:''});
+      await loadData();
+      statusEl.value='available'; companyEl.value='';
+      setStatus('Saved: ' + new Date().toLocaleString(),'ok');
+    }catch(err){
+      setStatus('Save error: ' + err.message,'err');
+    }finally{
+      btnSave.disabled=false; btnClear.disabled=false;
     }
   });
 
-  // Export CSV (Excel-friendly)
-  function toCsvRow(values) {
-    return values.map(v => {
-      const s = String(v ?? '');
-      if (/[",\n]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
-      return s;
-    }).join(',');
+  // CSV helpers
+  function csvEscape(v){
+    const s = String(v ?? '');
+    return (/[",\n]/.test(s)) ? '"' + s.replace(/"/g,'""') + '"' : s;
   }
-
-  btnExport.addEventListener('click', () => {
+  btnExport.addEventListener('click', ()=>{
     const rows = [['standId','status','company']];
-    const list = Array.from(byId.values()).sort((a,b) => a.standId.localeCompare(b.standId, undefined, {numeric:true}));
-    list.forEach(r => rows.push([r.standId, r.status, r.company || '']));
-
-    const csv = rows.map(r => toCsvRow(r)).join('\n');
-    const blob = new Blob([csv], { type:'text/csv;charset=utf-8' });
-
-    const ts = new Date().toISOString().replace(/[:.]/g,'-');
+    const list = Array.from(byId.values()).sort((a,b)=>a.standId.localeCompare(b.standId, undefined, {numeric:true}));
+    list.forEach(r=>rows.push([r.standId, r.status, r.company||'']));
+    const csv = rows.map(r=>r.map(csvEscape).join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `floorplan-stands-${ts}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    a.download = 'floorplan-stands-' + new Date().toISOString().replace(/[:.]/g,'-') + '.csv';
+    document.body.appendChild(a); a.click(); a.remove();
   });
 
-  // Import CSV (bulk update)
-  async function parseCsv(text) {
-    // small CSV parser (handles quoted fields)
-    const rows = [];
-    let i=0, field='', row=[], inQuotes=false;
+  btnImport.addEventListener('click', ()=> fileImport.click());
 
-    while (i < text.length) {
-      const c = text[i];
-      if (inQuotes) {
-        if (c === '"') {
-          if (text[i+1] === '"') { field += '"'; i += 2; continue; }
-          inQuotes = false; i++; continue;
+  async function parseCsv(text){
+    const rows=[]; let i=0, field='', row=[], inQuotes=false;
+    while(i<text.length){
+      const c=text[i];
+      if(inQuotes){
+        if(c === '"'){
+          if(text[i+1] === '"'){ field+='"'; i+=2; continue; }
+          inQuotes=false; i++; continue;
         }
-        field += c; i++; continue;
-      } else {
-        if (c === '"') { inQuotes = true; i++; continue; }
-        if (c === ',') { row.push(field); field=''; i++; continue; }
-        if (c === '\r') { i++; continue; }
-        if (c === '\n') { row.push(field); rows.push(row); row=[]; field=''; i++; continue; }
-        field += c; i++; continue;
+        field+=c; i++; continue;
+      }else{
+        if(c === '"'){ inQuotes=true; i++; continue; }
+        if(c === ','){ row.push(field); field=''; i++; continue; }
+        if(c === '\r'){ i++; continue; }
+        if(c === '\n'){ row.push(field); rows.push(row); row=[]; field=''; i++; continue; }
+        field+=c; i++; continue;
       }
     }
-    row.push(field);
-    rows.push(row);
-    return rows.filter(r => r.some(x => String(x||'').trim() !== ''));
+    row.push(field); rows.push(row);
+    return rows.filter(r=>r.some(x=>String(x||'').trim()!==''));
   }
 
-  fileImport.addEventListener('change', async (evt) => {
+  fileImport.addEventListener('change', async (evt)=>{
     const file = evt.target.files && evt.target.files[0];
-    if (!file) return;
+    if(!file) return;
 
-    btnImport.disabled = true;
-    btnExport.disabled = true;
-    setStatusWarn('Importing…');
+    btnImport.disabled=true; btnExport.disabled=true;
+    setStatus('Importing…','warn');
 
-    try {
+    try{
       const text = await file.text();
       const rows = await parseCsv(text);
-
-      const header = rows[0].map(h => String(h||'').trim().toLowerCase());
+      const header = rows[0].map(h=>String(h||'').trim().toLowerCase());
       const idxStand = header.indexOf('standid');
       const idxStatus = header.indexOf('status');
       const idxCompany = header.indexOf('company');
+      if(idxStand === -1 || idxStatus === -1) throw new Error('CSV must include headers: standId,status,company');
 
-      if (idxStand === -1 || idxStatus === -1) {
-        throw new Error('CSV must include headers: standId,status,company');
+      for(let r=1;r<rows.length;r++){
+        const rr=rows[r];
+        const standId = String(rr[idxStand]||'').trim();
+        if(!standId) continue;
+        const status = normalizeStatus(rr[idxStatus]);
+        const company = (status==='sold') ? String(rr[idxCompany]||'').trim() : '';
+        await postToSheet({standId, status, company});
       }
-
-      // Bulk update sequentially (simple + reliable)
-      for (let r = 1; r < rows.length; r++) {
-        const row = rows[r];
-        const standId = String(row[idxStand] || '').trim();
-        if (!standId) continue;
-        const status = normalizeStatus(row[idxStatus]);
-        const company = status === 'sold' ? String(row[idxCompany] || '').trim() : '';
-        await postToSheet({ standId, status, company });
-      }
-
-      await loadDataFromSheet();
-      setStatusOk('Import complete: ' + new Date().toLocaleString());
-    } catch (err) {
-      setStatusErr('Import error: ' + err.message);
-    } finally {
-      btnImport.disabled = false;
-      btnExport.disabled = false;
-      fileImport.value = '';
+      await loadData();
+      setStatus('Import complete: ' + new Date().toLocaleString(),'ok');
+    }catch(err){
+      setStatus('Import error: ' + err.message,'err');
+    }finally{
+      btnImport.disabled=false; btnExport.disabled=false;
+      fileImport.value='';
     }
   });
 
-  (async () => {
-    try {
-      await loadSvg();
-      await loadDataFromSheet();
-      syncLoop();
-    } catch (err) {
-      setStatusErr('Load error: ' + err.message);
-    }
+  (async ()=>{
+    try{ await loadSvg(); await loop(); }
+    catch(err){ setStatus('Load error: ' + err.message,'err'); }
   })();
 })();
 </script>
