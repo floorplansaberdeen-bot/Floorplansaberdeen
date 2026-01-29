@@ -1,393 +1,120 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta charset="UTF-8">
 <title>Floorplan Admin</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
 <style>
-  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#fff;color:#111;}
-  header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #e5e7eb;}
-  header h1{margin:0;font-size:18px;}
-  #syncStatus{font-size:13px;color:#b91c1c;}
-  .wrap{padding:14px 16px 24px;display:grid;grid-template-columns:1.3fr .7fr;gap:14px;}
-  @media(max-width:980px){.wrap{grid-template-columns:1fr;}}
-  .card{border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;background:#fff;}
-  .topbar{display:flex;justify-content:flex-end;gap:10px;align-items:center;padding:10px 12px;border-bottom:1px solid #e5e7eb;}
-  button{border:1px solid #d1d5db;background:#f9fafb;color:#111;padding:8px 10px;border-radius:10px;cursor:pointer;font-weight:600;}
-  button.primary{background:#dcfce7;border-color:#86efac;}
-  button.danger{background:#fee2e2;border-color:#fca5a5;}
-  button:disabled{opacity:.55;cursor:not-allowed;}
-  .panel{padding:12px;display:grid;gap:10px;}
-  label{font-size:12px;color:#6b7280;}
-  input[type=text],select{width:100%;padding:9px 10px;border-radius:10px;border:1px solid #d1d5db;background:#fff;}
-  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-  .btnrow{display:flex;gap:10px;flex-wrap:wrap;}
-  .legend{display:flex;gap:14px;align-items:center;padding:10px 12px;border-top:1px solid #e5e7eb;font-size:13px;}
-  .dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px;border:1px solid rgba(0,0,0,.15);}
-  .sold{background:#ef4444;}
-  .avail{background:#22c55e;}
-  #tooltip{position:fixed;z-index:9999;pointer-events:none;display:none;white-space:pre-wrap;
-    background:rgba(17,24,39,.95);color:#fff;border-radius:10px;padding:8px 10px;font-size:13px;
-    box-shadow:0 10px 26px rgba(0,0,0,.25);max-width:min(340px,80vw);}
-  #svgHost svg text, #svgHost svg tspan { pointer-events:none; user-select:none; }
+  body {
+    margin: 0;
+    font-family: Arial, Helvetica, sans-serif;
+    background: #ffffff;
+    color: #111;
+  }
+
+  header {
+    padding: 12px 16px;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  #status {
+    font-size: 13px;
+    color: #555;
+  }
+
+  #layout {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 12px;
+    padding: 12px;
+  }
+
+  #svgHost {
+    border: 1px solid #ddd;
+  }
+
+  svg text, svg tspan {
+    pointer-events: none;
+    user-select: none;
+  }
+
+  label {
+    font-size: 12px;
+    color: #444;
+  }
+
+  input, select, button {
+    width: 100%;
+    padding: 8px;
+    margin-top: 4px;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  #tooltip {
+    position: fixed;
+    display: none;
+    background: rgba(0,0,0,0.85);
+    color: #fff;
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 13px;
+    white-space: pre-line;
+    pointer-events: none;
+  }
 </style>
 </head>
+
 <body>
 <header>
-  <h1>Floorplan Admin</h1>
-  <div id="syncStatus">Loading…</div>
+  <strong>Floorplan Admin</strong>
+  <div id="status">Loading…</div>
 </header>
 
-<div class="wrap">
-  <div class="card">
-    <div class="topbar">
-      <button id="btnExport">Export CSV</button>
-      <label style="display:inline-flex;gap:8px;align-items:center;">
-        <input id="fileImport" type="file" accept=".csv,text/csv" style="display:none"/>
-        <button type="button" id="btnImport">Import CSV</button>
-      </label>
-    </div>
-    <div id="svgHost"></div>
-    <div class="legend">
-      <span><span class="dot sold"></span>Sold</span>
-      <span><span class="dot avail"></span>Available</span>
-    </div>
-  </div>
+<div id="layout">
+  <div id="svgHost"></div>
 
-  <div class="card">
-    <div class="panel">
-      <div><strong>Selected Stand</strong></div>
-      <div>
-        <label>Stand ID</label>
-        <input id="standId" type="text" readonly />
-      </div>
-      <div class="row">
-        <div>
-          <label>Status</label>
-          <select id="status">
-            <option value="available">Available</option>
-            <option value="sold">Sold</option>
-          </select>
-        </div>
-        <div>
-          <label>Company (sold only)</label>
-          <input id="company" type="text" placeholder="Company name…" />
-        </div>
-      </div>
-      <div class="btnrow">
-        <button class="primary" id="btnSave" disabled>Save</button>
-        <button class="danger" id="btnClear" disabled>Mark Available</button>
-      </div>
-      <div style="font-size:12px;color:#6b7280;">
-        Click a stand to edit. Hover shows stand, status, and company (if sold).
-      </div>
-    </div>
+  <div>
+    <label>Stand ID</label>
+    <input id="standId" readonly>
+
+    <label>Status</label>
+    <select id="statusSel">
+      <option value="available">Available</option>
+      <option value="sold">Sold</option>
+    </select>
+
+    <label>Company</label>
+    <input id="company">
+
+    <button id="save">Save</button>
   </div>
 </div>
 
 <div id="tooltip"></div>
 
 <script>
-(() => {
-  const SHEET_API_URL = 'https://script.google.com/macros/s/AKfycbxEq83BUYJ-oewP_2lPFL0tyol4veM2mhukSTTMCaKCZgEJS5m-f8Jqy1EO_bDc3q3a/exec';
-  const SVG_URL = './event_plan.svg';
-  const COLOR_SOLD = '#ef4444';
-  const COLOR_AVAILABLE = '#22c55e';
+const API_BASE = 'https://floorplansaberdeen.floorplansaberdeen.workers.dev';
+const SVG_URL = './event_plan.svg';
+const FILL_OPACITY = 0.75;
 
-  const svgHost = document.getElementById('svgHost');
-  const syncStatus = document.getElementById('syncStatus');
-  const tooltip = document.getElementById('tooltip');
+const statusEl = document.getElementById('status');
+const svgHost = document.getElementById('svgHost');
+const tooltip = document.getElementById('tooltip');
 
-  const standIdEl = document.getElementById('standId');
-  const statusEl = document.getElementById('status');
-  const companyEl = document.getElementById('company');
-  const btnSave = document.getElementById('btnSave');
-  const btnClear = document.getElementById('btnClear');
+const standIdEl = document.getElementById('standId');
+const statusSel = document.getElementById('statusSel');
+const companyEl = document.getElementById('company');
+const saveBtn = document.getElementById('save');
 
-  const btnExport = document.getElementById('btnExport');
-  const btnImport = document.getElementById('btnImport');
-  const fileImport = document.getElementById('fileImport');
+let current = new Map();
+let selected = null;
 
-  let svgRoot = null;
-  let map = new Map();
-  let selectedId = null;
-
-  function setStatus(text, isError=false){
-    syncStatus.textContent = text;
-    syncStatus.style.color = isError ? '#b91c1c' : '#374151';
-  }
-
-  function normalizeStatus(v){
-    v = String(v||'').toLowerCase().trim();
-    return v === 'sold' ? 'sold' : 'available';
-  }
-
-  function tooltipText(standId, status, company){
-    const s = normalizeStatus(status);
-    const lines = [String(standId||'').trim(), s==='sold'?'Sold':'Available'];
-    if (s==='sold' && company) lines.push(String(company).trim());
-    return lines.join('\n');
-  }
-
-  function jsonp(url, timeoutMs=12000){
-    return new Promise((resolve,reject)=>{
-      const cb = 'cb_' + Math.random().toString(36).slice(2);
-      const script = document.createElement('script');
-      let done = false;
-
-      const timer = setTimeout(()=>finish(new Error('JSONP timeout')), timeoutMs);
-
-      function finish(err, data){
-        if (done) return;
-        done = true;
-        clearTimeout(timer);
-        script.remove();
-        try { delete window[cb]; } catch(e) { window[cb]=undefined; }
-        err ? reject(err) : resolve(data);
-      }
-
-      window[cb] = (data)=>finish(null,data);
-
-      const sep = url.includes('?') ? '&' : '?';
-      script.src = url + sep + 'callback=' + cb + '&_=' + Date.now();
-      script.onerror = () => finish(new Error('JSONP network error (failed to load script)'));
-      document.head.appendChild(script);
-    });
-  }
-
-  async function postToSheet(payload){
-    const body = new URLSearchParams(payload);
-    const res = await fetch(SHEET_API_URL, { method:'POST', body });
-    const text = await res.text();
-    let json = null;
-    try { json = JSON.parse(text); } catch(e) {}
-    if (!res.ok || (json && json.success === false)) {
-      throw new Error((json && json.error) ? json.error : (text || 'Write failed'));
-    }
-    return json || { success:true };
-  }
-
-  function buildMap(data){
-    const m = new Map();
-    (Array.isArray(data)?data:[]).forEach(r=>{
-      if (!r || !r.standId) return;
-      m.set(String(r.standId).trim(), {
-        standId: String(r.standId).trim(),
-        status: normalizeStatus(r.status),
-        company: String(r.company||'').trim()
-      });
-    });
-    return m;
-  }
-
-  function applyPaint(el, status){
-    const s = normalizeStatus(status);
-    const fill = (s==='sold') ? COLOR_SOLD : COLOR_AVAILABLE;
-    const shapes = el.matches('path,rect,polygon,circle,ellipse') ? [el]
-      : Array.from(el.querySelectorAll('path,rect,polygon,circle,ellipse'));
-    shapes.forEach(sh=>{
-      sh.style.fill = fill;
-      sh.style.fillOpacity = '0.5';
-      sh.style.stroke = 'rgba(0,0,0,.55)';
-      sh.style.strokeWidth = '1';
-      sh.style.strokeOpacity = '0.9';
-      sh.style.cursor = 'pointer';
-    });
-  }
-
-  function attachTooltip(el, id){
-    el.addEventListener('mousemove', (evt)=>{
-      const info = map.get(id) || { standId:id, status:'available', company:'' };
-      tooltip.textContent = tooltipText(info.standId, info.status, info.company);
-      tooltip.style.left = (evt.clientX + 12) + 'px';
-      tooltip.style.top = (evt.clientY + 12) + 'px';
-      tooltip.style.display = 'block';
-    });
-    el.addEventListener('mouseleave', ()=> tooltip.style.display='none');
-  }
-
-  function attachClick(el, id){
-    el.addEventListener('click', ()=>{
-      const info = map.get(id) || { standId:id, status:'available', company:'' };
-      selectedId = id;
-      standIdEl.value = info.standId;
-      statusEl.value = info.status;
-      companyEl.value = info.company || '';
-      btnSave.disabled = false;
-      btnClear.disabled = false;
-    });
-  }
-
-  function applyAll(){
-    if (!svgRoot) return;
-    map.forEach((info,id)=>{
-      const el = svgRoot.querySelector('#' + CSS.escape(id));
-      if (!el) return;
-      if (el.matches('text,tspan')) return;
-      applyPaint(el, info.status);
-    });
-  }
-
-  function wireAll(){
-    if (!svgRoot) return;
-    map.forEach((info,id)=>{
-      const el = svgRoot.querySelector('#' + CSS.escape(id));
-      if (!el) return;
-      if (el.matches('text,tspan')) return;
-      attachTooltip(el, id);
-      attachClick(el, id);
-    });
-  }
-
-  async function loadSvg(){
-    const res = await fetch(SVG_URL, { cache:'no-store' });
-    if (!res.ok) throw new Error('Failed to load SVG: ' + res.status);
-    svgHost.innerHTML = await res.text();
-    svgRoot = svgHost.querySelector('svg');
-    if (!svgRoot) throw new Error('SVG root not found');
-  }
-
-  async function syncOnce(){
-    const data = await jsonp(SHEET_API_URL);
-    map = buildMap(data);
-    applyAll();
-    wireAll();
-    setStatus('Synced: ' + new Date().toLocaleString(), false);
-
-    if (selectedId && map.has(selectedId)) {
-      const info = map.get(selectedId);
-      standIdEl.value = info.standId;
-      statusEl.value = info.status;
-      companyEl.value = info.company || '';
-    }
-  }
-
-  async function loop(){
-    try {
-      await syncOnce();
-    } catch(err) {
-      setStatus('Sync error: ' + err.message, true);
-      console.error('JSONP sync failed. Check that SHEET_API_URL is correct and deployment is public.', err);
-    } finally {
-      setTimeout(loop, 5000);
-    }
-  }
-
-  btnSave.addEventListener('click', async ()=>{
-    if (!selectedId) return;
-    const standId = standIdEl.value.trim();
-    const status = normalizeStatus(statusEl.value);
-    const company = (status === 'sold') ? companyEl.value.trim() : '';
-
-    btnSave.disabled = true; btnClear.disabled = true;
-    setStatus('Saving…', false);
-    try {
-      await postToSheet({ standId, status, company });
-      await syncOnce();
-      setStatus('Saved: ' + new Date().toLocaleString(), false);
-    } catch(err) {
-      setStatus('Save error: ' + err.message, true);
-    } finally {
-      btnSave.disabled = false; btnClear.disabled = false;
-    }
-  });
-
-  btnClear.addEventListener('click', async ()=>{
-    if (!selectedId) return;
-    const standId = standIdEl.value.trim();
-    btnSave.disabled = true; btnClear.disabled = true;
-    setStatus('Saving…', false);
-    try {
-      await postToSheet({ standId, status:'available', company:'' });
-      await syncOnce();
-      statusEl.value='available'; companyEl.value='';
-      setStatus('Saved: ' + new Date().toLocaleString(), false);
-    } catch(err) {
-      setStatus('Save error: ' + err.message, true);
-    } finally {
-      btnSave.disabled = false; btnClear.disabled = false;
-    }
-  });
-
-  function toCsvCell(v){
-    const s = String(v ?? '');
-    return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
-  }
-
-  btnExport.addEventListener('click', ()=>{
-    const rows = [['standId','status','company']];
-    const list = Array.from(map.values()).sort((a,b)=>a.standId.localeCompare(b.standId, undefined, {numeric:true}));
-    list.forEach(r=>rows.push([r.standId, r.status, r.company||'']));
-    const csv = rows.map(r=>r.map(toCsvCell).join(',')).join('\n');
-    const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
-    const ts = new Date().toISOString().replace(/[:.]/g,'-');
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `floorplan-stands-${ts}.csv`;
-    document.body.appendChild(a); a.click(); a.remove();
-  });
-
-  btnImport.addEventListener('click', ()=> fileImport.click());
-
-  function parseCsv(text){
-    const rows=[]; let i=0, field='', row=[], q=false;
-    while(i<text.length){
-      const c=text[i];
-      if(q){
-        if(c=='"'){ if(text[i+1]=='"'){field+='"'; i+=2; continue;} q=false; i++; continue;}
-        field+=c; i++; continue;
-      } else {
-        if(c=='"'){q=true; i++; continue;}
-        if(c==','){row.push(field); field=''; i++; continue;}
-        if(c=='\r'){i++; continue;}
-        if(c=='\n'){row.push(field); rows.push(row); row=[]; field=''; i++; continue;}
-        field+=c; i++; continue;
-      }
-    }
-    row.push(field); rows.push(row);
-    return rows.filter(r=>r.some(x=>String(x||'').trim()!==''));
-  }
-
-  fileImport.addEventListener('change', async (evt)=>{
-    const file = evt.target.files && evt.target.files[0];
-    if(!file) return;
-    btnImport.disabled=true; btnExport.disabled=true;
-    setStatus('Importing…', false);
-    try {
-      const text = await file.text();
-      const rows = parseCsv(text);
-      const header = rows[0].map(h=>String(h||'').trim().toLowerCase());
-      const iStand = header.indexOf('standid');
-      const iStatus = header.indexOf('status');
-      const iCompany = header.indexOf('company');
-      if(iStand===-1 || iStatus===-1) throw new Error('CSV needs headers: standId,status,company');
-
-      for(let r=1;r<rows.length;r++) {
-        const row = rows[r];
-        const standId = String(row[iStand]||'').trim();
-        if(!standId) continue;
-        const status = normalizeStatus(row[iStatus]);
-        const company = status==='sold' ? String(row[iCompany]||'').trim() : '';
-        await postToSheet({ standId, status, company });
-      }
-      await syncOnce();
-      setStatus('Import complete: ' + new Date().toLocaleString(), false);
-    } catch(err) {
-      setStatus('Import error: ' + err.message, true);
-    } finally {
-      btnImport.disabled=false; btnExport.disabled=false; fileImport.value='';
-    }
-  });
-
-  (async()=>{
-    try {
-      await loadSvg();
-      await loop();
-    } catch(err) {
-      setStatus('Load error: ' + err.message, true);
-    }
-  })();
-})();
-</script>
-</body>
-</html>
+function normalizeStatus(v) {
+  return String(v).toLowerCase().trim() === '
