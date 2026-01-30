@@ -101,6 +101,18 @@
 
 <script>
 (() => {
+
+  // Safari compatibility: CSS.escape polyfill
+  if (!window.CSS) window.CSS = {};
+  if (typeof window.CSS.escape !== 'function') {
+    window.CSS.escape = function (value) {
+      return String(value).replace(/[^a-zA-Z0-9_\-]/g, function (ch) {
+        const hex = ch.codePointAt(0).toString(16).toUpperCase();
+        return '\\' + hex + ' ';
+      });
+    };
+  }
+
   const API_BASE = 'https://floorplansaberdeen.floorplansaberdeen.workers.dev';
   const SVG_URL = './event_plan.svg';
   const FILL_OPACITY = 0.75;
@@ -124,6 +136,8 @@
   let byId = new Map(); // standId -> {standId,status,company}
   let calloutLayer = null;
   let pinned = new Set();
+  let bboxCache = new Map();
+  let pinsRaf = 0;
 
   // Stand IDs look like: A1, AA1, AB2, AD10, SB20, C6 etc.
   const STAND_ID_RE = /^([A-Z]{1,3})(\d{1,3})$/;
@@ -149,7 +163,32 @@
   }
 
   
-  function splitLines(text, maxChars){
+  
+  function scheduleRenderPins(){
+    if (pinsRaf) return;
+    pinsRaf = requestAnimationFrame(() => {
+      pinsRaf = 0;
+      renderPins();
+    });
+
+    calloutLayer.appendChild(frag);
+  }
+
+  function getStandBox(standId){
+    if (bboxCache.has(standId)) return bboxCache.get(standId);
+    const node = svgRoot.querySelector('#' + CSS.escape(standId));
+    if (!node) return null;
+    try{
+      const bb = node.getBBox();
+      const info = { bb, cx: bb.x + bb.width/2, cy: bb.y + bb.height/2 };
+      bboxCache.set(standId, info);
+      return info;
+    }catch{
+      return null;
+    }
+  }
+
+function splitLines(text, maxChars){
     const s = String(text || '').trim();
     if (!s) return [''];
     const words = s.split(/\s+/);
@@ -245,7 +284,7 @@ async function fetchJson(url){
   function togglePin(standId){
     if (pinned.has(standId)) pinned.delete(standId);
     else pinned.add(standId);
-    renderPins();
+    scheduleRenderPins();
     renderSoldList();
   }
 
@@ -254,6 +293,8 @@ async function fetchJson(url){
     if (!calloutLayer) return;
     calloutLayer.innerHTML = '';
     if (!pinned.size) return;
+
+    const frag = document.createDocumentFragment();
 
     // Build list of pin infos (sold with company only)
     const pins = Array.from(pinned)
@@ -289,63 +330,72 @@ async function fetchJson(url){
     // Sort pins by stand position (top-to-bottom) for nicer stacking
     const pinsWithBox = [];
     for (const info of pins){
-      const node = svgRoot.querySelector('#' + CSS.escape(info.standId));
-      if (!node) continue;
-      try{
-        const bb = node.getBBox();
-        pinsWithBox.push({info, bb, cx: bb.x + bb.width/2, cy: bb.y + bb.height/2});
-      }catch{}
+      const box = getStandBox(info.standId);
+      if (!box) continue;
+      pinsWithBox.push({info, bb: box.bb, cx: box.cx, cy: box.cy});
     }
     pinsWithBox.sort((a,b)=>a.cy-b.cy);
 
     const startY = bounds.y + 40;
     const stepY = 44;
 
-    pinsWithBox.forEach((p, idx) => {
+    pinsWithBox.slice(0, 50).forEach((p, idx) => {  // cap to keep Safari responsive
+
       const labelX = useRight ? rightColX : leftColX;
       const labelY = Math.max(bounds.y + 30, Math.min(startY + idx*stepY, bounds.y + bounds.h - 30));
 
       const line = svgEl('line', {x1:p.cx,y1:p.cy,x2:labelX,y2:labelY,stroke:'#111','stroke-width':2,'stroke-linecap':'round'});
       line.style.opacity = '0.85';
-      calloutLayer.appendChild(line);
+      frag.appendChild(line);
 
       const g = svgEl('g', {});
       const lines = splitLines(p.info.company, 26);
       const baseFont = (p.info.company.length > 28) ? 12 : 14;
 
-      const text = svgEl('text', {
-        x: labelX,
-        y: labelY,
-        'font-size': baseFont,
-        'font-family': 'Arial, Helvetica, sans-serif',
-        'font-weight': '700',
-        fill: '#111'
-      });
-
-      // multi-line using tspans
-      lines.forEach((ln, i) => {
-        const t = svgEl('tspan', { x: labelX, dy: i === 0 ? 0 : (baseFont + 4) });
-        t.textContent = ln;
-        text.appendChild(t);
-      });
-
-      g.appendChild(text);
-      calloutLayer.appendChild(g);
-
+      // Estimate box size (avoid expensive text.getBBox in Safari)
+      const charW = baseFont * 0.62; // rough average
+      const maxLineLen = Math.max(...lines.map(l => l.length), 1);
       const pad = 10;
-      const tb = text.getBBox();
+      const lineH = baseFont + 4;
+      const boxW = Math.min(360, Math.max(120, Math.ceil(maxLineLen * charW) + pad * 2));
+      const boxH = Math.ceil(lines.length * lineH) + pad * 2;
+
+      // Draw rect first
       const rect = svgEl('rect', {
-        x: tb.x - pad,
-        y: tb.y - pad,
-        width: tb.width + pad * 2,
-        height: tb.height + pad * 2,
+        x: labelX,
+        y: labelY - (boxH/2),
+        width: boxW,
+        height: boxH,
         rx: 10, ry: 10,
         fill: '#fff',
         stroke: '#111',
         'stroke-width': 2
       });
       rect.style.opacity = '0.92';
-      g.insertBefore(rect, text);
+
+      // Text inside the box (top-left)
+      const textX = labelX + pad;
+      const textY = (labelY - (boxH/2)) + pad;
+
+      const text = svgEl('text', {
+        x: textX,
+        y: textY,
+        'font-size': baseFont,
+        'font-family': 'Arial, Helvetica, sans-serif',
+        'font-weight': '700',
+        fill: '#111',
+        'dominant-baseline': 'hanging'
+      });
+
+      lines.forEach((ln, i) => {
+        const t = svgEl('tspan', { x: textX, dy: i === 0 ? 0 : lineH });
+        t.textContent = ln;
+        text.appendChild(t);
+      });
+
+      // Add to layer
+      frag.appendChild(rect);
+      frag.appendChild(text);
     });
   }
   function bindNodeEvents(node){
@@ -413,8 +463,7 @@ async function fetchJson(url){
 
       renderPlan();
       renderSoldList();
-
-      renderPins();
+      scheduleRenderPins();
 
       setStatus('Synced: ' + new Date().toLocaleTimeString());
     }catch(e){
@@ -427,6 +476,7 @@ async function fetchJson(url){
     try{
       setStatus('Loading…');
       await loadSvg();
+      bboxCache = new Map();
       ensureCalloutLayer();
       getStandNodes().forEach(bindNodeEvents);
 

@@ -167,6 +167,18 @@
 
 <script>
 (() => {
+
+  // Safari compatibility: CSS.escape polyfill
+  if (!window.CSS) window.CSS = {};
+  if (typeof window.CSS.escape !== 'function') {
+    window.CSS.escape = function (value) {
+      return String(value).replace(/[^a-zA-Z0-9_\-]/g, function (ch) {
+        const hex = ch.codePointAt(0).toString(16).toUpperCase();
+        return '\\' + hex + ' ';
+      });
+    };
+  }
+
   const API_BASE = 'https://floorplansaberdeen.floorplansaberdeen.workers.dev';
   const SVG_URL = './event_plan.svg';
   const FILL_OPACITY = 0.75;
@@ -176,7 +188,7 @@
   const STAND_ID_RE = /^([A-Z]{1,3})(\d{1,3})$/;
   // Simple safeguard password for the Reset-all button (edit this).
     // Simple page-gate password to prevent accidental access (edit this).
-  const ADMIN_PASSWORD = 'FLOORPASS1';
+  const ADMIN_PASSWORD = 'CHANGE_ME';
   // Reset-all uses the same password
   const RESET_PASSWORD = ADMIN_PASSWORD;
 
@@ -298,6 +310,10 @@
 let svgRoot = null;
   let zoomSvgRoot = null;
   let byId = new Map();
+  let bboxCache = new Map();
+  let zoomRaf = 0;
+  let tipRaf = 0;
+  let lastTip = null;
   let selectedId = '';
   let autoSyncEnabled = true;
   let dirty = false;
@@ -411,7 +427,44 @@ let svgRoot = null;
     countEl.textContent = filtered.length+' / '+items.length;
   }
 
-    function initZoomSvg(){
+    
+  function getStandBox(standId){
+    if (bboxCache.has(standId)) return bboxCache.get(standId);
+    const node = svgRoot?.querySelector('#' + CSS.escape(standId));
+    if (!node) return null;
+    try{
+      const bb = node.getBBox();
+      const info = { bb };
+      bboxCache.set(standId, info);
+      return info;
+    }catch{
+      return null;
+    }
+  }
+
+  function scheduleUpdateZoom(standId){
+    if (!standId) return;
+    if (zoomRaf) cancelAnimationFrame(zoomRaf);
+    zoomRaf = requestAnimationFrame(() => {
+      zoomRaf = 0;
+      updateZoom(standId);
+    });
+  }
+
+  function scheduleTooltipUpdate(){
+    if (tipRaf) return;
+    tipRaf = requestAnimationFrame(() => {
+      tipRaf = 0;
+      if (!lastTip) return;
+      const { x, y, text } = lastTip;
+      tooltip.textContent = text;
+      tooltip.style.left = (x + 12) + 'px';
+      tooltip.style.top  = (y + 12) + 'px';
+      tooltip.style.display = 'block';
+    });
+  }
+
+function initZoomSvg(){
     if(!zoomHost || !svgRoot) return;
     zoomHost.innerHTML='';
     zoomSvgRoot = svgRoot.cloneNode(true);
@@ -442,9 +495,9 @@ let svgRoot = null;
 
   function updateZoom(standId){
     if(!zoomSvgRoot || !svgRoot || !standId) return;
-    const src = svgRoot.querySelector('#'+CSS.escape(standId));
-    if(!src) return;
-    let bb; try{ bb = src.getBBox(); }catch{ return; }
+    const box = getStandBox(standId);
+    if(!box) return;
+    const bb = box.bb;
     const pad = Math.max(20, Math.max(bb.width, bb.height) * 0.6);
     const x = bb.x - pad, y = bb.y - pad, w = bb.width + pad*2, h = bb.height + pad*2;
     zoomSvgRoot.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
@@ -472,7 +525,7 @@ let svgRoot = null;
 
     renderPreview(info);
     renderList();
-    updateZoom(info.standId);
+    scheduleUpdateZoom(info.standId);
 
     if(scrollToRow){
       const row=Array.from(tbody.querySelectorAll('tr')).find(tr=>tr.firstChild && tr.firstChild.textContent===standId);
@@ -488,10 +541,8 @@ let svgRoot = null;
 
     node.addEventListener('mousemove',e=>{
       const info=byId.get(standId)||{standId,status:'available',company:''};
-      tooltip.textContent=tooltipText(info);
-      tooltip.style.left=(e.clientX+12)+'px';
-      tooltip.style.top=(e.clientY+12)+'px';
-      tooltip.style.display='block';
+      lastTip = { x: e.clientX, y: e.clientY, text: tooltipText(info) };
+      scheduleTooltipUpdate();
     });
     node.addEventListener('mouseleave',()=>tooltip.style.display='none');
     node.addEventListener('click',()=>selectStand(standId,true));
@@ -517,7 +568,7 @@ let svgRoot = null;
           statusSel.value = normalizeStatus(info.status);
           companyEl.value = info.company||'';
           renderPreview(info);
-          updateZoom(info.standId);
+          scheduleUpdateZoom(info.standId);
         }
       }
 
@@ -681,6 +732,7 @@ statusSel.addEventListener('change', setDirty);
       }
       setStatus('Loading…');
       await loadSvg();
+      bboxCache = new Map();
       getStandNodes().forEach(bindNodeEvents);
       initZoomSvg();
       await syncOnce();
