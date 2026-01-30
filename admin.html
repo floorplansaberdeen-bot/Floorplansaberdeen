@@ -186,22 +186,18 @@
 
   
   function requireAdminLogin(){
-    try{
-      if (sessionStorage.getItem('fp_admin_ok') === '1') return true;
-    }catch{}
+  // Always prompt on every page load
+  for (let i = 0; i < 3; i++){
+    const entered = prompt('Admin password:');
+    if (entered === null) break;
 
-    // Allow up to 3 attempts
-    for (let i=0;i<3;i++){
-      const entered = prompt('Admin password:');
-      if (entered === null) break;
-      if (String(entered) === String(ADMIN_PASSWORD)){
-        try{ sessionStorage.setItem('fp_admin_ok','1'); }catch{}
-        return true;
-      }
-      alert('Wrong password.');
+    if (String(entered) === String(ADMIN_PASSWORD)){
+      return true;
     }
-    return false;
+    alert('Wrong password.');
   }
+  return false;
+}
 
 
 let svgRoot = null;
