@@ -311,7 +311,7 @@ async function fetchJson(url){
 
       const g = svgEl('g', {});
       const lines = splitLines(p.info.company, 26);
-      const baseFont = (p.info.company.length > 28) ? 15 : 18;
+      const baseFont = (p.info.company.length > 28) ? 12 : 14;
 
       const text = svgEl('text', {
         x: labelX,
@@ -332,7 +332,7 @@ async function fetchJson(url){
       g.appendChild(text);
       calloutLayer.appendChild(g);
 
-      const pad = 14;
+      const pad = 10;
       const tb = text.getBBox();
       const rect = svgEl('rect', {
         x: tb.x - pad,
