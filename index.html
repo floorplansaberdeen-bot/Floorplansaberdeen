@@ -40,6 +40,14 @@
   .legend{border-top:none;}
   #svgHost{min-height:auto;}
 }
+
+  .pdfOpts{margin-top:10px;border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:#fff;}
+  .pdfGrid{margin-top:8px;display:grid;grid-template-columns:1.4fr 1fr 1fr 1.2fr;gap:10px;align-items:center;}
+  .opt{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted);user-select:none;}
+  .opt input[type="text"]{flex:1;min-width:180px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:#111;}
+  .opt.chk{justify-content:flex-start;}
+  .opt.chk input{width:16px;height:16px;}
+  @media (max-width:900px){.pdfGrid{grid-template-columns:1fr 1fr;}}
 </style>
 </head>
 <body>
@@ -54,10 +62,6 @@
       <div style="font-weight:700;">Plan</div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
         <button id="btnClearPins" style="padding:8px 10px;border:1px solid var(--border);background:#fff;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;">Clear pins</button>
-        <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);user-select:none;"><span>Event</span><input id="eventName" type="text" value="Exhibition Floorplan" style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;min-width:220px;"></label>
-<label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);user-select:none;"><input id="chkPinsPdf" type="checkbox" checked style="width:16px;height:16px;">Include pins</label>
-<label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);user-select:none;"><input id="chkSoldListPdf" type="checkbox" style="width:16px;height:16px;">Print sold list</label>
-<label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);user-select:none;"><input id="chkLegendPdf" type="checkbox" checked style="width:16px;height:16px;">Print legend</label>
         <button id="btnExportPdf" style="padding:8px 10px;border:1px solid var(--border);background:#f7f7f7;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;">Export PDF</button>
       </div>
     </div>
@@ -75,6 +79,17 @@
       <strong>Sold exhibitors</strong>
       <input id="soldSearch" type="text" placeholder="Search company or stand…" />
     </div>
+    
+    <div class="pdfOpts">
+      <div style="font-weight:800;">PDF options</div>
+      <div class="pdfGrid">
+        <label class="opt"><span>Event name</span><input id="eventName" type="text" value="Exhibition Floorplan"></label>
+        <label class="opt chk"><input id="chkPinsPdf" type="checkbox" checked>Include pins</label>
+        <label class="opt chk"><input id="chkLegendPdf" type="checkbox" checked>Print legend</label>
+        <label class="opt chk"><input id="chkSoldListPdf" type="checkbox">Print exhibitor list</label>
+      </div>
+    </div>
+
     <div class="soldHint">Click a company name to highlight its stand with a label and pointer line.</div>
     <div class="soldListWrap">
       <div id="soldList"></div>
@@ -521,6 +536,14 @@ async function fetchJson(url){
     .wrap{padding:0;}
     .frame{max-width:none;}
   }
+
+  .pdfOpts{margin-top:10px;border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:#fff;}
+  .pdfGrid{margin-top:8px;display:grid;grid-template-columns:1.4fr 1fr 1fr 1.2fr;gap:10px;align-items:center;}
+  .opt{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted);user-select:none;}
+  .opt input[type="text"]{flex:1;min-width:180px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:#111;}
+  .opt.chk{justify-content:flex-start;}
+  .opt.chk input{width:16px;height:16px;}
+  @media (max-width:900px){.pdfGrid{grid-template-columns:1fr 1fr;}}
 </style>
 </head>
 <body>
