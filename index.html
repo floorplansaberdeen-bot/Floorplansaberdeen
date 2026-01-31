@@ -48,8 +48,6 @@
   .opt.chk{justify-content:flex-start;}
   .opt.chk input{width:16px;height:16px;}
   @media (max-width:900px){.pdfGrid{grid-template-columns:1fr 1fr;}}
-
-  .__safariPinned{ stroke:#111 !important; stroke-width:5px !important; }
 </style>
 </head>
 <body>
@@ -68,15 +66,9 @@
       </div>
     </div>
 
-    <div id="svgWrap" style="position:relative;">
-  <div id="safariOverlay" style="display:none;position:absolute;inset:0;z-index:5;"></div>
-  <div id="svgHost"></div>
+    <div id="svgHost"></div>
 
-    <div id="safariNote" style="display:none;margin-top:10px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fff;color:#444;font-size:13px;">
-Safari performance mode: clicking the plan can freeze Safari on some Macs. Use the exhibitor list below to pin/highlight stands.
-</div>
-
-<div class="legend">
+    <div class="legend">
       <span class="pill"><span class="dot sold"></span>Sold</span>
       <span class="pill"><span class="dot avail"></span>Available</span>
     </div>
@@ -112,8 +104,6 @@ Safari performance mode: clicking the plan can freeze Safari on some Macs. Use t
 
   // Safari compatibility: CSS.escape polyfill
   if (!window.CSS) window.CSS = {};
-  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-
   if (typeof window.CSS.escape !== 'function') {
     window.CSS.escape = function (value) {
       return String(value).replace(/[^a-zA-Z0-9_\-]/g, function (ch) {
@@ -147,7 +137,6 @@ Safari performance mode: clicking the plan can freeze Safari on some Macs. Use t
   let calloutLayer = null;
   let pinned = new Set();
   let bboxCache = new Map();
-      prewarmBBoxes();
   let pinsRaf = 0;
 
   // Stand IDs look like: A1, AA1, AB2, AD10, SB20, C6 etc.
@@ -201,27 +190,6 @@ Safari performance mode: clicking the plan can freeze Safari on some Macs. Use t
     requestAnimationFrame(step);
   }
 
-
-  function prewarmBBoxes(){
-    if (!isSafari || !svgRoot) return;
-    const nodes = Array.from(svgRoot.querySelectorAll('[id]'))
-      .filter(n => /^[A-Z]{1,2}\d+$/i.test(n.id)); // stand-like ids
-    let i = 0;
-    const batch = 12;
-    function step(){
-      const end = Math.min(nodes.length, i + batch);
-      for (; i < end; i++){
-        const id = nodes[i].id;
-        // compute and cache bbox
-        getStandBox(id);
-      }
-      if (i < nodes.length){
-        requestAnimationFrame(step);
-      }
-    }
-    requestAnimationFrame(step);
-  }
-
 function getStandBox(standId){
     if (bboxCache.has(standId)) return bboxCache.get(standId);
     const node = svgRoot.querySelector('#' + CSS.escape(standId));
@@ -234,22 +202,6 @@ function getStandBox(standId){
     }catch{
       return null;
     }
-  }
-
-
-  function showTooltipAtStand(standId, info){
-    if (!svgRoot) return;
-    const box = getStandBox(standId);
-    if (!box) return;
-    const pt = svgRoot.createSVGPoint();
-    pt.x = box.cx; pt.y = box.cy;
-    const ctm = svgRoot.getScreenCTM();
-    if (!ctm) return;
-    const sp = pt.matrixTransform(ctm);
-    tooltip.textContent = tooltipText(info);
-    tooltip.style.left = (sp.x + 12) + 'px';
-    tooltip.style.top  = (sp.y + 12) + 'px';
-    tooltip.style.display = 'block';
   }
 
 function splitLines(text, maxChars){
@@ -356,23 +308,6 @@ async function fetchJson(url){
     ensureCalloutLayer();
     if (!calloutLayer) return;
     calloutLayer.innerHTML = '';
-
-    // Safari fast mode: avoid SVG callout labels (prevents click freeze)
-    if (isSafari){
-      // clear previous highlight (inline styles)
-      clearSafariHighlights();
-      // apply highlight + render pinned list
-      const items = [];
-      pinned.forEach(id=>{
-        applySafariHighlight(id);
-        const info = byId.get(id) || { standId:id, status:'available', company:'' };
-        items.push(info);
-      });
-      items.sort((a,b)=>String(a.company||a.standId).localeCompare(String(b.company||b.standId)));
-      renderPinnedList(items);
-      return;
-    }
-
     if (!pinned.size) return;
 
     const frag = document.createDocumentFragment();
@@ -497,13 +432,7 @@ async function fetchJson(url){
     node.addEventListener('click', () => {
       const info = byId.get(standId);
       if (info && normalizeStatus(info.status)==='sold' && info.company){
-        if (isSafari){
-        try{ document.getElementById('svgHost').style.pointerEvents='none'; }catch{}
-        try{ const ov=document.getElementById('safariOverlay'); if(ov){ ov.style.display='block'; ov.addEventListener('click', (e)=>{ e.preventDefault(); e.stopPropagation(); }); } }catch{}
-        setTimeout(()=>{ try{ svgRoot.style.pointerEvents='auto'; }catch{}; togglePin(standId); }, 60);
-      } else {
         togglePin(standId);
-      }
       }
     });
   }
@@ -516,67 +445,7 @@ async function fetchJson(url){
     });
   }
 
-  
-  
-  function clearSafariHighlights(){
-    if(!svgRoot) return;
-    pinned.forEach(id=>{
-      const node = svgRoot.querySelector('#'+CSS.escape(id));
-      if(!node) return;
-      const targets = (node.tagName && node.tagName.toLowerCase()==='g') ? Array.from(node.querySelectorAll('path,rect,polygon,circle,ellipse,polyline,line')) : [node];
-      targets.forEach(t=>{
-        try{
-          t.style.stroke = '';
-          t.style.strokeWidth = '';
-          t.style.strokeOpacity = '';
-          t.style.filter = '';
-        }catch{}
-      });
-    });
-  }
-
-  function applySafariHighlight(standId){
-    if(!svgRoot) return;
-    const node = svgRoot.querySelector('#'+CSS.escape(standId));
-    if(!node) return;
-    const targets = (node.tagName && node.tagName.toLowerCase()==='g') ? Array.from(node.querySelectorAll('path,rect,polygon,circle,ellipse,polyline,line')) : [node];
-    targets.forEach(t=>{
-      try{
-        t.style.stroke = '#111';
-        t.style.strokeWidth = '5px';
-        t.style.strokeOpacity = '0.95';
-      }catch{}
-    });
-  }
-
-function renderPinnedList(items){
-    const host = document.getElementById('pinnedList');
-    if(!host) return;
-    host.innerHTML = '';
-    if(!items.length){
-      host.innerHTML = '<span style="color:#666;font-size:13px;">No pins yet.</span>';
-      return;
-    }
-    items.forEach(info=>{
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'pill';
-      const label = (info.company && info.company.trim()) ? info.company.trim() : info.standId;
-      btn.textContent = label;
-      btn.title = info.standId;
-      btn.addEventListener('click', ()=>{
-        // ensure stand is visible and show tooltip at stand
-        try{
-          const node = svgRoot.querySelector('#'+CSS.escape(info.standId));
-          if(node && node.scrollIntoView) node.scrollIntoView({behavior:'smooth',block:'center',inline:'center'});
-        }catch{}
-        try{ showTooltipAtStand(info.standId, info); }catch{}
-      });
-      host.appendChild(btn);
-    });
-  }
-
-function renderSoldList(){
+  function renderSoldList(){
     const q = String(soldSearchEl.value||'').toLowerCase().trim();
     const sold = Array.from(byId.values())
       .filter(r => normalizeStatus(r.status)==='sold' && r.company)
@@ -629,15 +498,6 @@ function renderSoldList(){
       warmBBoxCache();
       ensureCalloutLayer();
       getStandNodes().forEach(bindNodeEvents);
-
-      if (isSafari){
-        const note = document.getElementById('safariNote');
-        if (note) note.style.display='block';
-        // Disable direct SVG interaction to avoid Safari freezes
-        try{ document.getElementById('svgHost').style.pointerEvents='none'; }catch{}
-        try{ const ov=document.getElementById('safariOverlay'); if(ov){ ov.style.display='block'; ov.addEventListener('click', (e)=>{ e.preventDefault(); e.stopPropagation(); }); } }catch{}
-      }
-
 
       soldSearchEl.addEventListener('input', renderSoldList);
 
@@ -753,8 +613,6 @@ function renderSoldList(){
   .opt.chk{justify-content:flex-start;}
   .opt.chk input{width:16px;height:16px;}
   @media (max-width:900px){.pdfGrid{grid-template-columns:1fr 1fr;}}
-
-  .__safariPinned{ stroke:#111 !important; stroke-width:5px !important; }
 </style>
 </head>
 <body>
