@@ -6,155 +6,160 @@
 <title>Floorplan Admin</title>
 <style>
   :root{
-    --border:#d9d9d9;
-    --bg:#f6f7f9;
-    --card:#fff;
-    --text:#111;
-    --muted:#666;
-    --sold:#e74c3c;
-    --avail:#2ecc71;
-    --warn:#ffb020;
+    --border:#d9d9d9;--muted:#666;--row:#fafafa;--row2:#f3f6ff;
+    --sold:#e53935;--avail:#2ecc71;
   }
-  *{box-sizing:border-box}
-  body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
-  header{padding:18px 18px 10px;font-weight:900;font-size:18px}
-  .wrap{max-width:1300px;margin:0 auto;padding:0 12px 24px}
-  .grid{display:grid;gap:14px}
-  @media(min-width:980px){.grid{grid-template-columns:1.6fr 1fr;align-items:start}}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px;box-shadow:0 2px 10px rgba(0,0,0,.04)}
-  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-  .btn{border:1px solid var(--border);background:#fff;border-radius:10px;padding:8px 12px;font-weight:900;cursor:pointer}
-  .btn:hover{background:#f3f3f3}
-  .btnPrimary{background:#111;color:#fff;border-color:#111}
-  .btnPrimary:hover{background:#000}
-  .btnDanger{background:#ffecec;border-color:#f2b9b9}
-  .btnDanger:hover{background:#ffdede}
-  input[type="text"], input[type="password"], select{
-    width:100%;
-    border:1px solid var(--border);
-    border-radius:10px;
-    padding:8px 10px;
-    font-weight:700;
+  body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#111;}
+  header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  header .right{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  #status{font-size:13px;color:var(--muted);}
+  .btn{padding:8px 10px;border:1px solid var(--border);background:#f7f7f7;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px;}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+  .btn.green{background:#ecfff3;border-color:#bfe9cf;}
+  .btn.red{background:#fff0f0;border-color:#f1bcbc;}
+  .layout{display:grid;grid-template-columns:2.2fr 1.1fr;gap:12px;padding:12px;}
+  @media (max-width:1000px){.layout{grid-template-columns:1fr;}}
+  .card{border:1px solid var(--border);background:#fff;border-radius:10px;overflow:hidden;}
+  .card h2{margin:0;padding:10px 12px;border-bottom:1px solid var(--border);font-size:14px;color:#333;}
+  #svgHost{min-height:420px;overflow:auto;}
+  #svgHost svg{width:100%;height:auto;display:block;}
+  svg text, svg tspan{pointer-events:none;user-select:none;}
+  .pill{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:#222;border:1px solid var(--border);padding:6px 8px;border-radius:999px;background:#fff;}
+  .dot{width:10px;height:10px;border-radius:50%;}
+  .dot.sold{background:var(--sold);} .dot.avail{background:var(--avail);}
+
+  .form{padding:12px;display:grid;gap:10px;}
+  label{font-size:12px;color:#444;}
+  input,select{width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .help{font-size:12px;color:var(--muted);line-height:1.35;}
+  #tooltip{position:fixed;display:none;z-index:9999;pointer-events:none;background:rgba(0,0,0,.85);color:#fff;padding:8px 10px;border-radius:8px;font-size:13px;white-space:pre-line;max-width:min(360px,85vw);}
+
+  .preview{
+    border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:#fff;
   }
-  label{font-size:13px;color:var(--muted);font-weight:800}
-  small{color:var(--muted)}
-  #svgHost{width:100%;height:min(72vh,720px);overflow:hidden;border-radius:12px;border:1px solid var(--border);background:#fff}
-  #svgHost svg{width:100%;height:100%}
-  #tooltip{position:fixed;z-index:50;display:none;pointer-events:none;background:#111;color:#fff;padding:8px 10px;border-radius:10px;font-size:13px;max-width:260px;box-shadow:0 8px 22px rgba(0,0,0,.18)}
-  table{width:100%;border-collapse:collapse;font-size:13px}
-  th,td{padding:7px 8px;border-bottom:1px solid var(--border);text-align:left}
-  thead th{font-size:12px;color:var(--muted)}
-  tr:hover{background:#f6f6f8}
-  tr.selected{background:#eef3ff}
-  .pill{border:1px solid var(--border);border-radius:999px;padding:6px 10px;background:#fff;cursor:pointer;font-weight:900;font-size:12px}
-  .pill.active{background:#111;color:#fff;border-color:#111}
-  .status{font-size:13px;color:var(--muted)}
-  .tagSold{color:var(--sold);font-weight:900}
-  .tagAvail{color:var(--avail);font-weight:900}
-  .tagNone{color:#999;font-weight:900}
-  .hint{font-size:12.5px;color:var(--muted);line-height:1.35}
-  .twoCol{display:grid;gap:10px}
-  @media(min-width:980px){.twoCol{grid-template-columns:1fr 1fr}}
-  .divider{height:1px;background:var(--border);margin:10px 0}
-  .stickyRight{position:sticky;top:12px}
-  .scrollBox{max-height:420px;overflow:auto;border:1px solid var(--border);border-radius:12px}
+  .previewTitle{font-weight:800;margin-bottom:6px;}
+  .previewLine{font-size:13px;color:#333;margin:2px 0;}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-weight:800;font-size:12px;line-height:1.6;border:1px solid transparent;}
+  .badge.sold{background:#fff0f0;border-color:#f1bcbc;color:#a11414;}
+  .badge.avail{background:#ecfff3;border-color:#bfe9cf;color:#0f6a2f;}
+
+  .listWrap{padding:10px 12px;display:grid;gap:10px;}
+  .listTop{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  #search{flex:1;min-width:180px;}
+  #filter{min-width:170px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  thead th{text-align:left;padding:8px;background:#f5f5f5;border-top:1px solid var(--border);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:1;}
+  tbody td{padding:7px 8px;border-bottom:1px solid #eee;vertical-align:top;}
+  tbody tr{cursor:pointer;}
+  tbody tr:nth-child(odd){background:var(--row);}
+  tbody tr.selected{background:var(--row2)!important;outline:2px solid #b8c7ff;outline-offset:-2px;}
 </style>
 </head>
 <body>
-<header>Floorplan Admin</header>
+<header>
+  <strong>Floorplan Admin</strong>
+  <div class="right">
+    <span id="status">Loading…</span>
+    <button class="btn" id="btnToggleSync">Pause sync</button>
+    <button class="btn" id="btnExport">Export CSV</button>
+    <label class="btn" style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;">
+      Import CSV <input id="fileImport" type="file" accept=".csv,text/csv" style="display:none;">
+    </label>
+    <button class="btn red" id="btnResetAll" title="Mark ALL stands as available (requires password)">Reset all</button>
+  </div>
+</header>
 
-<div class="wrap">
-  <div class="grid">
+<div class="layout">
+  <div class="card">
+    <h2>Plan</h2>
+    <div id="svgHost"></div>
 
-    <div class="card">
-      <div class="row" style="justify-content:space-between;">
-        <div class="row">
-          <span class="status" id="status">Loading…</span>
-        </div>
-        <div class="row">
-          <button class="btn" id="exportBtn">Export CSV</button>
-          <button class="btn" id="importBtn">Import CSV</button>
-          <button class="btn btnDanger" id="resetBtn">Reset All</button>
-        </div>
-      </div>
+    <div style="padding:10px 12px;display:flex;gap:10px;flex-wrap:wrap;border-top:1px solid var(--border);">
+      <span class="pill"><span class="dot sold"></span>Sold</span>
+      <span class="pill"><span class="dot avail"></span>Available</span>
+    </div>
 
-      <div id="svgHost" style="margin-top:10px;"></div>
+    <div style="border-top:1px solid var(--border);padding:10px 12px;">
+      <div style="font-weight:800;font-size:13px;margin-bottom:8px;">Zoom</div>
+      <div id="zoomHost" style="border:1px solid var(--border);border-radius:10px;overflow:hidden;height:240px;background:#fff;"></div>
+      <div class="help" style="margin-top:6px;">Select a stand to zoom in.</div>
+    </div>
+  </div>
 
-      <div class="divider"></div>
-
-      <div class="twoCol">
-        <div>
-          <label>Selected stand</label>
-          <input id="standId" type="text" disabled />
-          <small class="hint">Click a stand on the plan or click a row in the list.</small>
-        </div>
-
+  <div class="card">
+    <h2>Selected Stand</h2>
+    <div class="form">
+      <div><label>Stand ID</label><input id="standId" readonly /></div>
+      <div class="row2">
         <div>
           <label>Status</label>
-          <select id="standStatus">
-            <option value="available">available</option>
-            <option value="sold">sold</option>
+          <select id="statusSel">
+            <option value="available">Available</option>
+            <option value="sold">Sold</option>
           </select>
         </div>
-
-        <div style="grid-column:1/-1;">
-          <label>Company (only used when sold)</label>
-          <input id="standCompany" type="text" placeholder="Company name" />
-        </div>
-
-        <div class="row" style="grid-column:1/-1;justify-content:flex-end;">
-          <button class="btn btnPrimary" id="saveBtn">Save</button>
+        <div>
+          <label>Company (sold only)</label>
+          <input id="company" placeholder="Company name…" />
         </div>
       </div>
-
-      <div class="divider"></div>
-
-      <div class="row" style="justify-content:space-between;">
-        <div class="row">
-          <button class="pill active" id="listAll">All</button>
-          <button class="pill" id="listAvail">Available</button>
-          <button class="pill" id="listSold">Sold</button>
-        </div>
-        <div class="row">
-          <input id="search" type="text" placeholder="Search stand or company…" style="min-width:220px;" />
-        </div>
+      <div class="row2">
+        <button class="btn green" id="btnSave" disabled>Save</button>
+        <button class="btn red" id="btnClear" disabled>Mark Available</button>
       </div>
 
-      <div class="scrollBox" style="margin-top:10px;">
-        <table id="standTable">
-          <thead>
-            <tr>
-              <th style="width:80px;">Stand</th>
-              <th style="width:110px;">Status</th>
-              <th>Company</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
+      <div class="preview" id="preview" style="display:none;">
+        <div class="previewTitle">Selected preview</div>
+        <div class="previewLine"><strong id="pvStand"></strong></div>
+        <div class="previewLine" id="pvStatus"></div>
+        <div class="previewLine" id="pvCompany"></div>
+      </div>
+
+      <div class="help">Click a stand on the plan or in the list to edit. Auto-sync won’t overwrite your form while you’re typing.</div>
+    </div>
+
+    <h2>Stands</h2>
+    <div class="listWrap">
+      <div class="listTop">
+        <input id="search" type="text" placeholder="Search stand or company…" />
+        <select id="filter">
+          <option value="all">All</option>
+          <option value="available">Available only</option>
+          <option value="sold">Sold only</option>
+        </select>
+        <span class="help" id="count"></span>
+      </div>
+
+      <div style="max-height:420px;overflow:auto;border:1px solid var(--border);border-radius:10px;">
+        <table>
+          <thead><tr><th style="width:90px;">Stand</th><th style="width:110px;">Status</th><th>Company</th></tr></thead>
+          <tbody id="tbody"></tbody>
         </table>
       </div>
-
     </div>
+  </div>
+</div>
 
-    <div class="card stickyRight">
-      <div style="font-weight:900;margin-bottom:6px;">Zoom preview</div>
-      <div class="hint" style="margin-bottom:10px;">Shows a zoomed view of the currently selected stand.</div>
-      <div id="zoomHost" style="width:100%;height:420px;overflow:hidden;border-radius:12px;border:1px solid var(--border);background:#fff;"></div>
 
-      <div class="divider"></div>
-
-      <div style="font-weight:900;margin-bottom:6px;">Admin login</div>
-      <div class="twoCol">
-        <div>
-          <label>Password</label>
-          <input id="adminPw" type="password" placeholder="••••••••" />
-        </div>
-        <div class="row" style="align-items:end;justify-content:flex-end;">
-          <button class="btn btnPrimary" id="unlockBtn">Unlock</button>
-        </div>
+<div id="loginModal" style="position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:10000;">
+  <div style="background:#fff;border-radius:14px;max-width:420px;width:calc(100% - 32px);box-shadow:0 20px 60px rgba(0,0,0,.25);border:1px solid #ddd;overflow:hidden;">
+    <div style="padding:14px 16px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;gap:10px;">
+      <div style="font-weight:900;">Admin login</div>
+      <div id="loginAttempts" style="font-size:12px;color:#666;"></div>
+    </div>
+    <div style="padding:16px;display:grid;gap:10px;">
+      <div style="font-size:13px;color:#444;">Enter admin password to continue.</div>
+      <input id="loginPw" type="password" autocomplete="current-password"
+             style="padding:10px 12px;border:1px solid #ccc;border-radius:10px;font-size:16px;"
+             placeholder="Password" />
+      <div id="loginErr" style="font-size:13px;color:#b00020;display:none;"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px;">
+        <button id="loginCancel" class="btn" style="background:#fff;">Cancel</button>
+        <button id="loginOk" class="btn green">Unlock</button>
       </div>
-      <small class="hint">Required on page load and for Reset All.</small>
+      <div style="font-size:12px;color:#666;line-height:1.35;">Tip: This is a client-side lock to prevent accidental access (not a secure login).</div>
     </div>
-
   </div>
 </div>
 
@@ -162,133 +167,308 @@
 
 <script>
 (() => {
+
   // Safari compatibility: CSS.escape polyfill
   if (!window.CSS) window.CSS = {};
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
   if (typeof window.CSS.escape !== 'function') {
     window.CSS.escape = function (value) {
-      return String(value).replace(/[^a-zA-Z0-9_\\-]/g, function (ch) {
+      return String(value).replace(/[^a-zA-Z0-9_\-]/g, function (ch) {
         const hex = ch.codePointAt(0).toString(16).toUpperCase();
-        return '\\\\' + hex + ' ';
+        return '\\' + hex + ' ';
       });
     };
   }
 
-  // ====== CONFIG ======
-  const SHEET_API_URL = 'https://floorplansaberdeen.floorplansaberdeen.workers.dev';
+  const API_BASE = 'https://floorplansaberdeen.floorplansaberdeen.workers.dev';
+  const SVG_URL = './event_plan.svg';
+  const FILL_OPACITY = 0.75;
+  const SYNC_INTERVAL_MS = 10000;
+  const SOLD = '#e53935';
+  const AVAIL = '#2ecc71';
+  const STAND_ID_RE = /^([A-Z]{1,3})(\d{1,3})$/;
+  // Simple safeguard password for the Reset-all button (edit this).
+    // Simple page-gate password to prevent accidental access (edit this).
+  const ADMIN_PASSWORD = 'CHANGE_ME';
+  // Reset-all uses the same password
+  const RESET_PASSWORD = ADMIN_PASSWORD;
 
-  // Set this to whatever you were using in v15
-  const ADMIN_PASSWORD = 'FLOORPASS1';
-
-  const SYNC_INTERVAL_MS = 25000;
-
-  // ====== UI ======
+  const elStatus = document.getElementById('status');
   const svgHost = document.getElementById('svgHost');
-  const zoomHost = document.getElementById('zoomHost');
   const tooltip = document.getElementById('tooltip');
+  const zoomHost = document.getElementById('zoomHost');
 
-  const statusEl = document.getElementById('status');
   const standIdEl = document.getElementById('standId');
-  const standStatusEl = document.getElementById('standStatus');
-  const standCompanyEl = document.getElementById('standCompany');
+  const statusSel = document.getElementById('statusSel');
+  const companyEl = document.getElementById('company');
+  const btnSave = document.getElementById('btnSave');
+  const btnClear = document.getElementById('btnClear');
 
-  const saveBtn = document.getElementById('saveBtn');
-  const exportBtn = document.getElementById('exportBtn');
-  const importBtn = document.getElementById('importBtn');
-  const resetBtn = document.getElementById('resetBtn');
+  const previewEl = document.getElementById('preview');
+  const pvStand = document.getElementById('pvStand');
+  const pvStatus = document.getElementById('pvStatus');
+  const pvCompany = document.getElementById('pvCompany');
 
-  const listAll = document.getElementById('listAll');
-  const listAvail = document.getElementById('listAvail');
-  const listSold = document.getElementById('listSold');
+  const btnToggleSync = document.getElementById('btnToggleSync');
+  const btnExport = document.getElementById('btnExport');
+  const fileImport = document.getElementById('fileImport');
+  const btnResetAll = document.getElementById('btnResetAll');
+
   const searchEl = document.getElementById('search');
+  const filterEl = document.getElementById('filter');
+  const tbody = document.getElementById('tbody');
+  const countEl = document.getElementById('count');
 
-  const tableBody = document.querySelector('#standTable tbody');
+  
+  function requireAdminLogin(){
+    // Always prompt on every page load using a masked password field.
+    return new Promise((resolve) => {
+      const modal = document.getElementById('loginModal');
+      const pw = document.getElementById('loginPw');
+      const ok = document.getElementById('loginOk');
+      const cancel = document.getElementById('loginCancel');
+      const err = document.getElementById('loginErr');
+      const attemptsEl = document.getElementById('loginAttempts');
 
-  const adminPw = document.getElementById('adminPw');
-  const unlockBtn = document.getElementById('unlockBtn');
+      let attempts = 0;
+      const maxAttempts = 3;
 
-  // ====== STATE ======
-  let svgRoot = null;
+      function setErr(msg){
+        if (!msg){
+          err.style.display = 'none';
+          err.textContent = '';
+        } else {
+          err.style.display = 'block';
+          err.textContent = msg;
+        }
+      }
+
+      function updateAttempts(){
+        attemptsEl.textContent = attempts ? `Attempt ${attempts} of ${maxAttempts}` : '';
+      }
+
+      function close(result){
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+        cleanup();
+        resolve(result);
+      }
+
+      function onOk(){
+        const entered = String(pw.value || '');
+        attempts += 1;
+        updateAttempts();
+
+        if (entered === String(ADMIN_PASSWORD)){
+          close(true);
+          return;
+        }
+
+        if (attempts >= maxAttempts){
+          setErr('Too many attempts.');
+          setTimeout(()=>close(false), 400);
+          return;
+        }
+
+        setErr('Wrong password.');
+        pw.select();
+        pw.focus();
+      }
+
+      function onCancel(){
+        close(false);
+      }
+
+      function onKey(e){
+        if (e.key === 'Enter'){ e.preventDefault(); onOk(); }
+        if (e.key === 'Escape'){ e.preventDefault(); onCancel(); }
+      }
+
+      function cleanup(){
+        ok.removeEventListener('click', onOk);
+        cancel.removeEventListener('click', onCancel);
+        pw.removeEventListener('keydown', onKey);
+      }
+
+      // Open modal
+      modal.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+      pw.value = '';
+      setErr('');
+      attempts = 0;
+      updateAttempts();
+
+      ok.addEventListener('click', onOk);
+      cancel.addEventListener('click', onCancel);
+      pw.addEventListener('keydown', onKey);
+
+      // Focus input
+      setTimeout(()=>pw.focus(), 0);
+    });
+  }
+
+
+let svgRoot = null;
   let zoomSvgRoot = null;
   let byId = new Map();
-  let selected = null;
-  let unlocked = false;
-
   let bboxCache = new Map();
+      prewarmBBoxes();
   let zoomRaf = 0;
+  let tipRaf = 0;
+  let lastTip = null;
+  let isPointerDown = false;
+  let hoverDisabledUntil = 0;
+  let selectedId = '';
+  let autoSyncEnabled = true;
+  let dirty = false;
 
-  function setStatus(msg, isError=false){
-    statusEl.textContent = msg;
-    statusEl.style.color = isError ? '#b00020' : 'var(--muted)';
+  function setStatus(text, isError=false){
+    elStatus.textContent = text;
+    elStatus.style.color = isError ? '#b00020' : '#555';
   }
-
-  function normalizeStatus(value) {
-    const v = String(value || '').toLowerCase().trim();
-    return v === 'sold' ? 'sold' : 'available';
-  }
-
+  function normalizeStatus(v){ return String(v||'').toLowerCase().trim()==='sold' ? 'sold' : 'available'; }
   function tooltipText(info){
-    const stand = info.standId || '';
-    const status = (info.status === 'sold') ? 'sold' : 'available';
-    const company = info.company ? info.company.trim() : '';
-    let lines = [stand, status];
-    if (status === 'sold' && company) lines.push(company);
-    return lines.join(' • ');
+    const s = normalizeStatus(info.status);
+    const lines = [info.standId, s==='sold'?'Sold':'Available'];
+    if (s==='sold' && info.company) lines.push(info.company);
+    return lines.join('\n');
   }
+  function isStandId(id){ return STAND_ID_RE.test(String(id||'').trim()); }
 
-  function isStandId(id){
-    if(!id) return false;
-    return /^[A-Z]{1,3}\\d{1,3}$/i.test(id);
+  async function fetchJson(url){
+    const res = await fetch(url,{cache:'no-store'});
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    return await res.json();
   }
-
-  function getStandNodes(){
-    if(!svgRoot) return [];
-    const groups = Array.from(svgRoot.querySelectorAll('g[id]')).filter(el=>isStandId(el.id));
-    const shapes = Array.from(svgRoot.querySelectorAll('path[id],rect[id],polygon[id],circle[id],ellipse[id],polyline[id],line[id]')).filter(el=>isStandId(el.id));
-    return groups.length ? groups : shapes;
-  }
-
-  function paintNode(standId, status){
-    const node = svgRoot.querySelector('#' + CSS.escape(standId));
-    if(!node) return;
-    const fill = (status === 'sold')
-      ? 'rgba(231,76,60,0.75)'
-      : (status === 'available')
-        ? 'rgba(46,204,113,0.75)'
-        : 'rgba(255,255,255,0.0)';
-    try{
-      if(node.tagName.toLowerCase() === 'g'){
-        node.querySelectorAll('path,rect,polygon,circle,ellipse,polyline,line').forEach(ch => ch.style.fill = fill);
-      }else{
-        node.style.fill = fill;
-      }
-    }catch{}
+  async function postJson(url,payload){
+    const res = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const text = await res.text();
+    let json=null; try{json=JSON.parse(text);}catch{}
+    if(!res.ok || (json && json.success===false)) throw new Error((json&&json.error)?json.error:(text||('HTTP '+res.status)));
+    return json||{success:true};
   }
 
   async function loadSvg(){
-    const resp = await fetch('event_plan.svg', { cache:'no-store' });
-    if(!resp.ok) throw new Error('Failed to load SVG');
-    const txt = await resp.text();
-    svgHost.innerHTML = txt;
+    const res = await fetch(SVG_URL,{cache:'no-store'});
+    if(!res.ok) throw new Error('SVG not found at '+SVG_URL+' (HTTP '+res.status+')');
+    svgHost.innerHTML = await res.text();
     svgRoot = svgHost.querySelector('svg');
-    if(!svgRoot) throw new Error('SVG root not found');
+    if(!svgRoot) throw new Error('SVG root <svg> not found');
+    svgRoot.style.userSelect='none';
   }
 
-  async function loadZoomSvg(){
-    const resp = await fetch('event_plan.svg', { cache:'no-store' });
-    if(!resp.ok) throw new Error('Failed to load SVG');
-    const txt = await resp.text();
-    zoomHost.innerHTML = txt;
-    zoomSvgRoot = zoomHost.querySelector('svg');
-    if(!zoomSvgRoot) throw new Error('Zoom SVG root not found');
-    // Ensure viewBox exists
-    if(!zoomSvgRoot.getAttribute('viewBox')){
-      const w = zoomSvgRoot.getAttribute('width') || 1000;
-      const h = zoomSvgRoot.getAttribute('height') || 600;
-      zoomSvgRoot.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  function getStandNodes(){
+    const groups = Array.from(svgRoot.querySelectorAll('g[id]')).filter(g=>isStandId(g.id));
+    const shapes = Array.from(svgRoot.querySelectorAll('path[id],rect[id],polygon[id],circle[id],ellipse[id],polyline[id],line[id]')).filter(el=>isStandId(el.id));
+    return groups.length?groups:shapes;
+  }
+
+  function paintNode(node,status){
+    const s=normalizeStatus(status);
+    const color = s==='sold'?SOLD:AVAIL;
+    const targets = (node.tagName.toLowerCase()==='g') ? node.querySelectorAll('path,rect,polygon,circle,ellipse,polyline,line') : [node];
+    targets.forEach(el=>{
+      el.style.fill=color;
+      el.style.fillOpacity=String(FILL_OPACITY);
+      el.style.stroke='rgba(0,0,0,0.45)';
+      el.style.strokeOpacity='0.6';
+      el.style.cursor='pointer';
+    });
+  }
+
+  function renderPlan(){
+    getStandNodes().forEach(node=>{
+      const id=String(node.id||'').trim();
+      const info=byId.get(id)||{standId:id,status:'available',company:''};
+      paintNode(node,info.status);
+    });
+  }
+
+  function renderPreview(info){
+    if(!info){ previewEl.style.display='none'; return; }
+    previewEl.style.display='block';
+    pvStand.textContent = info.standId;
+    const sold = normalizeStatus(info.status)==='sold';
+    pvStatus.innerHTML = sold ? '<span class="badge sold">Sold</span>' : '<span class="badge avail">Available</span>';
+    pvCompany.textContent = sold ? (info.company||'') : '';
+  }
+
+  function renderList(){
+    const q=String(searchEl.value||'').toLowerCase().trim();
+    const f=String(filterEl.value||'all');
+
+    const items=Array.from(byId.values()).sort((a,b)=>a.standId.localeCompare(b.standId,undefined,{numeric:true}));
+
+    const filtered = items.filter(r=>{
+      const s=normalizeStatus(r.status);
+      if (f!=='all' && s!==f) return false;
+      if (!q) return true;
+      return r.standId.toLowerCase().includes(q) ||
+             (r.company||'').toLowerCase().includes(q) ||
+             s.includes(q);
+    });
+
+    tbody.innerHTML='';
+    filtered.forEach(r=>{
+      const tr=document.createElement('tr');
+      if(r.standId===selectedId) tr.classList.add('selected');
+
+      const tdId=document.createElement('td'); tdId.textContent=r.standId;
+      const tdSt=document.createElement('td');
+      const badge=document.createElement('span');
+      const sold = normalizeStatus(r.status)==='sold';
+      badge.className='badge '+(sold?'sold':'avail');
+      badge.textContent=sold?'Sold':'Available';
+      tdSt.appendChild(badge);
+
+      const tdCo=document.createElement('td'); tdCo.textContent = sold ? (r.company||'') : '';
+
+      tr.appendChild(tdId); tr.appendChild(tdSt); tr.appendChild(tdCo);
+      tr.addEventListener('click',()=>selectStand(r.standId,true));
+      tbody.appendChild(tr);
+    });
+
+    countEl.textContent = filtered.length+' / '+items.length;
+  }
+
+    
+  
+  function showTooltipAtStand(standId, info){
+    if (!svgRoot) return;
+    const box = getStandBox(standId);
+    if (!box) return;
+    const bb = box.bb;
+    const pt = svgRoot.createSVGPoint();
+    pt.x = bb.x + bb.width/2;
+    pt.y = bb.y + bb.height/2;
+    const ctm = svgRoot.getScreenCTM();
+    if (!ctm) return;
+    const sp = pt.matrixTransform(ctm);
+    tooltip.textContent = tooltipText(info);
+    tooltip.style.left = (sp.x + 12) + 'px';
+    tooltip.style.top  = (sp.y + 12) + 'px';
+    tooltip.style.display = 'block';
+  }
+
+
+  function prewarmBBoxes(){
+    if (!isSafari || !svgRoot) return;
+    const nodes = Array.from(svgRoot.querySelectorAll('[id]'))
+      .filter(n => /^[A-Z]{1,2}\d+$/i.test(n.id));
+    let i = 0;
+    const batch = 12;
+    function step(){
+      const end = Math.min(nodes.length, i + batch);
+      for (; i < end; i++){
+        getStandBox(nodes[i].id);
+      }
+      if (i < nodes.length) requestAnimationFrame(step);
     }
+    requestAnimationFrame(step);
   }
 
-  function getStandBox(standId){
+function getStandBox(standId){
     if (bboxCache.has(standId)) return bboxCache.get(standId);
     const node = svgRoot?.querySelector('#' + CSS.escape(standId));
     if (!node) return null;
@@ -302,19 +482,20 @@
     }
   }
 
-  function updateZoom(standId){
-    if(!zoomSvgRoot || !svgRoot) return;
-    const box = getStandBox(standId);
-    if(!box) return;
-    const bb = box.bb;
-
-    const pad = Math.max(20, Math.min(bb.width, bb.height) * 0.35);
-    const x = bb.x - pad;
-    const y = bb.y - pad;
-    const w = bb.width + pad*2;
-    const h = bb.height + pad*2;
-
-    zoomSvgRoot.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
+  function warmBBoxCache(){
+    // Precompute stand bounding boxes gradually to keep Safari responsive on first clicks
+    const nodes = getStandNodes();
+    let i = 0;
+    function step(){
+      const start = performance.now();
+      while (i < nodes.length && (performance.now() - start) < 8){
+        const id = String(nodes[i].id || '').trim();
+        if (id) getStandBox(id);
+        i++;
+      }
+      if (i < nodes.length) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
   }
 
   function scheduleUpdateZoom(standId){
@@ -326,289 +507,326 @@
     });
   }
 
-  async function fetchAll(){
-    const resp = await fetch(SHEET_API_URL, { cache:'no-store' });
-    if(!resp.ok) throw new Error('Failed to fetch');
-    const arr = await resp.json();
-    byId = new Map();
-    arr.forEach(r=>{
-      const standId = String(r.standId||'').trim();
-      if(!standId) return;
-      byId.set(standId, {
-        standId,
-        status: normalizeStatus(r.status),
-        company: String(r.company||'').trim()
-      });
+  function scheduleTooltipUpdate(){
+    if (tipRaf) return;
+    tipRaf = requestAnimationFrame(() => {
+      tipRaf = 0;
+      if (!lastTip) return;
+      if (isSafari) return;
+      if (isPointerDown || Date.now() < hoverDisabledUntil) return;
+      const { x, y, text } = lastTip;
+      tooltip.textContent = text;
+      tooltip.style.left = (x + 12) + 'px';
+      tooltip.style.top  = (y + 12) + 'px';
+      tooltip.style.display = 'block';
     });
   }
 
-  function renderPlan(){
-    byId.forEach((info, id)=> paintNode(id, info.status));
-    // highlight selection
-    getStandNodes().forEach(n=>{
-      try{ n.style.stroke = ''; n.style.strokeWidth = ''; }catch{}
-    });
-    if(selected){
-      const n = svgRoot.querySelector('#'+CSS.escape(selected));
-      if(n){
-        try{
-          if(n.tagName.toLowerCase()==='g'){
-            n.querySelectorAll('path,rect,polygon,circle,ellipse,polyline,line').forEach(ch=>{
-              ch.style.stroke='#111';
-              ch.style.strokeWidth='3px';
-            });
-          }else{
-            n.style.stroke='#111';
-            n.style.strokeWidth='3px';
-          }
-        }catch{}
+function initZoomSvg(){
+    if(!zoomHost || !svgRoot) return;
+    zoomHost.innerHTML='';
+    zoomSvgRoot = svgRoot.cloneNode(true);
+
+    // Remove explicit sizing so it can scale in the zoom panel
+    zoomSvgRoot.removeAttribute('width');
+    zoomSvgRoot.removeAttribute('height');
+    zoomSvgRoot.style.width='100%';
+    zoomSvgRoot.style.height='100%';
+    zoomSvgRoot.setAttribute('preserveAspectRatio','xMidYMid meet');
+
+    // Make zoom non-interactive
+    zoomSvgRoot.querySelectorAll('*').forEach(el=>{ el.style.pointerEvents='none'; });
+
+    // Ensure we have a usable viewBox (some SVG exports omit it)
+    const vb = zoomSvgRoot.getAttribute('viewBox');
+    if(!vb){
+      try{
+        const b = svgRoot.getBBox();
+        zoomSvgRoot.setAttribute('viewBox', `${b.x} ${b.y} ${b.width} ${b.height}`);
+      }catch{
+        zoomSvgRoot.setAttribute('viewBox', '0 0 1000 1000');
       }
     }
+
+    zoomHost.appendChild(zoomSvgRoot);
   }
 
-  function currentListFilter(){
-    if(listAvail.classList.contains('active')) return 'available';
-    if(listSold.classList.contains('active')) return 'sold';
-    return 'all';
-  }
+  function updateZoom(standId){
+    if(!zoomSvgRoot || !svgRoot || !standId) return;
+    const box = getStandBox(standId);
+    if(!box) return;
+    const bb = box.bb;
+    const pad = Math.max(20, Math.max(bb.width, bb.height) * 0.6);
+    const x = bb.x - pad, y = bb.y - pad, w = bb.width + pad*2, h = bb.height + pad*2;
+    zoomSvgRoot.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
 
-  function renderTable(){
-    const f = currentListFilter();
-    const q = (searchEl.value||'').trim().toLowerCase();
-
-    const rows = Array.from(byId.values())
-      .filter(r=>{
-        if(f!=='all' && r.status!==f) return false;
-        if(!q) return true;
-        return r.standId.toLowerCase().includes(q) || (r.company||'').toLowerCase().includes(q);
-      })
-      .sort((a,b)=>a.standId.localeCompare(b.standId));
-
-    tableBody.innerHTML = '';
-    rows.forEach(r=>{
-      const tr = document.createElement('tr');
-      if(r.standId===selected) tr.classList.add('selected');
-
-      const statusClass = (r.status==='sold') ? 'tagSold' : 'tagAvail';
-      tr.innerHTML = `
-        <td><strong>${r.standId}</strong></td>
-        <td class="${statusClass}">${r.status}</td>
-        <td>${(r.company||'')}</td>
-      `;
-      tr.addEventListener('click', ()=> selectStand(r.standId, true));
-      tableBody.appendChild(tr);
-    });
+    // highlight outline
+    zoomSvgRoot.querySelectorAll('.__zoomHighlight').forEach(n=>n.remove());
+    const hi = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    hi.setAttribute('class','__zoomHighlight');
+    hi.setAttribute('x', bb.x - 2); hi.setAttribute('y', bb.y - 2);
+    hi.setAttribute('width', bb.width + 4); hi.setAttribute('height', bb.height + 4);
+    hi.setAttribute('fill','none'); hi.setAttribute('stroke','#111'); hi.setAttribute('stroke-width','3');
+    hi.setAttribute('rx','6'); hi.setAttribute('ry','6');
+    hi.style.opacity='0.85';
+    zoomSvgRoot.appendChild(hi);
   }
 
   function selectStand(standId, scrollToRow){
-    selected = standId;
-    const info = byId.get(standId) || { standId, status:'available', company:'' };
+    const info=byId.get(standId)||{standId,status:'available',company:''};
+    selectedId=standId;
+    dirty=false;
+    standIdEl.value=info.standId;
+    statusSel.value=normalizeStatus(info.status);
+    companyEl.value=info.company||'';
+    btnSave.disabled=false; btnClear.disabled=false;
 
-    standIdEl.value = info.standId;
-    standStatusEl.value = info.status;
-    standCompanyEl.value = info.company || '';
+    renderPreview(info);
+    renderList();
+    scheduleUpdateZoom(info.standId);
 
-    renderPlan();
-    renderTable();
-    scheduleUpdateZoom(standId);
-
-    // no forced scroll on desktop (keeps plan stable)
     if(scrollToRow){
-      const isNarrow = window.matchMedia && window.matchMedia('(max-width: 1000px)').matches;
-      if (isNarrow){
-        const row = Array.from(tableBody.querySelectorAll('tr')).find(tr => tr.firstChild && tr.firstChild.textContent.trim() === standId);
-        if(row) row.scrollIntoView({block:'center'});
-      }
+      const row=Array.from(tbody.querySelectorAll('tr')).find(tr=>tr.firstChild && tr.firstChild.textContent===standId);
+      if(row) row.scrollIntoView({block:'center'});
     }
   }
+
+  function setDirty(){ if(selectedId) dirty=true; }
 
   function bindNodeEvents(node){
-    const standId = node.id;
-    if(!isStandId(standId)) return;
+    const standId = String(node.id||'').trim();
+    if(!standId) return;
 
-    try{ node.style.cursor = 'pointer'; }catch{}
-
+    // Tooltip: Safari uses static tooltip (no mousemove tracking)
     node.addEventListener('mouseenter', () => {
+      if (isSafari && !(isPointerDown || Date.now() < hoverDisabledUntil)){
+        const info = byId.get(standId) || { standId, status:'available', company:'' };
+        showTooltipAtStand(standId, info);
+      }
+    });
+
+    node.addEventListener('mousemove', e=>{
+      if (isSafari) return;
+      if (isPointerDown || Date.now() < hoverDisabledUntil) return;
       const info = byId.get(standId) || { standId, status:'available', company:'' };
-      tooltip.textContent = tooltipText(info);
-      tooltip.style.display = 'block';
+      lastTip = { x: e.clientX, y: e.clientY, text: tooltipText(info) };
+      scheduleTooltipUpdate();
     });
 
-    node.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+    node.addEventListener('mouseleave', ()=>{ tooltip.style.display='none'; });
 
-    node.addEventListener('mousemove', e => {
-      tooltip.style.left = (e.clientX + 12) + 'px';
-      tooltip.style.top  = (e.clientY + 12) + 'px';
-      tooltip.style.display = 'block';
-    });
-
-    node.addEventListener('click', e => {
-      e.preventDefault(); e.stopPropagation();
+    // Click/tap: use pointerup on Safari to avoid delayed click issues
+    node.addEventListener('pointerup', e=>{
+      if (!isSafari) return;
+      e.preventDefault();
+      e.stopPropagation();
       tooltip.style.display='none';
-      selectStand(standId, false);
+      hoverDisabledUntil = Date.now() + 1200;
+      try{ svgRoot.style.pointerEvents='none'; }catch{}
+      setTimeout(()=>{ try{ svgRoot.style.pointerEvents='auto'; }catch{}; selectStand(standId,true); }, 0);
+    });
+
+    node.addEventListener('click', e=>{
+      if (isSafari) return;
+      e.preventDefault();
+      e.stopPropagation();
+      selectStand(standId,true);
     });
   }
 
-  async function saveStand(){
-    if(!unlocked){
-      alert('Unlock first (admin password).');
-      return;
+  async function syncOnce(force=false){
+    if(!autoSyncEnabled && !force) return;
+    try{
+      const data = await fetchJson(API_BASE+'/stands?ts='+Date.now());
+      byId = new Map((Array.isArray(data)?data:[]).map(r=>[String(r.standId).trim(),{
+        standId:String(r.standId).trim(),
+        status:normalizeStatus(r.status),
+        company:String(r.company||'').trim()
+      }]));
+
+      renderPlan();
+      renderList();
+
+      if(selectedId && !dirty){
+        const info = byId.get(selectedId);
+        if(info){
+          standIdEl.value = info.standId;
+          statusSel.value = normalizeStatus(info.status);
+          companyEl.value = info.company||'';
+          renderPreview(info);
+          scheduleUpdateZoom(info.standId);
+        }
+      }
+
+      setStatus('Synced: '+new Date().toLocaleTimeString());
+    }catch(e){
+      setStatus('Sync error: '+e.message,true);
+      console.error(e);
     }
-    if(!selected){
-      alert('Select a stand first.');
-      return;
-    }
-    const payload = {
-      standId: selected,
-      status: standStatusEl.value,
-      company: standCompanyEl.value
-    };
-
-    const resp = await fetch(SHEET_API_URL, { method:'POST', body: JSON.stringify(payload) });
-    if(!resp.ok) throw new Error('Save failed');
-    await syncOnce();
   }
 
-  function setListFilter(which){
-    [listAll, listAvail, listSold].forEach(b=>b.classList.remove('active'));
-    if(which==='all') listAll.classList.add('active');
-    if(which==='available') listAvail.classList.add('active');
-    if(which==='sold') listSold.classList.add('active');
-    renderTable();
+  function toCsvRow(values){
+    return values.map(v=>{
+      const s=String(v??'');
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+    }).join(',');
   }
-
-  function toCsv(rows){
-    return rows.map(r => r.map(v => {
-      const s = String(v ?? '');
-      return (s.includes(',') || s.includes('"') || s.includes('\\n')) ? `"${s.replace(/"/g,'""')}"` : s;
-    }).join(',')).join('\\n');
-  }
-
   function exportCsv(){
-    const rows = [['Stand ID','Status','Company']];
-    Array.from(byId.values()).sort((a,b)=>a.standId.localeCompare(b.standId)).forEach(r=>{
-      rows.push([r.standId, r.status, r.company || '']);
-    });
-    const blob = new Blob([toCsv(rows)], {type:'text/csv'});
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'stands_snapshot.csv';
-    a.click();
+    const rows=[['standId','status','company']];
+    const items=Array.from(byId.values()).sort((a,b)=>a.standId.localeCompare(b.standId,undefined,{numeric:true}));
+    items.forEach(r=>rows.push([r.standId, normalizeStatus(r.status), r.company||'']));
+    const csv=rows.map(toCsvRow).join('\n');
+    const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='floorplan-stands-'+new Date().toISOString().replace(/[:.]/g,'-')+'.csv';
+    document.body.appendChild(a); a.click(); a.remove();
   }
-
-  function importCsv(){
-    if(!unlocked){
-      alert('Unlock first (admin password).');
-      return;
+  async function parseCsv(text){
+    const rows=[]; let i=0,field='',row=[],inQuotes=false;
+    while(i<text.length){
+      const c=text[i];
+      if(inQuotes){
+        if(c==='"'){ if(text[i+1]==='"'){ field+='"'; i+=2; continue;} inQuotes=false; i++; continue; }
+        field+=c; i++; continue;
+      }else{
+        if(c==='"'){ inQuotes=true; i++; continue; }
+        if(c===','){ row.push(field); field=''; i++; continue; }
+        if(c==='\r'){ i++; continue; }
+        if(c==='\n'){ row.push(field); rows.push(row); row=[]; field=''; i++; continue; }
+        field+=c; i++; continue;
+      }
     }
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.csv,text/csv';
-    input.onchange = async () => {
-      if(!input.files || !input.files[0]) return;
-      const text = await input.files[0].text();
-      const lines = text.split(/\\r?\\n/).filter(Boolean);
-      // skip header
-      const rows = lines.slice(1).map(l=>{
-        // naive CSV split (works for simple exports)
-        const parts = l.split(',');
-        const standId = (parts[0]||'').replace(/^"|"$/g,'').trim();
-        const status = (parts[1]||'').replace(/^"|"$/g,'').trim();
-        const company = parts.slice(2).join(',').replace(/^"|"$/g,'').trim();
-        return {standId, status, company};
-      }).filter(r=>r.standId);
+    row.push(field); rows.push(row);
+    return rows.filter(r=>r.some(x=>String(x||'').trim()!=='')); 
+  }
+  async function importCsvFile(file){
+    const text=await file.text();
+    const rows=await parseCsv(text);
+    if(!rows.length) throw new Error('CSV is empty');
+    const header=rows[0].map(h=>String(h||'').trim().toLowerCase());
+    const idxStand=header.indexOf('standid');
+    const idxStatus=header.indexOf('status');
+    const idxCompany=header.indexOf('company');
+    if(idxStand===-1 || idxStatus===-1) throw new Error('CSV must have headers: standId,status,company');
 
-      for(const r of rows){
-        await fetch(SHEET_API_URL, { method:'POST', body: JSON.stringify({
-          standId: r.standId,
-          status: r.status,
-          company: r.company
-        })});
+    const prev=autoSyncEnabled;
+    autoSyncEnabled=false; btnToggleSync.textContent='Resume sync';
+    try{
+      for(let r=1;r<rows.length;r++){
+        const rr=rows[r];
+        const standId=String(rr[idxStand]||'').trim(); if(!standId) continue;
+        const status=normalizeStatus(rr[idxStatus]);
+        const company=(status==='sold')?String((idxCompany>=0?rr[idxCompany]:'')||'').trim():'';
+        await postJson(API_BASE+'/stand',{standId,status,company});
       }
       await syncOnce();
-    };
-    input.click();
-  }
-
-  async function resetAll(){
-    if(!unlocked){
-      alert('Unlock first (admin password).');
-      return;
-    }
-    const pw = prompt('Type admin password to confirm reset:');
-    if(pw !== ADMIN_PASSWORD){
-      alert('Wrong password.');
-      return;
-    }
-    const stands = Array.from(byId.values());
-    for(const s of stands){
-      await fetch(SHEET_API_URL, { method:'POST', body: JSON.stringify({ standId: s.standId, status:'available', company:'' }) });
-    }
-    await syncOnce();
-  }
-
-  function unlock(){
-    const pw = adminPw.value || '';
-    if(pw === ADMIN_PASSWORD){
-      unlocked = true;
-      adminPw.value = '';
-      alert('Unlocked.');
-    }else{
-      unlocked = false;
-      alert('Wrong password.');
+      setStatus('Import complete: '+new Date().toLocaleTimeString());
+    }finally{
+      autoSyncEnabled=prev; btnToggleSync.textContent=autoSyncEnabled?'Pause sync':'Resume sync';
     }
   }
 
-  async function syncOnce(){
+  async function saveCurrent(statusOverride=null){
+    if(!selectedId) return;
+    const standId=standIdEl.value.trim();
+    const status=normalizeStatus(statusOverride??statusSel.value);
+    const company=(status==='sold')?companyEl.value.trim():'';
+    btnSave.disabled=true; btnClear.disabled=true;
     try{
-      setStatus('Syncing…');
-      await fetchAll();
-      renderPlan();
-      renderTable();
-      if(selected) scheduleUpdateZoom(selected);
-      setStatus('Last sync: ' + new Date().toLocaleTimeString());
+      setStatus('Saving…');
+      await postJson(API_BASE+'/stand',{standId,status,company});
+      dirty=false;
+      await syncOnce();
+      setStatus('Saved: '+new Date().toLocaleTimeString());
     }catch(e){
+      setStatus('Save error: '+e.message,true);
       console.error(e);
-      setStatus('Sync error: ' + e.message, true);
+    }finally{
+      btnSave.disabled=false; btnClear.disabled=false;
     }
   }
 
-  // ====== Wire UI ======
-  saveBtn.addEventListener('click', () => saveStand().catch(e=>{ alert(e.message); }));
-  exportBtn.addEventListener('click', exportCsv);
-  importBtn.addEventListener('click', importCsv);
-  resetBtn.addEventListener('click', () => resetAll().catch(e=>alert(e.message)));
+  
+  async function resetAll(){
+    // Extra safety prompts
+    const confirmWord = prompt('Type RESET to mark ALL stands as AVAILABLE:');
+    if (confirmWord !== 'RESET') return;
 
-  listAll.addEventListener('click', ()=>setListFilter('all'));
-  listAvail.addEventListener('click', ()=>setListFilter('available'));
-  listSold.addEventListener('click', ()=>setListFilter('sold'));
-  searchEl.addEventListener('input', renderTable);
+    const pw = prompt('Admin password to proceed:');
+    if (pw !== RESET_PASSWORD){
+      setStatus('Reset cancelled (wrong password).', true);
+      return;
+    }
 
-  unlockBtn.addEventListener('click', unlock);
+    const prevAuto = autoSyncEnabled;
+    autoSyncEnabled = false;
+    btnToggleSync.textContent = 'Resume sync';
 
-  // ====== Boot ======
+    try{
+      setStatus('Resetting…');
+      const items = Array.from(byId.values());
+      // Do sequential updates to keep it reliable with Apps Script behind the worker
+      for (let i=0; i<items.length; i++){
+        const s = items[i];
+        await postJson(API_BASE + '/stand', { standId: s.standId, status: 'available', company: '' });
+        if (i % 10 === 0) setStatus(`Resetting… ${i+1}/${items.length}`);
+      }
+      await syncOnce(true);
+      setStatus('Reset complete: ' + new Date().toLocaleTimeString());
+    }catch(e){
+      setStatus('Reset error: ' + e.message, true);
+      console.error(e);
+    }finally{
+      autoSyncEnabled = prevAuto;
+      btnToggleSync.textContent = autoSyncEnabled ? 'Pause sync' : 'Resume sync';
+    }
+  }
+
+statusSel.addEventListener('change', setDirty);
+  companyEl.addEventListener('input', setDirty);
+  btnSave.addEventListener('click', ()=>saveCurrent(null));
+  btnClear.addEventListener('click', ()=>saveCurrent('available'));
+  btnToggleSync.addEventListener('click', ()=>{
+    autoSyncEnabled=!autoSyncEnabled;
+    btnToggleSync.textContent = autoSyncEnabled ? 'Pause sync' : 'Resume sync';
+    if(autoSyncEnabled) syncOnce();
+  });
+  btnExport.addEventListener('click', exportCsv);
+  fileImport.addEventListener('change', async e=>{
+    const f=e.target.files && e.target.files[0];
+    if(!f) return;
+    try{
+      setStatus('Importing…');
+      await importCsvFile(f);
+    }catch(err){
+      setStatus('Import error: '+err.message,true);
+      console.error(err);
+    }finally{
+      fileImport.value='';
+    }
+  });
+  searchEl.addEventListener('input', renderList);
+  filterEl.addEventListener('change', renderList);
+  btnResetAll?.addEventListener('click', resetAll);
+
   (async () => {
     try{
-      // require password on page load (v15 behavior)
-      const pw = prompt('Admin password:');
-      if(pw !== ADMIN_PASSWORD){
-        alert('Wrong password.');
+      if (!(await requireAdminLogin())){
+        document.body.innerHTML = '<div style="font-family:Arial,Helvetica,sans-serif;padding:24px;max-width:720px;margin:0 auto;"><h2>Floorplan Admin</h2><p>Access cancelled or password incorrect.</p><p><a href="./admin.html">Try again</a></p></div>';
         return;
       }
-      unlocked = true;
-
+      setStatus('Loading…');
       await loadSvg();
-      await loadZoomSvg();
       bboxCache = new Map();
-
-      // bind interactions once
+      warmBBoxCache();
       getStandNodes().forEach(bindNodeEvents);
-
+      initZoomSvg();
       await syncOnce();
       setInterval(syncOnce, SYNC_INTERVAL_MS);
     }catch(e){
+      setStatus('Load error: '+e.message,true);
       console.error(e);
-      setStatus('Load error: ' + e.message, true);
     }
   })();
 })();
