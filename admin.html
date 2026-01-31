@@ -188,7 +188,7 @@
   const STAND_ID_RE = /^([A-Z]{1,3})(\d{1,3})$/;
   // Simple safeguard password for the Reset-all button (edit this).
     // Simple page-gate password to prevent accidental access (edit this).
-  const ADMIN_PASSWORD = 'FLOORPASS1';
+  const ADMIN_PASSWORD = 'CHANGE_ME';
   // Reset-all uses the same password
   const RESET_PASSWORD = ADMIN_PASSWORD;
 
@@ -440,6 +440,22 @@ let svgRoot = null;
     }catch{
       return null;
     }
+  }
+
+  function warmBBoxCache(){
+    // Precompute stand bounding boxes gradually to keep Safari responsive on first clicks
+    const nodes = getStandNodes();
+    let i = 0;
+    function step(){
+      const start = performance.now();
+      while (i < nodes.length && (performance.now() - start) < 8){
+        const id = String(nodes[i].id || '').trim();
+        if (id) getStandBox(id);
+        i++;
+      }
+      if (i < nodes.length) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
   }
 
   function scheduleUpdateZoom(standId){
@@ -733,6 +749,7 @@ statusSel.addEventListener('change', setDirty);
       setStatus('Loading…');
       await loadSvg();
       bboxCache = new Map();
+      warmBBoxCache();
       getStandNodes().forEach(bindNodeEvents);
       initZoomSvg();
       await syncOnce();

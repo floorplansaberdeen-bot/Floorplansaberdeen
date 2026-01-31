@@ -170,11 +170,27 @@
       pinsRaf = 0;
       renderPins();
     });
-
-    calloutLayer.appendChild(frag);
   }
 
-  function getStandBox(standId){
+  
+  function warmBBoxCache(){
+    // Precompute a few stand bounding boxes per frame to avoid Safari freezing on first click
+    const nodes = getStandNodes();
+    let i = 0;
+    function step(){
+      const start = performance.now();
+      // up to ~8ms per frame
+      while (i < nodes.length && (performance.now() - start) < 8){
+        const id = String(nodes[i].id || '').trim();
+        if (id) getStandBox(id);
+        i++;
+      }
+      if (i < nodes.length) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+function getStandBox(standId){
     if (bboxCache.has(standId)) return bboxCache.get(standId);
     const node = svgRoot.querySelector('#' + CSS.escape(standId));
     if (!node) return null;
@@ -397,6 +413,8 @@ async function fetchJson(url){
       frag.appendChild(rect);
       frag.appendChild(text);
     });
+
+    calloutLayer.appendChild(frag);
   }
   function bindNodeEvents(node){
     const standId = String(node.id||'').trim();
@@ -477,6 +495,7 @@ async function fetchJson(url){
       setStatus('Loading…');
       await loadSvg();
       bboxCache = new Map();
+      warmBBoxCache();
       ensureCalloutLayer();
       getStandNodes().forEach(bindNodeEvents);
 
