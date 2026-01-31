@@ -104,6 +104,8 @@
 
   // Safari compatibility: CSS.escape polyfill
   if (!window.CSS) window.CSS = {};
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
   if (typeof window.CSS.escape !== 'function') {
     window.CSS.escape = function (value) {
       return String(value).replace(/[^a-zA-Z0-9_\-]/g, function (ch) {
@@ -202,6 +204,22 @@ function getStandBox(standId){
     }catch{
       return null;
     }
+  }
+
+
+  function showTooltipAtStand(standId, info){
+    if (!svgRoot) return;
+    const box = getStandBox(standId);
+    if (!box) return;
+    const pt = svgRoot.createSVGPoint();
+    pt.x = box.cx; pt.y = box.cy;
+    const ctm = svgRoot.getScreenCTM();
+    if (!ctm) return;
+    const sp = pt.matrixTransform(ctm);
+    tooltip.textContent = tooltipText(info);
+    tooltip.style.left = (sp.x + 12) + 'px';
+    tooltip.style.top  = (sp.y + 12) + 'px';
+    tooltip.style.display = 'block';
   }
 
 function splitLines(text, maxChars){
@@ -432,7 +450,11 @@ async function fetchJson(url){
     node.addEventListener('click', () => {
       const info = byId.get(standId);
       if (info && normalizeStatus(info.status)==='sold' && info.company){
+        if (isSafari){
+        setTimeout(()=>togglePin(standId), 0);
+      } else {
         togglePin(standId);
+      }
       }
     });
   }
