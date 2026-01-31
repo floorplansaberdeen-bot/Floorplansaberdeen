@@ -48,6 +48,8 @@
   .opt.chk{justify-content:flex-start;}
   .opt.chk input{width:16px;height:16px;}
   @media (max-width:900px){.pdfGrid{grid-template-columns:1fr 1fr;}}
+
+  .__safariPinned{ stroke:#111 !important; stroke-width:5px !important; }
 </style>
 </head>
 <body>
@@ -139,6 +141,7 @@
   let calloutLayer = null;
   let pinned = new Set();
   let bboxCache = new Map();
+      prewarmBBoxes();
   let pinsRaf = 0;
 
   // Stand IDs look like: A1, AA1, AB2, AD10, SB20, C6 etc.
@@ -188,6 +191,27 @@
         i++;
       }
       if (i < nodes.length) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+
+  function prewarmBBoxes(){
+    if (!isSafari || !svgRoot) return;
+    const nodes = Array.from(svgRoot.querySelectorAll('[id]'))
+      .filter(n => /^[A-Z]{1,2}\d+$/i.test(n.id)); // stand-like ids
+    let i = 0;
+    const batch = 12;
+    function step(){
+      const end = Math.min(nodes.length, i + batch);
+      for (; i < end; i++){
+        const id = nodes[i].id;
+        // compute and cache bbox
+        getStandBox(id);
+      }
+      if (i < nodes.length){
+        requestAnimationFrame(step);
+      }
     }
     requestAnimationFrame(step);
   }
@@ -326,6 +350,26 @@ async function fetchJson(url){
     ensureCalloutLayer();
     if (!calloutLayer) return;
     calloutLayer.innerHTML = '';
+
+    // Safari fast mode: avoid SVG callout labels (prevents click freeze)
+    if (isSafari){
+      // clear previous highlight
+      getStandNodes().forEach(n=>{
+        try{ n.classList.remove('__safariPinned'); }catch{}
+      });
+      // apply highlight + render pinned list
+      const items = [];
+      pinned.forEach(id=>{
+        const node = svgRoot.querySelector('#'+CSS.escape(id));
+        if(node) try{ node.classList.add('__safariPinned'); }catch{}
+        const info = byId.get(id) || { standId:id, status:'available', company:'' };
+        items.push(info);
+      });
+      items.sort((a,b)=>String(a.company||a.standId).localeCompare(String(b.company||b.standId)));
+      renderPinnedList(items);
+      return;
+    }
+
     if (!pinned.size) return;
 
     const frag = document.createDocumentFragment();
@@ -451,7 +495,8 @@ async function fetchJson(url){
       const info = byId.get(standId);
       if (info && normalizeStatus(info.status)==='sold' && info.company){
         if (isSafari){
-        setTimeout(()=>togglePin(standId), 0);
+        try{ svgRoot.style.pointerEvents='none'; }catch{}
+        setTimeout(()=>{ try{ svgRoot.style.pointerEvents='auto'; }catch{}; togglePin(standId); }, 60);
       } else {
         togglePin(standId);
       }
@@ -467,7 +512,35 @@ async function fetchJson(url){
     });
   }
 
-  function renderSoldList(){
+  
+  function renderPinnedList(items){
+    const host = document.getElementById('pinnedList');
+    if(!host) return;
+    host.innerHTML = '';
+    if(!items.length){
+      host.innerHTML = '<span style="color:#666;font-size:13px;">No pins yet.</span>';
+      return;
+    }
+    items.forEach(info=>{
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'pill';
+      const label = (info.company && info.company.trim()) ? info.company.trim() : info.standId;
+      btn.textContent = label;
+      btn.title = info.standId;
+      btn.addEventListener('click', ()=>{
+        // ensure stand is visible and show tooltip at stand
+        try{
+          const node = svgRoot.querySelector('#'+CSS.escape(info.standId));
+          if(node && node.scrollIntoView) node.scrollIntoView({behavior:'smooth',block:'center',inline:'center'});
+        }catch{}
+        try{ showTooltipAtStand(info.standId, info); }catch{}
+      });
+      host.appendChild(btn);
+    });
+  }
+
+function renderSoldList(){
     const q = String(soldSearchEl.value||'').toLowerCase().trim();
     const sold = Array.from(byId.values())
       .filter(r => normalizeStatus(r.status)==='sold' && r.company)
@@ -635,6 +708,8 @@ async function fetchJson(url){
   .opt.chk{justify-content:flex-start;}
   .opt.chk input{width:16px;height:16px;}
   @media (max-width:900px){.pdfGrid{grid-template-columns:1fr 1fr;}}
+
+  .__safariPinned{ stroke:#111 !important; stroke-width:5px !important; }
 </style>
 </head>
 <body>
