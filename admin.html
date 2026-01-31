@@ -69,11 +69,14 @@
     <button class="btn red" id="btnResetAll" title="Mark ALL stands as available (requires password)">Reset all</button>
   </div>
 </header>
+<div id="safariAdminNote" style="display:none;margin:12px auto 0;max-width:1200px;padding:10px 12px;border:1px solid #e6e6e6;border-radius:10px;background:#fff;color:#444;font-size:13px;">Safari performance mode: plan clicks/hover can freeze Safari. Use the stand list/search to select a stand.</div>
 
 <div class="layout">
   <div class="card">
     <h2>Plan</h2>
-    <div id="svgHost"></div>
+    <div id="svgWrap" style="position:relative;">
+  <div id="safariOverlay" style="display:none;position:absolute;inset:0;z-index:5;"></div>
+  <div id="svgHost"></div>
 
     <div style="padding:10px 12px;display:flex;gap:10px;flex-wrap:wrap;border-top:1px solid var(--border);">
       <span class="pill"><span class="dot sold"></span>Sold</span>
@@ -190,7 +193,7 @@
   const STAND_ID_RE = /^([A-Z]{1,3})(\d{1,3})$/;
   // Simple safeguard password for the Reset-all button (edit this).
     // Simple page-gate password to prevent accidental access (edit this).
-  const ADMIN_PASSWORD = 'FLOORPASS1';
+  const ADMIN_PASSWORD = 'CHANGE_ME';
   // Reset-all uses the same password
   const RESET_PASSWORD = ADMIN_PASSWORD;
 
@@ -623,7 +626,8 @@ function initZoomSvg(){
       e.stopPropagation();
       tooltip.style.display='none';
       hoverDisabledUntil = Date.now() + 1200;
-      try{ svgRoot.style.pointerEvents='none'; }catch{}
+      try{ document.getElementById('svgHost').style.pointerEvents='none'; }catch{}
+        try{ const ov=document.getElementById('safariOverlay'); if(ov){ ov.style.display='block'; ov.addEventListener('click', (e)=>{ e.preventDefault(); e.stopPropagation(); }); } }catch{}
       setTimeout(()=>{ try{ svgRoot.style.pointerEvents='auto'; }catch{}; selectStand(standId,true); }, 0);
     });
 
@@ -822,6 +826,12 @@ statusSel.addEventListener('change', setDirty);
       bboxCache = new Map();
       // Bind interactions once
       getStandNodes().forEach(n=>bindNodeEvents(n));
+      if (isSafari){
+        const note = document.getElementById('safariAdminNote');
+        if (note) note.style.display='block';
+        try{ document.getElementById('svgHost').style.pointerEvents='none'; }catch{}
+        try{ const ov=document.getElementById('safariOverlay'); if(ov){ ov.style.display='block'; ov.addEventListener('click', (e)=>{ e.preventDefault(); e.stopPropagation(); }); } }catch{}
+      }
       warmBBoxCache();
       getStandNodes().forEach(bindNodeEvents);
       initZoomSvg();
