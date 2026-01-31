@@ -104,8 +104,6 @@
 
   // Safari compatibility: CSS.escape polyfill
   if (!window.CSS) window.CSS = {};
-  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-
   if (typeof window.CSS.escape !== 'function') {
     window.CSS.escape = function (value) {
       return String(value).replace(/[^a-zA-Z0-9_\-]/g, function (ch) {
@@ -139,7 +137,6 @@
   let calloutLayer = null;
   let pinned = new Set();
   let bboxCache = new Map();
-      prewarmBBoxes();
   let pinsRaf = 0;
 
   // Stand IDs look like: A1, AA1, AB2, AD10, SB20, C6 etc.
@@ -193,27 +190,6 @@
     requestAnimationFrame(step);
   }
 
-
-  function prewarmBBoxes(){
-    if (!isSafari || !svgRoot) return;
-    const nodes = Array.from(svgRoot.querySelectorAll('[id]'))
-      .filter(n => /^[A-Z]{1,2}\d+$/i.test(n.id)); // stand-like ids
-    let i = 0;
-    const batch = 12;
-    function step(){
-      const end = Math.min(nodes.length, i + batch);
-      for (; i < end; i++){
-        const id = nodes[i].id;
-        // compute and cache bbox
-        getStandBox(id);
-      }
-      if (i < nodes.length){
-        requestAnimationFrame(step);
-      }
-    }
-    requestAnimationFrame(step);
-  }
-
 function getStandBox(standId){
     if (bboxCache.has(standId)) return bboxCache.get(standId);
     const node = svgRoot.querySelector('#' + CSS.escape(standId));
@@ -226,22 +202,6 @@ function getStandBox(standId){
     }catch{
       return null;
     }
-  }
-
-
-  function showTooltipAtStand(standId, info){
-    if (!svgRoot) return;
-    const box = getStandBox(standId);
-    if (!box) return;
-    const pt = svgRoot.createSVGPoint();
-    pt.x = box.cx; pt.y = box.cy;
-    const ctm = svgRoot.getScreenCTM();
-    if (!ctm) return;
-    const sp = pt.matrixTransform(ctm);
-    tooltip.textContent = tooltipText(info);
-    tooltip.style.left = (sp.x + 12) + 'px';
-    tooltip.style.top  = (sp.y + 12) + 'px';
-    tooltip.style.display = 'block';
   }
 
 function splitLines(text, maxChars){
@@ -344,6 +304,47 @@ async function fetchJson(url){
     renderSoldList();
   }
 
+    function getViewBox(){
+    const vbAttr = svgRoot.getAttribute('viewBox');
+    if (vbAttr){
+      const p = vbAttr.trim().split(/[ ,]+/).map(Number);
+      if (p.length===4 && p.every(n=>Number.isFinite(n))) return {x:p[0], y:p[1], w:p[2], h:p[3]};
+    }
+    try{
+      const vb = svgRoot.viewBox && svgRoot.viewBox.baseVal ? svgRoot.viewBox.baseVal : null;
+      if (vb && vb.width) return {x:vb.x, y:vb.y, w:vb.width, h:vb.height};
+    }catch{}
+    try{
+      const b = svgRoot.getBBox();
+      return {x:b.x, y:b.y, w:b.width, h:b.height};
+    }catch{
+      return {x:0,y:0,w:2000,h:2000};
+    }
+  }
+
+  function setViewBox(vb){
+    svgRoot.setAttribute('viewBox', `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+  }
+
+  function computePlanBounds(){
+    // Union of all stand bboxes (not the whole svg) – used to place labels outside the plan.
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    const nodes = getStandNodes();
+    for (const n of nodes){
+      const id = String(n.id||'').trim();
+      if (!id) continue;
+      const b = getStandBox(id);
+      if (!b) continue;
+      const bb = b.bb;
+      minX = Math.min(minX, bb.x);
+      minY = Math.min(minY, bb.y);
+      maxX = Math.max(maxX, bb.x + bb.width);
+      maxY = Math.max(maxY, bb.y + bb.height);
+    }
+    if (!Number.isFinite(minX)) return null;
+    return {minX, minY, maxX, maxY, w:maxX-minX, h:maxY-minY};
+  }
+
   function renderPins(){
     ensureCalloutLayer();
     if (!calloutLayer) return;
@@ -352,7 +353,7 @@ async function fetchJson(url){
 
     const frag = document.createDocumentFragment();
 
-    // Build list of pin infos (sold with company only)
+    // Only show pins for sold stands that have company names
     const pins = Array.from(pinned)
       .map(id => byId.get(id))
       .filter(info => info && normalizeStatus(info.status)==='sold' && info.company);
@@ -362,26 +363,22 @@ async function fetchJson(url){
       return;
     }
 
-    // Create callouts; try to keep labels readable by stacking them in a column at the side.
-    // Column selection: right side if there is space, else left.
-    let bounds;
-    try{
-      const vb = svgRoot.viewBox && svgRoot.viewBox.baseVal ? svgRoot.viewBox.baseVal : null;
-      if (vb && vb.width) bounds = {x:vb.x,y:vb.y,w:vb.width,h:vb.height};
-    }catch{}
-    if (!bounds){
-      try{
-        const b = svgRoot.getBBox();
-        bounds = {x:b.x,y:b.y,w:b.width,h:b.height};
-      }catch{
-        bounds = {x:0,y:0,w:2000,h:2000};
-      }
-    }
+    // Calculate plan bounds (stands union), so labels can sit OUTSIDE the plan area.
+    const plan = computePlanBounds();
+    const vb = getViewBox();
 
-    const labelWGuess = 260;
-    const rightColX = bounds.x + bounds.w - (labelWGuess + 30);
-    const leftColX  = bounds.x + 30;
-    const useRight = true;
+    // If we can't compute plan bounds, fall back to the right edge of the viewBox.
+    const planMaxX = plan ? plan.maxX : (vb.x + vb.w);
+    const planMinY = plan ? plan.minY : vb.y;
+
+    const labelColumnX = planMaxX + 80;        // place labels to the right of the plan
+    const labelMaxWidthGuess = 360;
+    const rightNeeded = (labelColumnX - vb.x) + labelMaxWidthGuess + 80;
+
+    // Expand viewBox width to include label column (prevents clipping).
+    if (rightNeeded > vb.w){
+      setViewBox({x:vb.x, y:vb.y, w:rightNeeded, h:vb.h});
+    }
 
     // Sort pins by stand position (top-to-bottom) for nicer stacking
     const pinsWithBox = [];
@@ -392,46 +389,50 @@ async function fetchJson(url){
     }
     pinsWithBox.sort((a,b)=>a.cy-b.cy);
 
-    const startY = bounds.y + 40;
-    const stepY = 44;
+    const startY = planMinY + 40;
+    const stepY = 48;
 
-    pinsWithBox.slice(0, 50).forEach((p, idx) => {  // cap to keep Safari responsive
+    pinsWithBox.slice(0, 60).forEach((p, idx) => { // cap for Safari responsiveness
+      const labelX = labelColumnX;
+      const labelY = startY + idx * stepY;
 
-      const labelX = useRight ? rightColX : leftColX;
-      const labelY = Math.max(bounds.y + 30, Math.min(startY + idx*stepY, bounds.y + bounds.h - 30));
-
-      const line = svgEl('line', {x1:p.cx,y1:p.cy,x2:labelX,y2:labelY,stroke:'#111','stroke-width':2,'stroke-linecap':'round'});
-      line.style.opacity = '0.85';
+      // Thinner pointer line, same color as sold
+      const line = svgEl('line', {
+        x1:p.cx, y1:p.cy,
+        x2:labelX, y2:labelY,
+        stroke: SOLD,
+        'stroke-width': 1.4,
+        'stroke-linecap':'round'
+      });
+      line.style.opacity = '0.9';
       frag.appendChild(line);
 
-      const g = svgEl('g', {});
-      const lines = splitLines(p.info.company, 26);
-      const baseFont = (p.info.company.length > 28) ? 12 : 14;
+      const lines = splitLines(p.info.company, 24);
+      const baseFont = (p.info.company.length > 28) ? 12 : 13;
 
       // Estimate box size (avoid expensive text.getBBox in Safari)
-      const charW = baseFont * 0.62; // rough average
+      const charW = baseFont * 0.62;
       const maxLineLen = Math.max(...lines.map(l => l.length), 1);
-      const pad = 10;
+      const padX = 10;
+      const padY = 8;
       const lineH = baseFont + 4;
-      const boxW = Math.min(360, Math.max(120, Math.ceil(maxLineLen * charW) + pad * 2));
-      const boxH = Math.ceil(lines.length * lineH) + pad * 2;
+      const boxW = Math.min(360, Math.max(120, Math.ceil(maxLineLen * charW) + padX * 2));
+      const boxH = Math.ceil(lines.length * lineH) + padY * 2;
 
-      // Draw rect first
+      // Label background matches sold color, no outline, white text
       const rect = svgEl('rect', {
         x: labelX,
         y: labelY - (boxH/2),
         width: boxW,
         height: boxH,
         rx: 10, ry: 10,
-        fill: '#fff',
-        stroke: '#111',
-        'stroke-width': 2
+        fill: SOLD
       });
-      rect.style.opacity = '0.92';
+      rect.style.opacity = '0.95';
+      frag.appendChild(rect);
 
-      // Text inside the box (top-left)
-      const textX = labelX + pad;
-      const textY = (labelY - (boxH/2)) + pad;
+      const textX = labelX + padX;
+      const textY = (labelY - (boxH/2)) + padY;
 
       const text = svgEl('text', {
         x: textX,
@@ -439,7 +440,7 @@ async function fetchJson(url){
         'font-size': baseFont,
         'font-family': 'Arial, Helvetica, sans-serif',
         'font-weight': '700',
-        fill: '#111',
+        fill: '#fff',
         'dominant-baseline': 'hanging'
       });
 
@@ -448,14 +449,12 @@ async function fetchJson(url){
         t.textContent = ln;
         text.appendChild(t);
       });
-
-      // Add to layer
-      frag.appendChild(rect);
       frag.appendChild(text);
     });
 
     calloutLayer.appendChild(frag);
   }
+
   function bindNodeEvents(node){
     const standId = String(node.id||'').trim();
     if (!standId) return;
@@ -472,12 +471,7 @@ async function fetchJson(url){
     node.addEventListener('click', () => {
       const info = byId.get(standId);
       if (info && normalizeStatus(info.status)==='sold' && info.company){
-        if (isSafari){
-        try{ svgRoot.style.pointerEvents='none'; }catch{}
-        setTimeout(()=>{ try{ svgRoot.style.pointerEvents='auto'; }catch{}; togglePin(standId); }, 60);
-      } else {
         togglePin(standId);
-      }
       }
     });
   }
