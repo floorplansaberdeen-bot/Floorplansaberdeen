@@ -23,7 +23,8 @@
 
   .soldSection{margin-top:12px;border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:#fff;}
   .soldHeader{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
-  #soldSearch{flex:1;min-width:240px;padding:9px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;}
+  .soldTitle{font-weight:900;font-size:22px;margin:10px 0 8px;}
+  #soldSearch{flex:1;min-width:240px;padding:9px 10px;border:1px solid var(--border);border-radius:8px;font-size:16px;}
   .soldHint{margin-top:6px;font-size:12px;color:var(--muted);}
   .soldListWrap{margin-top:10px;border:1px solid var(--border);border-radius:10px;overflow:auto;max-height:360px;}
   .soldItem{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 12px;border-bottom:1px solid #eee;cursor:pointer;background:#fff;}
@@ -71,7 +72,7 @@
   .pdfOpts{margin-top:10px;border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:#fff;}
   .pdfGrid{margin-top:8px;display:grid;grid-template-columns:1.4fr 1fr 1fr 1.2fr;gap:10px;align-items:center;}
   .opt{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted);user-select:none;}
-  .opt input[type="text"]{flex:1;min-width:180px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:#111;}
+  .opt input[type="text"]{flex:1;min-width:180px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:16px;color:#111;}
   .opt.chk{justify-content:flex-start;}
   .opt.chk input{width:16px;height:16px;}
   @media (max-width:900px){.pdfGrid{grid-template-columns:1fr 1fr;}}
@@ -80,8 +81,8 @@
   #svgHost{position:relative; overflow:hidden;}
   #pinPanel{
     position:absolute;
-    top:12px;
-    right:12px;
+    top:20px;
+    right:20px;
     width:220px;
     max-height:calc(100% - 24px);
     overflow:auto;
@@ -99,10 +100,10 @@
   @media (max-width: 820px){
     #btnTogglePins{display:inline-block !important;}
     #pinPanel{
-      left:12px;
-      right:12px;
+      left:16px;
+      right:16px;
       top:auto;
-      bottom:12px;
+      bottom:16px;
       width:auto;
       max-height:40%;
       background:rgba(255,255,255,0.92);
@@ -145,10 +146,10 @@
   /* Mobile: pins appear in the large white area under the plan */
   @media (max-width: 720px){
     #pinPanel{
-      left:12px !important;
-      right:12px !important;
+      left:16px !important;
+      right:16px !important;
       top:auto !important;
-      bottom:12px !important;
+      bottom:16px !important;
       width:auto !important;
       max-height:96px !important;
     }
@@ -179,15 +180,15 @@
   </div>
 
   <div class="soldSection">
+    <div class="soldTitle">Sold exhibitors</div>
     <div class="soldHeader">
-      <strong>Sold exhibitors</strong>
       <input id="soldSearch" type="text" placeholder="Search company or stand…" />
     </div>
     
     <div class="pdfOpts">
       <div style="font-weight:800;">PDF options</div>
       <div class="pdfGrid">
-        <label class="opt"><span>Event name</span><input id="eventName" type="text" value="Exhibition Floorplan"></label>
+        <label class="opt"><span>Event name</span><input id="eventName" type="text" value="Exhibition Floorplan" readonly></label>
         <label class="opt chk"><input id="chkPinsPdf" type="checkbox" checked>Include pins</label>
         <label class="opt chk"><input id="chkLegendPdf" type="checkbox" checked>Print legend</label>
         <label class="opt chk"><input id="chkSoldListPdf" type="checkbox">Print exhibitor list</label>
@@ -992,7 +993,7 @@ async function fetchJson(url){
   .pdfOpts{margin-top:10px;border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:#fff;}
   .pdfGrid{margin-top:8px;display:grid;grid-template-columns:1.4fr 1fr 1fr 1.2fr;gap:10px;align-items:center;}
   .opt{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted);user-select:none;}
-  .opt input[type="text"]{flex:1;min-width:180px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;color:#111;}
+  .opt input[type="text"]{flex:1;min-width:180px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:16px;color:#111;}
   .opt.chk{justify-content:flex-start;}
   .opt.chk input{width:16px;height:16px;}
   @media (max-width:900px){.pdfGrid{grid-template-columns:1fr 1fr;}}
