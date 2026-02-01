@@ -78,17 +78,18 @@
   @media (max-width:900px){.pdfGrid{grid-template-columns:1fr 1fr;}}
 
   /* Pinned label column (scrollable, does NOT resize the map) */
-  #svgHost{position:relative; overflow:hidden;}
+  #svgHost{position:relative; overflow:visible;}
   #pinPanel{
+    box-sizing:border-box;
     position:absolute;
     top:20px;
-    right:20px;
-    width:220px;
+    right:40px;
+    width:200px;
     max-height:calc(100% - 24px);
     overflow:auto;
     display:none;
     gap:8px;
-    padding:0;
+    padding:6px;
     background:transparent;
     pointer-events:auto;
   }
