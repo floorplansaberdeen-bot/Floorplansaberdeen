@@ -343,6 +343,12 @@ async function fetchJson(url){
     return groups.length ? groups : shapes;
   }
 
+  // expose for any legacy calls
+  window.getStandNodes = function(){
+    if(!svgRoot) return [];
+    return getStandNodes();
+  };
+
   function paintNode(node, status){
     const s = normalizeStatus(status);
     const color = s==='sold' ? SOLD : AVAIL;
