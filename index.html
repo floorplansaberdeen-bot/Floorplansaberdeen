@@ -415,7 +415,7 @@ async function fetchJson(url){
     scheduleRenderPins();
   }
 
-  function setupPanZoom(){
+  window.setupPanZoom = function setupPanZoom(){
     if (!svgRoot) return;
 
     // Disable default touch gestures on the SVG (Safari iOS)
@@ -814,7 +814,7 @@ function computePlanBounds(){
       warmBBoxCache();
       ensureCalloutLayer();
       initBaseViewBox();
-      setupPanZoom();
+      window.setupPanZoom();
       getStandNodes().forEach(bindNodeEvents);
 
       soldSearchEl.addEventListener('input', renderSoldList);
