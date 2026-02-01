@@ -72,10 +72,7 @@
 
     <div id="svgHost"></div>
 
-    <div class="legend">
-      <span class="pill"><span class="dot sold"></span>Sold</span>
-      <span class="pill"><span class="dot avail"></span>Available</span>
-    </div>
+    <!-- Public page: legend hidden on-map (still optional in PDF export) -->
   </div>
 
   <div class="soldSection">
@@ -416,6 +413,128 @@ async function fetchJson(url){
 
     applyViewBox({x, y, w, h});
     scheduleRenderPins();
+  }
+
+  function setupPanZoom(){
+    if (!svgRoot) return;
+
+    // Disable default touch gestures on the SVG (Safari iOS)
+    try{ svgRoot.style.touchAction = 'none'; }catch{}
+
+    const pointers = new Map(); // pointerId -> {x,y}
+    let startVB = null;
+    let startDist = 0;
+    let startMid = null;
+    let raf = 0;
+    let pendingVB = null;
+
+    function dist(a,b){
+      const dx = a.x-b.x, dy = a.y-b.y;
+      return Math.sqrt(dx*dx + dy*dy);
+    }
+    function mid(a,b){
+      return {x:(a.x+b.x)/2, y:(a.y+b.y)/2};
+    }
+    function scheduleApply(vb){
+      pendingVB = vb;
+      if (raf) return;
+      raf = requestAnimationFrame(()=>{
+        raf = 0;
+        if (pendingVB){
+          applyViewBox(pendingVB);
+          pendingVB = null;
+          scheduleRenderPins();
+        }
+      });
+    }
+
+    function onDown(e){
+      // Only left click / primary touch
+      if (e.button != null && e.button !== 0) return;
+      pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+      try{ svgRoot.setPointerCapture(e.pointerId); }catch{}
+
+      startVB = currentViewBox();
+      if (pointers.size === 2){
+        const pts = Array.from(pointers.values());
+        startDist = dist(pts[0], pts[1]);
+        startMid = mid(pts[0], pts[1]);
+      }
+    }
+
+    function onMove(e){
+      if (!pointers.has(e.pointerId)) return;
+      const prevPt = pointers.get(e.pointerId);
+      pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+
+      // If user pans/zooms, lock the viewBox as user controlled
+      userViewChanged = true;
+
+      const vb0 = startVB || currentViewBox();
+
+      if (pointers.size === 1){
+        // Pan (compute delta ourselves for Safari)
+        const dx = prevPt ? (e.clientX - prevPt.x) : ((e.movementX != null) ? e.movementX : 0);
+        const dy = prevPt ? (e.clientY - prevPt.y) : ((e.movementY != null) ? e.movementY : 0);
+
+        // Convert screen delta -> svg delta using current viewBox dimensions
+        const rect = svgRoot.getBoundingClientRect();
+        const sx = vb0.w / Math.max(1, rect.width);
+        const sy = vb0.h / Math.max(1, rect.height);
+
+        const nx = vb0.x - dx * sx;
+        const ny = vb0.y - dy * sy;
+        scheduleApply({x:nx, y:ny, w:vb0.w, h:vb0.h});
+        return;
+      }
+
+      if (pointers.size >= 2){
+        const pts = Array.from(pointers.values());
+        const d = dist(pts[0], pts[1]);
+        const m = mid(pts[0], pts[1]);
+
+        const factor = (startDist && d) ? (startDist / d) : 1;
+
+        const rect = svgRoot.getBoundingClientRect();
+        const vb = vb0;
+
+        // Midpoint in SVG coords (approx) based on screen ratio
+        const rx = (m.x - rect.left) / Math.max(1, rect.width);
+        const ry = (m.y - rect.top) / Math.max(1, rect.height);
+        const cx = vb.x + rx * vb.w;
+        const cy = vb.y + ry * vb.h;
+
+        const newW = Math.max(200, vb.w * factor);
+        const newH = Math.max(200, vb.h * factor);
+
+        const nx = cx - (cx - vb.x) * (newW / vb.w);
+        const ny = cy - (cy - vb.y) * (newH / vb.h);
+
+        scheduleApply({x:nx, y:ny, w:newW, h:newH});
+        return;
+      }
+    }
+
+    function onUp(e){
+      pointers.delete(e.pointerId);
+      if (pointers.size < 2){
+        startDist = 0;
+        startMid = null;
+      }
+    }
+
+    // Wheel zoom (desktop)
+    function onWheel(e){
+      e.preventDefault();
+      const factor = e.deltaY > 0 ? 1.12 : 0.90;
+      zoomAt(e.clientX, e.clientY, factor);
+    }
+
+    svgRoot.addEventListener('pointerdown', onDown, {passive:true});
+    svgRoot.addEventListener('pointermove', onMove, {passive:true});
+    svgRoot.addEventListener('pointerup', onUp, {passive:true});
+    svgRoot.addEventListener('pointercancel', onUp, {passive:true});
+    svgRoot.addEventListener('wheel', onWheel, {passive:false});
   }
 
 function computePlanBounds(){
