@@ -54,18 +54,35 @@
   #pinPanel{
     position:absolute;
     top:12px;
-    left:12px;
-    width:190px;
+    right:12px;
+    width:220px;
     max-height:calc(100% - 24px);
-    overflow-y:auto;
-    overflow-x:hidden;
+    overflow:auto;
     display:none;
     gap:8px;
     padding:0;
-    margin:0;
-    z-index:5;
+    background:transparent;
     pointer-events:auto;
   }
+  /* Desktop: tidy column on right */
+  #pinPanel .pinItem{width:100%;}
+  /* Mobile: stack pins in the big white space under the plan */
+  @media (max-width: 820px){
+    #pinPanel{
+      left:12px;
+      right:12px;
+      top:auto;
+      bottom:12px;
+      width:auto;
+      max-height:40%;
+      background:rgba(255,255,255,0.92);
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:10px;
+      box-shadow:0 8px 18px rgba(0,0,0,0.08);
+    }
+  }
+
   #pinPanel .pinItem{
     display:flex;
     align-items:center;
@@ -107,11 +124,7 @@
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
         <button id="btnClearPins" style="padding:8px 10px;border:1px solid var(--border);background:#fff;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;">Clear pins</button>
         <button id="btnExportPdf" style="padding:8px 10px;border:1px solid var(--border);background:#f7f7f7;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;">Export PDF</button>
-        <button id="btnResetView" style="padding:8px 10px;border:1px solid var(--border);background:#fff;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;">Reset view</button>
-        <button id="btnFitView" style="padding:8px 10px;border:1px solid var(--border);background:#fff;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;">Fit to screen</button>
-        <button id="btnZoomIn" style="padding:8px 10px;border:1px solid var(--border);background:#fff;border-radius:8px;cursor:pointer;font-weight:900;font-size:13px;">+</button>
-        <button id="btnZoomOut" style="padding:8px 10px;border:1px solid var(--border);background:#fff;border-radius:8px;cursor:pointer;font-weight:900;font-size:13px;">−</button>
-      </div>
+</div>
     </div>
 
     <div id="svgHost"></div>
@@ -172,10 +185,6 @@
   const soldSearchEl = document.getElementById('soldSearch');
   const btnClearPins = document.getElementById('btnClearPins');
   const btnExportPdf = document.getElementById('btnExportPdf');
-  const btnResetView = document.getElementById('btnResetView');
-  const btnFitView = document.getElementById('btnFitView');
-  const btnZoomIn = document.getElementById('btnZoomIn');
-  const btnZoomOut = document.getElementById('btnZoomOut');
   const chkPinsPdf = document.getElementById('chkPinsPdf');
   const chkSoldListPdf = document.getElementById('chkSoldListPdf');
   const eventNameEl = document.getElementById('eventName');
@@ -516,129 +525,7 @@ async function fetchJson(url){
     scheduleRenderPins();
   }
 
-  window.setupPanZoom = function setupPanZoom(){
-    if (!svgRoot) return;
-
-    // Disable default touch gestures on the SVG (Safari iOS)
-    try{ svgRoot.style.touchAction = 'none'; }catch{}
-
-    const pointers = new Map(); // pointerId -> {x,y}
-    let startVB = null;
-    let startDist = 0;
-    let startMid = null;
-    let raf = 0;
-    let pendingVB = null;
-
-    function dist(a,b){
-      const dx = a.x-b.x, dy = a.y-b.y;
-      return Math.sqrt(dx*dx + dy*dy);
-    }
-    function mid(a,b){
-      return {x:(a.x+b.x)/2, y:(a.y+b.y)/2};
-    }
-    function scheduleApply(vb){
-      pendingVB = vb;
-      if (raf) return;
-      raf = requestAnimationFrame(()=>{
-        raf = 0;
-        if (pendingVB){
-          applyViewBox(pendingVB);
-          pendingVB = null;
-          scheduleRenderPins();
-        }
-      });
-    }
-
-    function onDown(e){
-      // Only left click / primary touch
-      if (e.button != null && e.button !== 0) return;
-      pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
-      try{ svgRoot.setPointerCapture(e.pointerId); }catch{}
-
-      startVB = currentViewBox();
-      if (pointers.size === 2){
-        const pts = Array.from(pointers.values());
-        startDist = dist(pts[0], pts[1]);
-        startMid = mid(pts[0], pts[1]);
-      }
-    }
-
-    function onMove(e){
-      if (!pointers.has(e.pointerId)) return;
-      const prevPt = pointers.get(e.pointerId);
-      pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
-
-      // If user pans/zooms, lock the viewBox as user controlled
-      userViewChanged = true;
-
-      const vb0 = startVB || currentViewBox();
-
-      if (pointers.size === 1){
-        // Pan (compute delta ourselves for Safari)
-        const dx = prevPt ? (e.clientX - prevPt.x) : ((e.movementX != null) ? e.movementX : 0);
-        const dy = prevPt ? (e.clientY - prevPt.y) : ((e.movementY != null) ? e.movementY : 0);
-
-        // Convert screen delta -> svg delta using current viewBox dimensions
-        const rect = svgRoot.getBoundingClientRect();
-        const sx = vb0.w / Math.max(1, rect.width);
-        const sy = vb0.h / Math.max(1, rect.height);
-
-        const nx = vb0.x - dx * sx;
-        const ny = vb0.y - dy * sy;
-        scheduleApply({x:nx, y:ny, w:vb0.w, h:vb0.h});
-        return;
-      }
-
-      if (pointers.size >= 2){
-        const pts = Array.from(pointers.values());
-        const d = dist(pts[0], pts[1]);
-        const m = mid(pts[0], pts[1]);
-
-        const factor = (startDist && d) ? (startDist / d) : 1;
-
-        const rect = svgRoot.getBoundingClientRect();
-        const vb = vb0;
-
-        // Midpoint in SVG coords (approx) based on screen ratio
-        const rx = (m.x - rect.left) / Math.max(1, rect.width);
-        const ry = (m.y - rect.top) / Math.max(1, rect.height);
-        const cx = vb.x + rx * vb.w;
-        const cy = vb.y + ry * vb.h;
-
-        const newW = Math.max(200, vb.w * factor);
-        const newH = Math.max(200, vb.h * factor);
-
-        const nx = cx - (cx - vb.x) * (newW / vb.w);
-        const ny = cy - (cy - vb.y) * (newH / vb.h);
-
-        scheduleApply({x:nx, y:ny, w:newW, h:newH});
-        return;
-      }
-    }
-
-    function onUp(e){
-      pointers.delete(e.pointerId);
-      if (pointers.size < 2){
-        startDist = 0;
-        startMid = null;
-      }
-    }
-
-    // Wheel zoom (desktop)
-    function onWheel(e){
-      e.preventDefault();
-      const factor = e.deltaY > 0 ? 1.12 : 0.90;
-      zoomAt(e.clientX, e.clientY, factor);
-    }
-
-    svgRoot.addEventListener('pointerdown', onDown, {passive:true});
-    svgRoot.addEventListener('pointermove', onMove, {passive:true});
-    svgRoot.addEventListener('pointerup', onUp, {passive:true});
-    svgRoot.addEventListener('pointercancel', onUp, {passive:true});
-    svgRoot.addEventListener('wheel', onWheel, {passive:false});
-  }
-
-function computePlanBounds(){
+  function computePlanBounds(){
     // Union of all stand bboxes (not the whole svg) – used to place labels outside the plan.
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     const nodes = getStandNodes();
@@ -869,7 +756,7 @@ function computePlanBounds(){
       initBaseViewBox();
       // Start with the largest "plan-only" fit.
       fitToScreen();
-      window.setupPanZoom();
+      window.
       getStandNodes().forEach(bindNodeEvents);
 
       soldSearchEl.addEventListener('input', renderSoldList);
@@ -884,10 +771,6 @@ function computePlanBounds(){
       }catch{}
 
       btnClearPins?.addEventListener('click', () => { clearPins(); renderSoldList(); });
-      btnResetView?.addEventListener('click', () => resetView());
-      btnFitView?.addEventListener('click', () => fitToScreen());
-      btnZoomIn?.addEventListener('click', () => zoomAt(window.innerWidth/2, 200, 0.85));
-      btnZoomOut?.addEventListener('click', () => zoomAt(window.innerWidth/2, 200, 1.18));
       
       
       
