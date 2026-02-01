@@ -48,6 +48,50 @@
   .opt.chk{justify-content:flex-start;}
   .opt.chk input{width:16px;height:16px;}
   @media (max-width:900px){.pdfGrid{grid-template-columns:1fr 1fr;}}
+
+  /* Pinned label column (scrollable, does NOT resize the map) */
+  #svgHost{position:relative; overflow:hidden;}
+  #pinPanel{
+    position:absolute;
+    top:12px;
+    left:12px;
+    width:190px;
+    max-height:calc(100% - 24px);
+    overflow-y:auto;
+    overflow-x:hidden;
+    display:none;
+    gap:8px;
+    padding:0;
+    margin:0;
+    z-index:5;
+    pointer-events:auto;
+  }
+  #pinPanel .pinItem{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    padding:8px 10px;
+    border-radius:12px;
+    background: var(--sold);
+    color:#fff;
+    font-weight:800;
+    font-size:13px;
+    line-height:1.15;
+    user-select:none;
+    cursor:pointer;
+    word-break:break-word;
+  }
+  #pinPanel .pinItem.small{font-size:12px;font-weight:800;}
+  #overlaySvg{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    z-index:4;
+    pointer-events:none;
+  }
+
 </style>
 </head>
 <body>
@@ -145,9 +189,13 @@
   let gesture = {mode:null, startVB:null, startPt:null, startDist:0, startCenter:null, moved:false};
   let byId = new Map(); // standId -> {standId,status,company}
   let calloutLayer = null;
+  let pinPanelEl = null;
+  let overlaySvgEl = null;
+  let lastPinsRendered = [];
   let pinned = new Set();
   let bboxCache = new Map();
   let pinsRaf = 0;
+  let linesRaf = 0;
 
   // Stand IDs look like: A1, AA1, AB2, AD10, SB20, C6 etc.
   const STAND_ID_RE = /^([A-Z]{1,3})(\d{1,3})$/;
@@ -179,6 +227,14 @@
     pinsRaf = requestAnimationFrame(() => {
       pinsRaf = 0;
       renderPins();
+    });
+  }
+
+function scheduleUpdateLines(){
+    if (linesRaf) return;
+    linesRaf = requestAnimationFrame(() => {
+      linesRaf = 0;
+      updateOverlayLines();
     });
   }
 
@@ -301,15 +357,45 @@ async function fetchJson(url){
     }
   }
 
+  function ensureOverlay(){
+    if (!svgHost) return;
+    if (!pinPanelEl){
+      pinPanelEl = document.createElement('div');
+      pinPanelEl.id = 'pinPanel';
+      svgHost.appendChild(pinPanelEl);
+      pinPanelEl.addEventListener('scroll', () => scheduleUpdateLines());
+    }
+    if (!overlaySvgEl){
+      overlaySvgEl = document.createElementNS('http://www.w3.org/2000/svg','svg');
+      overlaySvgEl.setAttribute('id','overlaySvg');
+      overlaySvgEl.setAttribute('xmlns','http://www.w3.org/2000/svg');
+      overlaySvgEl.setAttribute('preserveAspectRatio','none');
+      svgHost.appendChild(overlaySvgEl);
+      // keep overlay sized to host
+      const ro = new ResizeObserver(() => scheduleRenderPins());
+      ro.observe(svgHost);
+    }
+  }
+
+  function clearOverlay(){
+    if (overlaySvgEl) overlaySvgEl.innerHTML = '';
+    if (pinPanelEl){
+      pinPanelEl.innerHTML = '';
+      pinPanelEl.style.display = 'none';
+    }
+    lastPinsRendered = [];
+  }
+
   function clearPins(){
     pinned.clear();
-    if (calloutLayer) calloutLayer.innerHTML = '';
     soldListEl?.querySelectorAll('.soldItem.active').forEach(x=>x.classList.remove('active'));
+    clearOverlay();
     // When no pins, return to the largest (plan-only) fit unless the user manually panned/zoomed.
     if (!userViewChanged && initialFitViewBox){
       applyViewBox(initialFitViewBox);
     }
     scheduleRenderPins();
+    renderSoldList();
   }
 
   function togglePin(standId){
@@ -572,10 +658,14 @@ function computePlanBounds(){
   }
 
   function renderPins(){
-    ensureCalloutLayer();
-    if (!calloutLayer) return;
-    calloutLayer.innerHTML = '';
-    if (!pinned.size) return;
+    ensureOverlay();
+    if (!svgRoot || !svgHost) return;
+
+    // If no pins, clear overlays (and keep map at initial fit unless user changed view)
+    if (!pinned.size){
+      clearOverlay();
+      return;
+    }
 
     // Only show pins for sold stands that have company names
     const pins = Array.from(pinned)
@@ -584,126 +674,115 @@ function computePlanBounds(){
 
     if (!pins.length){
       pinned.clear();
+      clearOverlay();
       return;
     }
 
-    const frag = document.createDocumentFragment();
-
-    const plan = computePlanBounds();
-    const vb = getViewBox();
-
-    // fallbacks
-    const planMinX = plan ? plan.minX : vb.x;
-    const planMaxX = plan ? plan.maxX : (vb.x + vb.w);
-    const planMinY = plan ? plan.minY : vb.y;
-    const planMaxY = plan ? plan.maxY : (vb.y + vb.h);
-
-    // Sort pins by stand position (top-to-bottom), then left-to-right
+    // Build ordered list (top-to-bottom stand position)
     const pinsWithBox = [];
     for (const info of pins){
       const box = getStandBox(info.standId);
       if (!box) continue;
-      pinsWithBox.push({info, bb: box.bb, cx: box.cx, cy: box.cy});
+      pinsWithBox.push({info, cx: box.cx, cy: box.cy});
     }
     pinsWithBox.sort((a,b)=> (a.cy-b.cy) || (a.cx-b.cx));
 
-    const labelBoxW = 190;
-    const colGap = 24;
-    const stepY = 48;
+    const pinsToShow = pinsWithBox.slice(0, 200); // cap for responsiveness
+    lastPinsRendered = pinsToShow.map(p=>p.info.standId);
 
-    const maxPins = 140; // cap for Safari responsiveness
-    const pinsToShow = pinsWithBox.slice(0, maxPins);
+    // Preserve scroll position while rebuilding
+    const prevScroll = pinPanelEl ? pinPanelEl.scrollTop : 0;
 
-    if (!pinsToShow.length) return;
-
-    // ===== Labels RIGHT of the plan (all sizes) =====
-    const startY = planMinY + 40;
-    const rowsPerCol = Math.max(1, Math.floor(((planMaxY - planMinY) - 80) / stepY));
-    const labelColumnX = planMaxX + 70; // leave space between plan and labels
-
-    // Track label extents so we can auto-fit to include them (without user pan/zoom)
-    let labelsMaxX = labelColumnX;
-    let labelsMinY = startY;
-    let labelsMaxY = startY;
-
-    pinsToShow.forEach((p, idx) => {
-        const col = Math.floor(idx / rowsPerCol);
-        const row = idx % rowsPerCol;
-
-        const labelX = labelColumnX + col * (labelBoxW + colGap);
-        const labelY = startY + row * stepY;
-
-        const line = svgEl('line', {
-          x1:p.cx, y1:p.cy,
-          x2:labelX, y2:labelY,
-          stroke: SOLD,
-          'stroke-width': 1.0,
-          'stroke-linecap':'round'
+    // Build HTML label column (single tidy column, scrollable)
+    if (pinPanelEl){
+      pinPanelEl.style.display = 'flex';
+      pinPanelEl.style.flexDirection = 'column';
+      pinPanelEl.style.alignItems = 'stretch';
+      pinPanelEl.style.gap = '10px';
+      pinPanelEl.style.left = '';
+      pinPanelEl.style.right = '12px'; // RIGHT side as requested
+      pinPanelEl.innerHTML = '';
+      for (const p of pinsToShow){
+        const div = document.createElement('div');
+        div.className = 'pinItem';
+        // Slightly smaller font for long names, keep centered
+        if (String(p.info.company).length > 18) div.classList.add('small');
+        div.textContent = p.info.company;
+        div.title = `${p.info.company} (${p.info.standId})`;
+        div.dataset.standId = p.info.standId;
+        div.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          // Clicking a pin label scrolls the sold list to it (if visible)
+          const row = soldListEl?.querySelector(`[data-stand="${CSS.escape(p.info.standId)}"]`);
+          if (row && row.scrollIntoView) row.scrollIntoView({block:'center', behavior:'smooth'});
         });
-        line.style.opacity = '0.9';
-        frag.appendChild(line);
+        pinPanelEl.appendChild(div);
+      }
+      // restore scroll (clamped)
+      pinPanelEl.scrollTop = Math.min(prevScroll, pinPanelEl.scrollHeight);
+    }
 
-        const lines = splitLines(p.info.company, 22);
-        const baseFont = (p.info.company.length > 28) ? 12 : 13;
+    // Draw pointer lines on overlay SVG (in pixel space)
+    scheduleUpdateLines();
+  }
 
-        const charW = baseFont * 0.62;
-        const maxLineLen = Math.max(...lines.map(l => l.length), 1);
-        const padX = 10;
-        const padY = 8;
-        const lineH = baseFont * 1.25;
-        const boxW = Math.min(labelBoxW, padX*2 + maxLineLen*charW);
-        const boxH = padY*2 + lines.length*lineH;
+  function updateOverlayLines(){
+    if (!overlaySvgEl || !svgRoot || !svgHost) return;
+    if (!pinned.size || !lastPinsRendered.length){
+      overlaySvgEl.innerHTML = '';
+      return;
+    }
 
-        const rect = svgEl('rect', {
-          x: labelX,
-          y: labelY - boxH/2,
-          width: boxW,
-          height: boxH,
-          rx: 10, ry: 10,
-          fill: SOLD
-        });
-        rect.style.opacity = '0.95';
-        frag.appendChild(rect);
+    const hostRect = svgHost.getBoundingClientRect();
+    const w = Math.max(1, Math.round(hostRect.width));
+    const h = Math.max(1, Math.round(hostRect.height));
 
-        lines.forEach((t, li) => {
-          const ty = (labelY - boxH/2) + padY + (li+0.9)*lineH;
-          const text = svgEl('text', {
-            x: labelX + boxW/2,
-            y: ty,
-            fill: '#fff',
-            'text-anchor': 'middle',
-            'font-size': baseFont,
-            'font-weight': 700
-          });
-          text.textContent = t;
-          frag.appendChild(text);
-        });
-        labelsMaxX = Math.max(labelsMaxX, labelX + boxW);
-        labelsMinY = Math.min(labelsMinY, labelY - boxH/2);
-        labelsMaxY = Math.max(labelsMaxY, labelY + boxH/2);
-    });
+    overlaySvgEl.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    overlaySvgEl.innerHTML = '';
 
-    // Auto-fit behaviour:
-    // - If user hasn't panned/zoomed, and there are pins, widen view to include labels.
-    // - If pins are cleared, snap back to the initial fit (plan-only).
-    if (!userViewChanged && plan){
-      const pad = Math.max(18, Math.round(Math.max(plan.w, plan.h) * 0.06));
-      const want = {
-        x: planMinX - pad,
-        y: Math.min(planMinY - pad, labelsMinY - pad),
-        w: (labelsMaxX + pad) - (planMinX - pad),
-        h: (Math.max(planMaxY + pad, labelsMaxY + pad)) - (Math.min(planMinY - pad, labelsMinY - pad))
-      };
-
-      // Only apply if meaningfully different (prevents infinite render loops)
-      const cur = currentViewBox();
-      const delta = Math.abs(cur.w - want.w) + Math.abs(cur.h - want.h) + Math.abs(cur.x - want.x) + Math.abs(cur.y - want.y);
-      if (delta > 0.5){
-        applyViewBox(want);
+    // Build quick lookup from standId -> pin label element
+    const labelEls = new Map();
+    if (pinPanelEl){
+      for (const el of Array.from(pinPanelEl.querySelectorAll('.pinItem'))){
+        const id = String(el.dataset.standId||'').trim();
+        if (id) labelEls.set(id, el);
       }
     }
 
-    calloutLayer.appendChild(frag);
+    const frag = document.createDocumentFragment();
+
+    for (const standId of lastPinsRendered){
+      const info = byId.get(standId);
+      if (!info || normalizeStatus(info.status)!=='sold' || !info.company) continue;
+
+      const standNode = svgRoot.querySelector('#' + CSS.escape(standId));
+      const labelEl = labelEls.get(standId);
+      if (!standNode || !labelEl) continue;
+
+      const standRect = standNode.getBoundingClientRect();
+      const labelRect = labelEl.getBoundingClientRect();
+
+      const x1 = (standRect.left - hostRect.left) + standRect.width/2;
+      const y1 = (standRect.top  - hostRect.top)  + standRect.height/2;
+
+      // Line ends at left-middle of the label pill
+      const x2 = (labelRect.left - hostRect.left) - 6;
+      const y2 = (labelRect.top  - hostRect.top)  + labelRect.height/2;
+
+      const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+      line.setAttribute('x1', x1.toFixed(2));
+      line.setAttribute('y1', y1.toFixed(2));
+      line.setAttribute('x2', x2.toFixed(2));
+      line.setAttribute('y2', y2.toFixed(2));
+      line.setAttribute('stroke', SOLD);
+      line.setAttribute('stroke-width', '1');
+      line.setAttribute('stroke-linecap','round');
+      line.style.opacity = '0.85';
+      frag.appendChild(line);
+    }
+
+    overlaySvgEl.appendChild(frag);
   }
 
   function bindNodeEvents(node){
