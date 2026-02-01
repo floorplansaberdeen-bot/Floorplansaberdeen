@@ -33,6 +33,33 @@
   .soldName{font-weight:700;font-size:13px;line-height:1.2;}
   .soldMeta{font-size:12px;color:var(--muted);white-space:nowrap;}
 
+
+/* ===== Mobile: keep plan pinned, scroll exhibitors ===== */
+@media (max-width: 820px){
+  header{position:sticky;top:0;z-index:50;background:#fff;}
+  body{overflow:hidden;}
+  .wrap{
+    padding:10px;
+    height: calc(100vh - var(--headerH, 56px));
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .card{flex:0 0 auto;}
+  /* Keep plan visible but not huge; avoid dead white space */
+  #svgHost{min-height:260px;max-height:46vh;overflow:hidden;}
+  #svgHost svg{height:100%;}
+  /* Scroll everything under the plan */
+  .soldSection{
+    flex:1 1 auto;
+    margin-top:0;
+    overflow:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  .soldListWrap{max-height:none;}
+}
+
 @media print{
   header, .soldSection{display:none !important;}
   .wrap{padding:0;}
@@ -178,6 +205,16 @@
 
 <script>
 (() => {
+
+  // Keep a CSS var for header height (for mobile pinned plan layout)
+  function setHeaderHeightVar(){
+    const h = document.querySelector('header');
+    if (!h) return;
+    document.documentElement.style.setProperty('--headerH', (h.getBoundingClientRect().height || h.offsetHeight || 56) + 'px');
+  }
+  window.addEventListener('resize', () => { try{ setHeaderHeightVar(); }catch(e){} }, {passive:true});
+  // initial
+  setHeaderHeightVar();
 
   // Safari compatibility: CSS.escape polyfill
   if (!window.CSS) window.CSS = {};
