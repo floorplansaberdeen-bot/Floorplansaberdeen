@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Exhibition Floorplan</title>
+<title><span id="eventTitle">New Event</span></title>
 <style>
   :root{--border:#d9d9d9;--muted:#666;--sold:#e53935;--avail:#2ecc71;}
   body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#111;}
@@ -143,6 +143,22 @@
     }
     #pinPanel .pinItem{ width:100%; text-align:center; }
   }
+
+  /* Mobile UX tweaks */
+  @media (max-width: 720px){
+    .cardHead .title{ display:none; }
+    #soldSearch{ font-size:16px; }
+  }
+  /* Keep the pin lozenge fully visible */
+  #pinPanel{
+    right:auto !important;
+    left:52% !important;
+    transform: translateX(-50%);
+    max-width: calc(100% - 24px);
+  }
+  /* Give iOS address bar some breathing room */
+  .soldCard{ padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 32px); }
+
 </style>
 </head>
 <body>
@@ -168,22 +184,10 @@
   </div>
 
   <div class="soldSection">
-    <div class="soldTitle">Sold exhibitors</div>
-    <div class="soldHeader">
+<div class="soldHeader">
       <input id="soldSearch" type="text" placeholder="Search company or stand…" />
     </div>
-    
-    <div class="pdfOpts">
-      <div style="font-weight:800;">PDF options</div>
-      <div class="pdfGrid">
-        <label class="opt"><span>Event name</span><input id="eventName" type="text" value="Exhibition Floorplan" readonly></label>
-        <label class="opt chk"><input id="chkPinsPdf" type="checkbox" checked>Include pins</label>
-        <label class="opt chk"><input id="chkLegendPdf" type="checkbox" checked>Print legend</label>
-        <label class="opt chk"><input id="chkSoldListPdf" type="checkbox">Print exhibitor list</label>
-      </div>
-    </div>
-
-    <div class="soldHint">Click a company name to highlight its stand with a label and pointer line.</div>
+<div class="soldHint">Click a company name to highlight its stand with a label and pointer line.</div>
     <div class="soldListWrap">
       <div id="soldList"></div>
     </div>
@@ -231,10 +235,16 @@
   const btnClearPins = document.getElementById('btnClearPins');
   const btnTogglePins = document.getElementById('btnTogglePins');
   const btnExportPdf = document.getElementById('btnExportPdf');
-  const chkPinsPdf = document.getElementById('chkPinsPdf');
-  const chkSoldListPdf = document.getElementById('chkSoldListPdf');
-  const eventNameEl = document.getElementById('eventName');
-  const chkLegendPdf = document.getElementById('chkLegendPdf');
+  const PDF_DEFAULTS = { includePins:true, includeLegend:true, includeSoldList:true };
+  let eventName = 'New Event';
+  function applyEventName(name){
+    const n = String(name||'').trim();
+    if(!n) return;
+    eventName = n;
+    const t = document.getElementById('eventTitle');
+    if(t) t.textContent = eventName;
+    try{ localStorage.setItem('floorplanEventName', eventName); }catch(_){ }
+  }
 
   let svgRoot = null;
   let baseViewBox = null;
@@ -756,7 +766,7 @@ async function fetchJson(url){
       line.setAttribute('y1', y1.toFixed(2));
       line.setAttribute('x2', x2.toFixed(2));
       line.setAttribute('y2', y2.toFixed(2));
-      line.setAttribute('stroke', SOLD);
+      line.setAttribute('stroke', '#111');
       line.setAttribute('stroke-width', '1');
       line.setAttribute('stroke-linecap','round');
       line.style.opacity = '0.85';
@@ -829,7 +839,11 @@ async function fetchJson(url){
   async function syncOnce(){
     try{
       const data = await fetchJson(API_BASE + '/stands?ts=' + Date.now());
-      byId = new Map((Array.isArray(data)?data:[]).map(r => [String(r.standId).trim(), {
+      const stands = Array.isArray(data) ? data : (data && Array.isArray(data.stands) ? data.stands : []);
+      if(data && !Array.isArray(data) && data.settings && typeof data.settings.eventName === 'string'){
+        applyEventName(data.settings.eventName);
+      }
+      byId = new Map(stands.map(r => [String(r.standId).trim(), {
         standId:String(r.standId).trim(),
         status:normalizeStatus(r.status),
         company:String(r.company||'').trim()
@@ -849,6 +863,7 @@ async function fetchJson(url){
   (async () => {
     try{
       setStatus('Loading…');
+      try{ applyEventName(localStorage.getItem('floorplanEventName')); }catch(_){ }
       await loadSvg();
       bboxCache = new Map();
       warmBBoxCache();
@@ -863,9 +878,9 @@ async function fetchJson(url){
       // Persist event name
       try{
         const saved = localStorage.getItem('fp_eventName');
-        if (saved && eventNameEl) eventNameEl.value = saved;
+        if (saved && eventNameEl) eventName = saved;
         eventNameEl?.addEventListener('input', () => {
-          localStorage.setItem('fp_eventName', eventNameEl.value || '');
+          localStorage.setItem('fp_eventName', eventName || '');
         });
       }catch{}
 
@@ -889,11 +904,11 @@ async function fetchJson(url){
       btnExportPdf?.addEventListener('click', () => {
         if (!svgRoot) return;
 
-        const includePins = !!(chkPinsPdf && chkPinsPdf.checked);
-        const includeSoldList = !!(chkSoldListPdf && chkSoldListPdf.checked);
-        const includeLegend = !!(chkLegendPdf && chkLegendPdf.checked);
+        const includePins = !!(chkPinsPdf && PDF_DEFAULTS.includePins);
+        const includeSoldList = !!(chkSoldListPdf && PDF_DEFAULTS.includeSoldList);
+        const includeLegend = !!(chkLegendPdf && PDF_DEFAULTS.includeLegend);
 
-        const rawEventName = (eventNameEl && eventNameEl.value) ? eventNameEl.value : 'Exhibition Floorplan';
+        const rawEventName = (eventNameEl && eventName) ? eventName : 'Exhibition Floorplan';
         const eventName = String(rawEventName).trim() || 'Exhibition Floorplan';
 
         const d = new Date();
@@ -939,8 +954,7 @@ async function fetchJson(url){
           if (sold.length){
             const rows = sold.map(r => `<div class="sRow"><div class="sName">${escapeHtml(r.company)}</div><div class="sStand">Stand ${escapeHtml(r.standId)}</div></div>`).join('');
             soldHtml = `<div class="soldBox">
-              <div class="soldTitle">Sold exhibitors</div>
-              ${rows}
+${rows}
             </div>`;
           }
         }
