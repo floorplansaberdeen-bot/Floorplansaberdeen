@@ -67,7 +67,10 @@
   /* Desktop: tidy column on right */
   #pinPanel .pinItem{width:100%;}
   /* Mobile: stack pins in the big white space under the plan */
+  .mobileOnly{display:none;}
+  @media (max-width: 820px){.mobileOnly{display:inline-flex;}}
   @media (max-width: 820px){
+    #btnTogglePins{display:inline-block !important;}
     #pinPanel{
       left:12px;
       right:12px;
@@ -123,6 +126,7 @@
       <div style="font-weight:700;">Plan</div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
         <button id="btnClearPins" style="padding:8px 10px;border:1px solid var(--border);background:#fff;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;">Clear pins</button>
+        <button id="btnTogglePins" class="mobileOnly" style="padding:8px 10px;border:1px solid var(--border);background:#fff;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;">Pinned exhibitors</button>
         <button id="btnExportPdf" style="padding:8px 10px;border:1px solid var(--border);background:#f7f7f7;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;">Export PDF</button>
 </div>
     </div>
@@ -184,6 +188,7 @@
   const soldListEl = document.getElementById('soldList');
   const soldSearchEl = document.getElementById('soldSearch');
   const btnClearPins = document.getElementById('btnClearPins');
+  const btnTogglePins = document.getElementById('btnTogglePins');
   const btnExportPdf = document.getElementById('btnExportPdf');
   const chkPinsPdf = document.getElementById('chkPinsPdf');
   const chkSoldListPdf = document.getElementById('chkSoldListPdf');
@@ -205,6 +210,7 @@
   let bboxCache = new Map();
   let pinsRaf = 0;
   let linesRaf = 0;
+  let pinsPanelVisible = true; // mobile toggle
 
   // Stand IDs look like: A1, AA1, AB2, AD10, SB20, C6 etc.
   const STAND_ID_RE = /^([A-Z]{1,3})(\d{1,3})$/;
@@ -236,6 +242,7 @@
     pinsRaf = requestAnimationFrame(() => {
       pinsRaf = 0;
       renderPins();
+      updatePinUi();
     });
   }
 
@@ -399,6 +406,7 @@ async function fetchJson(url){
     pinned.clear();
     soldListEl?.querySelectorAll('.soldItem.active').forEach(x=>x.classList.remove('active'));
     clearOverlay();
+    updatePinUi();
     // When no pins, return to the largest (plan-only) fit unless the user manually panned/zoomed.
     if (!userViewChanged && initialFitViewBox){
       applyViewBox(initialFitViewBox);
@@ -420,6 +428,36 @@ async function fetchJson(url){
 
     
   // ===== ViewBox / Pan-Zoom helpers (clean for iOS Safari) =====
+
+  function isMobile(){
+    return window.matchMedia && window.matchMedia("(max-width: 820px)").matches;
+  }
+
+  function updatePinUi(){
+    if (!pinPanelEl) return;
+    const mobile = isMobile();
+    if (btnTogglePins){
+      btnTogglePins.style.display = (mobile && pinned.size) ? "inline-flex" : "none";
+      if (mobile && pinned.size){
+        btnTogglePins.textContent = (pinsPanelVisible ? "Hide pinned (" : "Show pinned (") + pinned.size + ")";
+      }
+    }
+
+    if (!pinned.size){
+      pinPanelEl.style.display = "none";
+      if (overlaySvgEl) overlaySvgEl.style.display = "none";
+      return;
+    }
+
+    if (mobile && !pinsPanelVisible){
+      pinPanelEl.style.display = "none";
+      if (overlaySvgEl) overlaySvgEl.style.display = "none";
+    }else{
+      pinPanelEl.style.display = "flex";
+      if (overlaySvgEl) overlaySvgEl.style.display = "block";
+    }
+  }
+
   function getViewBox(){
     try{
       const vbAttr = svgRoot && svgRoot.getAttribute ? svgRoot.getAttribute('viewBox') : null;
@@ -551,6 +589,7 @@ async function fetchJson(url){
     // If no pins, clear overlays (and keep map at initial fit unless user changed view)
     if (!pinned.size){
       clearOverlay();
+    updatePinUi();
       return;
     }
 
@@ -562,6 +601,7 @@ async function fetchJson(url){
     if (!pins.length){
       pinned.clear();
       clearOverlay();
+    updatePinUi();
       return;
     }
 
@@ -756,7 +796,6 @@ async function fetchJson(url){
       initBaseViewBox();
       // Start with the largest "plan-only" fit.
       fitToScreen();
-      window.
       getStandNodes().forEach(bindNodeEvents);
 
       soldSearchEl.addEventListener('input', renderSoldList);
@@ -771,6 +810,19 @@ async function fetchJson(url){
       }catch{}
 
       btnClearPins?.addEventListener('click', () => { clearPins(); renderSoldList(); });
+
+      btnTogglePins?.addEventListener('click', () => {
+        pinsPanelVisible = !pinsPanelVisible;
+        try{ sessionStorage.setItem('fp_pinsVisible', pinsPanelVisible ? '1' : '0'); }catch{}
+        updatePinUi();
+        scheduleRenderPins();
+      });
+
+      try{
+        const savedPins = sessionStorage.getItem('fp_pinsVisible');
+        if (savedPins === '0') pinsPanelVisible = false;
+      }catch{}
+      updatePinUi();
       
       
       
