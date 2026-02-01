@@ -305,11 +305,20 @@ async function fetchJson(url){
     pinned.clear();
     if (calloutLayer) calloutLayer.innerHTML = '';
     soldListEl?.querySelectorAll('.soldItem.active').forEach(x=>x.classList.remove('active'));
+    // When no pins, return to the largest (plan-only) fit unless the user manually panned/zoomed.
+    if (!userViewChanged && initialFitViewBox){
+      applyViewBox(initialFitViewBox);
+    }
+    scheduleRenderPins();
   }
 
   function togglePin(standId){
     if (pinned.has(standId)) pinned.delete(standId);
     else pinned.add(standId);
+    // If we just removed the last pin, snap back to the plan-only fit.
+    if (!pinned.size && !userViewChanged && initialFitViewBox){
+      applyViewBox(initialFitViewBox);
+    }
     scheduleRenderPins();
     renderSoldList();
   }
@@ -390,13 +399,16 @@ async function fetchJson(url){
     scheduleRenderPins();
   }
 
+  // Remember the "natural" fit (plan only) so we can snap back when no exhibitors are pinned.
+  let initialFitViewBox = null;
+
   function isNarrowLayout(){
     const w = (svgHost && svgHost.getBoundingClientRect) ? svgHost.getBoundingClientRect().width : window.innerWidth;
     return w < 720;
   }
 
   function fitToScreen(){
-    // Fits tightly to the plan. If pins exist, user can still pan/zoom to see labels.
+    // Fit to the plan only (no label space). This should be the biggest-looking plan on phones.
     userViewChanged = false;
     autoViewBox = null;
 
@@ -411,7 +423,10 @@ async function fetchJson(url){
     let w = plan ? (plan.w + pad*2) : vbBase.w;
     let h = plan ? (plan.h + pad*2) : vbBase.h;
 
-    applyViewBox({x, y, w, h});
+    const vb = {x, y, w, h};
+    applyViewBox(vb);
+    // Only capture this as the "initial" fit when nothing is pinned.
+    if (!pinned.size) initialFitViewBox = {...vb};
     scheduleRenderPins();
   }
 
@@ -576,7 +591,6 @@ function computePlanBounds(){
 
     const plan = computePlanBounds();
     const vb = getViewBox();
-    const narrow = isNarrowLayout();
 
     // fallbacks
     const planMinX = plan ? plan.minX : vb.x;
@@ -602,79 +616,17 @@ function computePlanBounds(){
 
     if (!pinsToShow.length) return;
 
-    if (narrow){
-      // ===== Labels BELOW the plan (mobile) =====
-      const startX = planMinX + 10;
-      const startY = planMaxY + 70;
+    // ===== Labels RIGHT of the plan (all sizes) =====
+    const startY = planMinY + 40;
+    const rowsPerCol = Math.max(1, Math.floor(((planMaxY - planMinY) - 80) / stepY));
+    const labelColumnX = planMaxX + 70; // leave space between plan and labels
 
-      // columns based on available width in the *current* fit box (not the whole SVG)
-      const fitW = (plan ? (planMaxX - planMinX) : vb.w) + 40;
-      const cols = Math.max(1, Math.floor(fitW / (labelBoxW + colGap)));
-      const rows = Math.max(1, Math.ceil(pinsToShow.length / cols)); 
+    // Track label extents so we can auto-fit to include them (without user pan/zoom)
+    let labelsMaxX = labelColumnX;
+    let labelsMinY = startY;
+    let labelsMaxY = startY;
 
-      pinsToShow.forEach((p, idx) => {
-        const col = idx % cols;
-        const row = Math.floor(idx / cols);
-
-        const labelX = startX + col * (labelBoxW + colGap);
-        const labelY = startY + row * stepY;
-
-        const line = svgEl('line', {
-          x1:p.cx, y1:p.cy,
-          x2:labelX, y2:labelY,
-          stroke: SOLD,
-          'stroke-width': 1.1,
-          'stroke-linecap':'round'
-        });
-        line.style.opacity = '0.9';
-        frag.appendChild(line);
-
-        const lines = splitLines(p.info.company, 22);
-        const baseFont = (p.info.company.length > 28) ? 12 : 13;
-
-        const charW = baseFont * 0.62;
-        const maxLineLen = Math.max(...lines.map(l => l.length), 1);
-        const padX = 10;
-        const padY = 8;
-        const lineH = baseFont * 1.25;
-        const boxW = Math.min(labelBoxW, padX*2 + maxLineLen*charW);
-        const boxH = padY*2 + lines.length*lineH;
-
-        const rect = svgEl('rect', {
-          x: labelX,
-          y: labelY - boxH/2,
-          width: boxW,
-          height: boxH,
-          rx: 10, ry: 10,
-          fill: SOLD
-        });
-        rect.style.opacity = '0.95';
-        frag.appendChild(rect);
-
-        lines.forEach((t, li) => {
-          const ty = (labelY - boxH/2) + padY + (li+0.9)*lineH;
-          const text = svgEl('text', {
-            x: labelX + boxW/2,
-            y: ty,
-            fill: '#fff',
-            'text-anchor': 'middle',
-            'font-size': baseFont,
-            'font-weight': 700
-          });
-          text.textContent = t;
-          frag.appendChild(text);
-        });
-      });
-
-    } else {
-      // ===== Labels LEFT of the plan (desktop/tablet) =====
-      const startY = planMinY + 40;
-      const rowsPerCol = Math.max(1, Math.floor(((planMaxY - planMinY) - 80) / stepY));
-      const colCount = Math.max(1, Math.ceil(pinsToShow.length / rowsPerCol));
-
-      const labelColumnX = (plan ? (planMinX - (labelBoxW + 80)) : (vb.x + 20));
-
-      pinsToShow.forEach((p, idx) => {
+    pinsToShow.forEach((p, idx) => {
         const col = Math.floor(idx / rowsPerCol);
         const row = idx % rowsPerCol;
 
@@ -685,7 +637,7 @@ function computePlanBounds(){
           x1:p.cx, y1:p.cy,
           x2:labelX, y2:labelY,
           stroke: SOLD,
-          'stroke-width': 1.1,
+          'stroke-width': 1.0,
           'stroke-linecap':'round'
         });
         line.style.opacity = '0.9';
@@ -726,7 +678,29 @@ function computePlanBounds(){
           text.textContent = t;
           frag.appendChild(text);
         });
-      });
+        labelsMaxX = Math.max(labelsMaxX, labelX + boxW);
+        labelsMinY = Math.min(labelsMinY, labelY - boxH/2);
+        labelsMaxY = Math.max(labelsMaxY, labelY + boxH/2);
+    });
+
+    // Auto-fit behaviour:
+    // - If user hasn't panned/zoomed, and there are pins, widen view to include labels.
+    // - If pins are cleared, snap back to the initial fit (plan-only).
+    if (!userViewChanged && plan){
+      const pad = Math.max(18, Math.round(Math.max(plan.w, plan.h) * 0.06));
+      const want = {
+        x: planMinX - pad,
+        y: Math.min(planMinY - pad, labelsMinY - pad),
+        w: (labelsMaxX + pad) - (planMinX - pad),
+        h: (Math.max(planMaxY + pad, labelsMaxY + pad)) - (Math.min(planMinY - pad, labelsMinY - pad))
+      };
+
+      // Only apply if meaningfully different (prevents infinite render loops)
+      const cur = currentViewBox();
+      const delta = Math.abs(cur.w - want.w) + Math.abs(cur.h - want.h) + Math.abs(cur.x - want.x) + Math.abs(cur.y - want.y);
+      if (delta > 0.5){
+        applyViewBox(want);
+      }
     }
 
     calloutLayer.appendChild(frag);
@@ -814,6 +788,8 @@ function computePlanBounds(){
       warmBBoxCache();
       ensureCalloutLayer();
       initBaseViewBox();
+      // Start with the largest "plan-only" fit.
+      fitToScreen();
       window.setupPanZoom();
       getStandNodes().forEach(bindNodeEvents);
 
