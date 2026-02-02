@@ -194,9 +194,10 @@ header .miniLabel{font-size:12px;color:#555;font-weight:700;}
   const STAND_ID_RE = /^([A-Z]{1,3})(\d{1,3})$/;
   // Simple safeguard password for the Reset-all button (edit this).
     // Simple page-gate password to prevent accidental access (edit this).
-  const ADMIN_PASSWORD = 'FLOORPASS1';
+  const ADMIN_PASSWORD = 'CHANGE_ME';
   // Reset-all uses the same password
   const RESET_PASSWORD = ADMIN_PASSWORD;
+  let sessionPassword = '';
 
   const elStatus = document.getElementById('status');
   const svgHost = document.getElementById('svgHost');
@@ -265,6 +266,7 @@ header .miniLabel{font-size:12px;color:#555;font-weight:700;}
         updateAttempts();
 
         if (entered === String(ADMIN_PASSWORD)){
+          sessionPassword = entered;
           close(true);
           return;
         }
@@ -813,29 +815,7 @@ statusSel.addEventListener('change', setDirty);
   filterEl.addEventListener('change', renderList);
   btnResetAll?.addEventListener('click', resetAll);
 
-// Event name shared with public page (localStorage)
-const EVENT_NAME_KEY = "fp_eventName";
-const adminEventNameEl = document.getElementById("adminEventName");
-const btnSaveEventName = document.getElementById("btnSaveEventName");
-const loadEventName = () => {
-  if (!adminEventNameEl) return;
-  adminEventNameEl.value = localStorage.getItem(EVENT_NAME_KEY) || "New Event";
-};
-const saveEventName = () => {
-  if (!adminEventNameEl) return;
-  const v = (adminEventNameEl.value || "").trim() || "Exhibition Floorplan";
-  localStorage.setItem(EVENT_NAME_KEY, v);
-  setStatus("Event name saved");
-};
-loadEventName();
-  const _evEl = document.getElementById('eventNameAdmin');
-  if(_evEl){ _evEl.addEventListener('change', saveEventName); _evEl.addEventListener('blur', saveEventName); }
-
-btnSaveEventName?.addEventListener("click", saveEventName);
-
-
-
-  btnResetAll?.addEventListener('click', resetAll);
+btnResetAll?.addEventListener('click', resetAll);
 
   (async () => {
     try{
@@ -844,6 +824,29 @@ btnSaveEventName?.addEventListener("click", saveEventName);
         return;
       }
       setStatus('Loading…');
+      // Load shared settings (Event name) from backend
+      try{
+        const s = await fetchJson(API_BASE + '/settings?ts=' + Date.now());
+        const ev = (s && typeof s.eventName === 'string') ? s.eventName : 'New Event';
+        const evEl = document.getElementById('eventNameAdmin');
+        if(evEl) evEl.value = ev;
+      }catch(_){/* ignore */}
+      // Save event name on change/blur (requires admin password)
+      const evEl2 = document.getElementById('eventNameAdmin');
+      if(evEl2){
+        const saveEv = async () => {
+          const v = String(evEl2.value || '').trim() || 'New Event';
+          try{
+            await postJson(API_BASE + '/settings', { eventName: v, adminPassword: sessionPassword });
+            setStatus('Event name saved');
+          }catch(err){
+            setStatus('Event name save error: ' + err.message, true);
+            console.error(err);
+          }
+        };
+        evEl2.addEventListener('change', saveEv);
+        evEl2.addEventListener('blur', saveEv);
+      }
       await loadSvg();
       bboxCache = new Map();
       warmBBoxCache();

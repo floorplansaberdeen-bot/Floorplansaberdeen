@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title><span id="eventTitle">New Event</span></title>
+<title>New Event</title>
 <style>
   :root{--border:#d9d9d9;--muted:#666;--sold:#e53935;--avail:#2ecc71;}
   body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#111;}
@@ -163,7 +163,7 @@
 </head>
 <body>
 <header>
-  <strong>Exhibition Floorplan</strong>
+  <strong id="eventNameText">New Event</strong>
   <div id="status">Loading…</div>
 </header>
 
@@ -241,9 +241,9 @@
     const n = String(name||'').trim();
     if(!n) return;
     eventName = n;
-    const t = document.getElementById('eventTitle');
-    if(t) t.textContent = eventName;
-    try{ localStorage.setItem('floorplanEventName', eventName); }catch(_){ }
+    document.title = eventName;
+    const h = document.getElementById('eventNameText');
+    if(h) h.textContent = eventName;
   }
 
   let svgRoot = null;
@@ -840,9 +840,7 @@ async function fetchJson(url){
     try{
       const data = await fetchJson(API_BASE + '/stands?ts=' + Date.now());
       const stands = Array.isArray(data) ? data : (data && Array.isArray(data.stands) ? data.stands : []);
-      if(data && !Array.isArray(data) && data.settings && typeof data.settings.eventName === 'string'){
-        applyEventName(data.settings.eventName);
-      }
+      if(data && !Array.isArray(data) && typeof data.eventName === 'string') applyEventName(data.eventName);
       byId = new Map(stands.map(r => [String(r.standId).trim(), {
         standId:String(r.standId).trim(),
         status:normalizeStatus(r.status),
@@ -863,8 +861,13 @@ async function fetchJson(url){
   (async () => {
     try{
       setStatus('Loading…');
-      try{ applyEventName(localStorage.getItem('floorplanEventName')); }catch(_){ }
-      await loadSvg();
+await loadSvg();
+      // Load shared settings (event name) from backend
+      try{
+        const s = await fetchJson(API_BASE + '/settings?ts=' + Date.now());
+        if(s && typeof s.eventName === 'string') applyEventName(s.eventName);
+      }catch(_){/* ignore */}
+
       bboxCache = new Map();
       warmBBoxCache();
       ensureCalloutLayer();
@@ -874,15 +877,6 @@ async function fetchJson(url){
       getStandNodes().forEach(bindNodeEvents);
 
       soldSearchEl.addEventListener('input', renderSoldList);
-
-      // Persist event name
-      try{
-        const saved = localStorage.getItem('fp_eventName');
-        if (saved && eventNameEl) eventName = saved;
-        eventNameEl?.addEventListener('input', () => {
-          localStorage.setItem('fp_eventName', eventName || '');
-        });
-      }catch{}
 
       btnClearPins?.addEventListener('click', () => { clearPins(); renderSoldList(); });
 
