@@ -101,7 +101,10 @@
 
       <div class="box">
         <div class="title">Help</div>
-        <div class="muted">Tap or click a stand to highlight it. Export saves the highlighted plan.</div>
+        <div class="muted">
+          Tap or click a stand to highlight it.<br>
+          Export saves the highlighted plan.
+        </div>
       </div>
     </div>
   </div>
@@ -175,7 +178,9 @@
       const pdf=new jsPDF({orientation:"landscape",unit:"pt",format:"a4"});
       const w=pdf.internal.pageSize.getWidth(), h=pdf.internal.pageSize.getHeight();
       const scale=Math.min(w/canvas.width,h/canvas.height);
-      pdf.addImage(canvas.toDataURL("image/png"),"PNG",(w-canvas.width*scale)/2,(h-canvas.height*scale)/2,canvas.width*scale,canvas.height*scale);
+      pdf.addImage(canvas.toDataURL("image/png"),"PNG",
+        (w-canvas.width*scale)/2,(h-canvas.height*scale)/2,
+        canvas.width*scale,canvas.height*scale);
       pdf.save((eventNameEl.textContent||"floorplan")+(selected?("_"+selected):"")+".pdf");
     }catch{
       window.print();
@@ -189,7 +194,7 @@
     eventNameEl.textContent=s.eventName||"Event";
     const stands=await fetchJson(API_BASE+"/stands");
     stands.forEach(x=>byId.set(x.standId,x));
-    const svg=await fetch(SVG_URL).then(r=>r.text());
+    const svg=await fetch(SVG_URL,{cache:"no-store"}).then(r=>r.text());
     planHost.insertAdjacentHTML("afterbegin",svg);
     svgRoot=planHost.querySelector("svg");
     render();
@@ -208,13 +213,16 @@
     const q=searchEl.value.toLowerCase().trim();
     resultsEl.innerHTML="";
     if(!q)return;
-    [...byId.values()].filter(s=>s.standId.toLowerCase().includes(q)||(s.company||"").toLowerCase().includes(q))
-      .slice(0,10).forEach(s=>{
-        const b=document.createElement("button");
-        b.className="btn"; b.textContent=s.standId+" "+(s.company||"");
-        b.onclick=()=>select(s.standId);
-        resultsEl.appendChild(b);
-      });
+    [...byId.values()].filter(s=>
+      s.standId.toLowerCase().includes(q) ||
+      (s.company||"").toLowerCase().includes(q)
+    ).slice(0,10).forEach(s=>{
+      const b=document.createElement("button");
+      b.className="btn";
+      b.textContent=s.standId+" "+(s.company||"");
+      b.onclick=()=>select(s.standId);
+      resultsEl.appendChild(b);
+    });
   };
 
   init().catch(e=>{
@@ -227,4 +235,3 @@
 </script>
 </body>
 </html>
-
