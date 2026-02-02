@@ -6,25 +6,25 @@
 <title>Floorplan Admin</title>
 <style>
   :root{
-    --border:#d9d9d9;--muted:#666;--row:#fafafa;--row2:#f3f6ff;
-    --sold:#e53935;--avail:#2ecc71;
+    --border:#d9d9d9; --muted:#666; --row:#fafafa; --row2:#f3f6ff;
+    --sold:#e53935; --avail:#2ecc71;
   }
   body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#111;}
-  header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;}
-header .eventWrap{display:inline-flex;align-items:center;gap:8px;}
-header .miniInput{width:220px;max-width:30vw;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:13px;}
-header .miniLabel{font-size:12px;color:#555;font-weight:700;}
+  header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+  header strong{font-size:16px;}
   header .right{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
   #status{font-size:13px;color:var(--muted);}
-  .btn{padding:8px 10px;border:1px solid var(--border);background:#f7f7f7;border-radius:6px;cursor:pointer;font-weight:600;font-size:13px;}
+  .btn{padding:8px 10px;border:1px solid var(--border);background:#f7f7f7;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;}
   .btn:disabled{opacity:.5;cursor:not-allowed;}
   .btn.green{background:#ecfff3;border-color:#bfe9cf;}
   .btn.red{background:#fff0f0;border-color:#f1bcbc;}
+  .miniLabel{font-size:12px;color:#555;font-weight:800;}
+  .miniInput{width:220px;max-width:38vw;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:13px;}
   .layout{display:grid;grid-template-columns:2.2fr 1.1fr;gap:12px;padding:12px;}
   @media (max-width:1000px){.layout{grid-template-columns:1fr;}}
-  .card{border:1px solid var(--border);background:#fff;border-radius:10px;overflow:hidden;}
+  .card{border:1px solid var(--border);background:#fff;border-radius:12px;overflow:hidden;}
   .card h2{margin:0;padding:10px 12px;border-bottom:1px solid var(--border);font-size:14px;color:#333;}
-  #svgHost{min-height:420px;overflow:auto;}
+  #svgHost{min-height:420px;overflow:auto;-webkit-overflow-scrolling:touch;}
   #svgHost svg{width:100%;height:auto;display:block;}
   svg text, svg tspan{pointer-events:none;user-select:none;}
   .pill{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:#222;border:1px solid var(--border);padding:6px 8px;border-radius:999px;background:#fff;}
@@ -32,18 +32,15 @@ header .miniLabel{font-size:12px;color:#555;font-weight:700;}
   .dot.sold{background:var(--sold);} .dot.avail{background:var(--avail);}
 
   .form{padding:12px;display:grid;gap:10px;}
-  label{font-size:12px;color:#444;}
-  input,select{width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;}
+  label{font-size:12px;color:#444;font-weight:700;}
+  input,select{width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:10px;font-size:14px;}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
   .help{font-size:12px;color:var(--muted);line-height:1.35;}
-  #tooltip{position:fixed;display:none;z-index:9999;pointer-events:none;background:rgba(0,0,0,.85);color:#fff;padding:8px 10px;border-radius:8px;font-size:13px;white-space:pre-line;max-width:min(360px,85vw);}
-
-  .preview{
-    border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:#fff;
-  }
-  .previewTitle{font-weight:800;margin-bottom:6px;}
+  #tooltip{position:fixed;display:none;z-index:9999;pointer-events:none;background:rgba(0,0,0,.85);color:#fff;padding:8px 10px;border-radius:10px;font-size:13px;white-space:pre-line;max-width:min(360px,85vw);}
+  .preview{border:1px solid var(--border);border-radius:12px;padding:10px 12px;background:#fff;}
+  .previewTitle{font-weight:900;margin-bottom:6px;}
   .previewLine{font-size:13px;color:#333;margin:2px 0;}
-  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-weight:800;font-size:12px;line-height:1.6;border:1px solid transparent;}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-weight:900;font-size:12px;line-height:1.6;border:1px solid transparent;}
   .badge.sold{background:#fff0f0;border-color:#f1bcbc;color:#a11414;}
   .badge.avail{background:#ecfff3;border-color:#bfe9cf;color:#0f6a2f;}
 
@@ -57,20 +54,30 @@ header .miniLabel{font-size:12px;color:#555;font-weight:700;}
   tbody tr{cursor:pointer;}
   tbody tr:nth-child(odd){background:var(--row);}
   tbody tr.selected{background:var(--row2)!important;outline:2px solid #b8c7ff;outline-offset:-2px;}
+
+  /* Login modal */
+  #loginModal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:10000;}
+  #loginCard{background:#fff;border-radius:14px;max-width:420px;width:calc(100% - 32px);box-shadow:0 20px 60px rgba(0,0,0,.25);border:1px solid #ddd;overflow:hidden;}
 </style>
 </head>
+
 <body>
 <header>
   <strong>Floorplan Admin</strong>
   <div class="right">
     <span id="status">Loading…</span>
-    <label class="btn" style="display:inline-flex;align-items:center;gap:8px;background:#fff;border:1px solid #ddd;">Event name <input id="eventNameAdmin" type="text" value="" style="border:0;outline:none;width:180px;font:inherit;"></label>
+
+    <span class="miniLabel">Event name</span>
+    <input class="miniInput" id="eventNameAdmin" type="text" value="" placeholder="New Event">
+
     <button class="btn" id="btnToggleSync">Pause sync</button>
     <button class="btn" id="btnExport">Export CSV</button>
+
     <label class="btn" style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;">
       Import CSV <input id="fileImport" type="file" accept=".csv,text/csv" style="display:none;">
     </label>
-    <button class="btn red" id="btnResetAll" title="Mark ALL stands as available (requires password)">Reset all</button>
+
+    <button class="btn red" id="btnResetAll" title="Mark ALL stands as available">Reset all</button>
   </div>
 </header>
 
@@ -83,18 +90,13 @@ header .miniLabel{font-size:12px;color:#555;font-weight:700;}
       <span class="pill"><span class="dot sold"></span>Sold</span>
       <span class="pill"><span class="dot avail"></span>Available</span>
     </div>
-
-    <div style="border-top:1px solid var(--border);padding:10px 12px;">
-      <div style="font-weight:800;font-size:13px;margin-bottom:8px;">Zoom</div>
-      <div id="zoomHost" style="border:1px solid var(--border);border-radius:10px;overflow:hidden;height:240px;background:#fff;"></div>
-      <div class="help" style="margin-top:6px;">Select a stand to zoom in.</div>
-    </div>
   </div>
 
   <div class="card">
     <h2>Selected Stand</h2>
     <div class="form">
       <div><label>Stand ID</label><input id="standId" readonly /></div>
+
       <div class="row2">
         <div>
           <label>Status</label>
@@ -108,6 +110,7 @@ header .miniLabel{font-size:12px;color:#555;font-weight:700;}
           <input id="company" placeholder="Company name…" />
         </div>
       </div>
+
       <div class="row2">
         <button class="btn green" id="btnSave" disabled>Save</button>
         <button class="btn red" id="btnClear" disabled>Mark Available</button>
@@ -135,7 +138,7 @@ header .miniLabel{font-size:12px;color:#555;font-weight:700;}
         <span class="help" id="count"></span>
       </div>
 
-      <div style="max-height:420px;overflow:auto;border:1px solid var(--border);border-radius:10px;">
+      <div style="max-height:420px;overflow:auto;border:1px solid var(--border);border-radius:12px;-webkit-overflow-scrolling:touch;">
         <table>
           <thead><tr><th style="width:90px;">Stand</th><th style="width:110px;">Status</th><th>Company</th></tr></thead>
           <tbody id="tbody"></tbody>
@@ -145,9 +148,8 @@ header .miniLabel{font-size:12px;color:#555;font-weight:700;}
   </div>
 </div>
 
-
-<div id="loginModal" style="position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:10000;">
-  <div style="background:#fff;border-radius:14px;max-width:420px;width:calc(100% - 32px);box-shadow:0 20px 60px rgba(0,0,0,.25);border:1px solid #ddd;overflow:hidden;">
+<div id="loginModal">
+  <div id="loginCard">
     <div style="padding:14px 16px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;gap:10px;">
       <div style="font-weight:900;">Admin login</div>
       <div id="loginAttempts" style="font-size:12px;color:#666;"></div>
@@ -162,7 +164,9 @@ header .miniLabel{font-size:12px;color:#555;font-weight:700;}
         <button id="loginCancel" class="btn" style="background:#fff;">Cancel</button>
         <button id="loginOk" class="btn green">Unlock</button>
       </div>
-      <div style="font-size:12px;color:#666;line-height:1.35;">Tip: This is a client-side lock to prevent accidental access (not a secure login).</div>
+      <div style="font-size:12px;color:#666;line-height:1.35;">
+        This verifies the password against the backend (Apps Script). It is not a full security system.
+      </div>
     </div>
   </div>
 </div>
@@ -170,12 +174,20 @@ header .miniLabel{font-size:12px;color:#555;font-weight:700;}
 <div id="tooltip"></div>
 
 <script>
-(() => {
+(function(){
+
+  // ====== CONFIG (EDIT THESE) ======
+  const API_BASE = 'https://floorplansaberdeen.floorplansaberdeen.workers.dev'; // your Worker
+  const SVG_URL  = './event_plan.svg'; // your plan svg
+  const SYNC_INTERVAL_MS = 10000;
+  const FILL_OPACITY = 0.75;
+  const SOLD  = '#e53935';
+  const AVAIL = '#2ecc71';
+  const STAND_ID_RE = /^([A-Z]{1,3})(\d{1,3})$/;
+  // =================================
 
   // Safari compatibility: CSS.escape polyfill
   if (!window.CSS) window.CSS = {};
-  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-
   if (typeof window.CSS.escape !== 'function') {
     window.CSS.escape = function (value) {
       return String(value).replace(/[^a-zA-Z0-9_\-]/g, function (ch) {
@@ -185,24 +197,12 @@ header .miniLabel{font-size:12px;color:#555;font-weight:700;}
     };
   }
 
-  const API_BASE = 'https://floorplansaberdeen.floorplansaberdeen.workers.dev';
-  const SVG_URL = './event_plan.svg';
-  const FILL_OPACITY = 0.75;
-  const SYNC_INTERVAL_MS = 10000;
-  const SOLD = '#e53935';
-  const AVAIL = '#2ecc71';
-  const STAND_ID_RE = /^([A-Z]{1,3})(\d{1,3})$/;
-  // Simple safeguard password for the Reset-all button (edit this).
-    // Simple page-gate password to prevent accidental access (edit this).
-  const ADMIN_PASSWORD = 'FLOORPASS1';
-  // Reset-all uses the same password
-  const RESET_PASSWORD = ADMIN_PASSWORD;
-  let sessionPassword = '';
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
+  // Elements
   const elStatus = document.getElementById('status');
   const svgHost = document.getElementById('svgHost');
   const tooltip = document.getElementById('tooltip');
-  const zoomHost = document.getElementById('zoomHost');
 
   const standIdEl = document.getElementById('standId');
   const statusSel = document.getElementById('statusSel');
@@ -224,10 +224,76 @@ header .miniLabel{font-size:12px;color:#555;font-weight:700;}
   const filterEl = document.getElementById('filter');
   const tbody = document.getElementById('tbody');
   const countEl = document.getElementById('count');
+  const eventNameEl = document.getElementById('eventNameAdmin');
 
-  
+  // State
+  let sessionPassword = '';
+  let svgRoot = null;
+  let byId = new Map();
+  let selectedId = '';
+  let autoSyncEnabled = true;
+  let dirty = false;
+  let tipRaf = 0;
+  let lastTip = null;
+  let isPointerDown = false;
+  let hoverDisabledUntil = 0;
+
+  function setStatus(text, isError=false){
+    elStatus.textContent = text;
+    elStatus.style.color = isError ? '#b00020' : '#555';
+  }
+
+  function normalizeStatus(v){
+    return String(v || '').toLowerCase().trim() === 'sold' ? 'sold' : 'available';
+  }
+
+  function isStandId(id){ return STAND_ID_RE.test(String(id||'').trim()); }
+
+  function tooltipText(info){
+    const s = normalizeStatus(info.status);
+    const lines = [info.standId, s==='sold'?'Sold':'Available'];
+    if (s==='sold' && info.company) lines.push(info.company);
+    return lines.join('\n');
+  }
+
+  async function fetchJson(url){
+    const res = await fetch(url, { cache:'no-store' });
+    const text = await res.text();
+    let json = null;
+    try { json = JSON.parse(text); } catch (e) {
+      throw new Error('Non-JSON response');
+    }
+    if (!res.ok || (json && json.ok === false) || (json && json.success === false)) {
+      throw new Error((json && (json.error || json.message)) || ('HTTP ' + res.status));
+    }
+    return json;
+  }
+
+  async function postJson(url, payload){
+    const bodyObj = Object.assign({}, payload || {});
+    // always attach adminPassword for writes unless explicitly provided
+    if (!bodyObj.adminPassword && !bodyObj.password) bodyObj.adminPassword = sessionPassword || '';
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify(bodyObj)
+    });
+
+    const text = await res.text();
+    let json = null;
+    try { json = JSON.parse(text); } catch (_) {}
+
+    const failed = !res.ok || (json && json.ok === false) || (json && json.success === false);
+    if (failed) {
+      const msg = (json && (json.error || json.message)) || text || ('HTTP ' + res.status);
+      throw new Error(msg);
+    }
+    return json || { ok: true };
+  }
+
+  // Verify password against backend by doing an authenticated settings write (idempotent)
   function requireAdminLogin(){
-    // Always prompt on every page load using a masked password field.
     return new Promise((resolve) => {
       const modal = document.getElementById('loginModal');
       const pw = document.getElementById('loginPw');
@@ -237,67 +303,74 @@ header .miniLabel{font-size:12px;color:#555;font-weight:700;}
       const attemptsEl = document.getElementById('loginAttempts');
 
       let attempts = 0;
-      const maxAttempts = 3;
+      const maxAttempts = 5;
 
       function setErr(msg){
-        if (!msg){
-          err.style.display = 'none';
-          err.textContent = '';
-        } else {
-          err.style.display = 'block';
-          err.textContent = msg;
-        }
+        if (!msg){ err.style.display='none'; err.textContent=''; }
+        else { err.style.display='block'; err.textContent=msg; }
       }
-
       function updateAttempts(){
         attemptsEl.textContent = attempts ? `Attempt ${attempts} of ${maxAttempts}` : '';
       }
-
+      function cleanup(){
+        ok.removeEventListener('click', onOk);
+        cancel.removeEventListener('click', onCancel);
+        pw.removeEventListener('keydown', onKey);
+      }
       function close(result){
         modal.style.display = 'none';
         document.body.style.overflow = '';
         cleanup();
         resolve(result);
       }
-
-      function onOk(){
-        const entered = String(pw.value || '');
-        attempts += 1;
-        updateAttempts();
-
-        if (entered === String(ADMIN_PASSWORD)){
-          sessionPassword = entered;
-          close(true);
-          return;
-        }
-
-        if (attempts >= maxAttempts){
-          setErr('Too many attempts.');
-          setTimeout(()=>close(false), 400);
-          return;
-        }
-
-        setErr('Wrong password.');
-        pw.select();
-        pw.focus();
-      }
-
-      function onCancel(){
-        close(false);
-      }
-
+      function onCancel(){ close(false); }
       function onKey(e){
         if (e.key === 'Enter'){ e.preventDefault(); onOk(); }
         if (e.key === 'Escape'){ e.preventDefault(); onCancel(); }
       }
 
-      function cleanup(){
-        ok.removeEventListener('click', onOk);
-        cancel.removeEventListener('click', onCancel);
-        pw.removeEventListener('keydown', onKey);
+      async function onOk(){
+        const entered = String(pw.value || '').trim();
+        attempts += 1;
+        updateAttempts();
+
+        if (!entered){
+          setErr('Enter a password.');
+          pw.focus();
+          return;
+        }
+
+        try{
+          // Use current input (or New Event) and send password
+          const currentName = String(eventNameEl.value || '').trim() || 'New Event';
+          const res = await fetch(API_BASE + '/settings', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ eventName: currentName, adminPassword: entered })
+          });
+
+          const text = await res.text();
+          let json = null;
+          try { json = JSON.parse(text); } catch (_) {}
+
+          if (!res.ok || (json && json.ok === false) || (json && json.success === false)) {
+            throw new Error((json && (json.error || json.message)) || 'Invalid password');
+          }
+
+          sessionPassword = entered;
+          close(true);
+        } catch (e){
+          if (attempts >= maxAttempts){
+            setErr('Too many attempts.');
+            setTimeout(()=>close(false), 400);
+            return;
+          }
+          setErr('Wrong password.');
+          pw.select();
+          pw.focus();
+        }
       }
 
-      // Open modal
       modal.style.display = 'flex';
       document.body.style.overflow = 'hidden';
       pw.value = '';
@@ -308,166 +381,139 @@ header .miniLabel{font-size:12px;color:#555;font-weight:700;}
       ok.addEventListener('click', onOk);
       cancel.addEventListener('click', onCancel);
       pw.addEventListener('keydown', onKey);
-
-      // Focus input
       setTimeout(()=>pw.focus(), 0);
     });
   }
 
-
-let svgRoot = null;
-  let zoomSvgRoot = null;
-  let byId = new Map();
-  let bboxCache = new Map();
-        let zoomRaf = 0;
-  let tipRaf = 0;
-  let lastTip = null;
-  let isPointerDown = false;
-  let hoverDisabledUntil = 0;
-  let selectedId = '';
-  let autoSyncEnabled = true;
-  let dirty = false;
-
-  function setStatus(text, isError=false){
-    elStatus.textContent = text;
-    elStatus.style.color = isError ? '#b00020' : '#555';
-  }
-  function normalizeStatus(v){ return String(v||'New Event').toLowerCase().trim()==='sold' ? 'sold' : 'available'; }
-  function tooltipText(info){
-    const s = normalizeStatus(info.status);
-    const lines = [info.standId, s==='sold'?'Sold':'Available'];
-    if (s==='sold' && info.company) lines.push(info.company);
-    return lines.join('\n');
-  }
-  function isStandId(id){ return STAND_ID_RE.test(String(id||'').trim()); }
-
-  async function fetchJson(url){
-    const res = await fetch(url,{cache:'no-store'});
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    return await res.json();
-  }
-  async function postJson(url, data) {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-
-  const text = await res.text();
-
-  // ✅ always log the response for debugging
-  console.log("POST", url, "status", res.status, "raw response:", text);
-
-  let out;
-  try {
-    out = JSON.parse(text);
-  } catch (e) {
-    throw new Error("Non-JSON response: " + text.slice(0, 120));
-  }
-
-  // If backend says error, throw it (but now we’ve logged the debug object)
-  if (out && out.success === false) {
-    throw new Error(out.error || "Request failed");
-  }
-  if (out && out.error) {
-    throw new Error(out.error);
-  }
-
-  return out;
-}
-
-  }
-
   async function loadSvg(){
-    const res = await fetch(SVG_URL,{cache:'no-store'});
-    if(!res.ok) throw new Error('SVG not found at '+SVG_URL+' (HTTP '+res.status+')');
+    const res = await fetch(SVG_URL, { cache:'no-store' });
+    if (!res.ok) throw new Error('SVG not found at ' + SVG_URL + ' (HTTP ' + res.status + ')');
     svgHost.innerHTML = await res.text();
     svgRoot = svgHost.querySelector('svg');
-    if(!svgRoot) throw new Error('SVG root <svg> not found');
-    svgRoot.style.userSelect='none';
+    if (!svgRoot) throw new Error('SVG root <svg> not found');
+    svgRoot.style.userSelect = 'none';
   }
 
   function getStandNodes(){
     const groups = Array.from(svgRoot.querySelectorAll('g[id]')).filter(g=>isStandId(g.id));
     const shapes = Array.from(svgRoot.querySelectorAll('path[id],rect[id],polygon[id],circle[id],ellipse[id],polyline[id],line[id]')).filter(el=>isStandId(el.id));
-    return groups.length?groups:shapes;
+    return groups.length ? groups : shapes;
   }
 
-  function paintNode(node,status){
-    const s=normalizeStatus(status);
-    const color = s==='sold'?SOLD:AVAIL;
-    const targets = (node.tagName.toLowerCase()==='g') ? node.querySelectorAll('path,rect,polygon,circle,ellipse,polyline,line') : [node];
+  function paintNode(node, status){
+    const s = normalizeStatus(status);
+    const color = (s === 'sold') ? SOLD : AVAIL;
+    const targets = (node.tagName.toLowerCase() === 'g')
+      ? node.querySelectorAll('path,rect,polygon,circle,ellipse,polyline,line')
+      : [node];
     targets.forEach(el=>{
-      el.style.fill=color;
-      el.style.fillOpacity=String(FILL_OPACITY);
-      el.style.stroke='rgba(0,0,0,0.45)';
-      el.style.strokeOpacity='0.6';
-      el.style.cursor='pointer';
+      el.style.fill = color;
+      el.style.fillOpacity = String(FILL_OPACITY);
+      el.style.stroke = 'rgba(0,0,0,0.45)';
+      el.style.strokeOpacity = '0.6';
+      el.style.cursor = 'pointer';
     });
   }
 
   function renderPlan(){
     getStandNodes().forEach(node=>{
-      const id=String(node.id||'').trim();
-      const info=byId.get(id)||{standId:id,status:'available',company:''};
-      paintNode(node,info.status);
+      const id = String(node.id||'').trim();
+      const info = byId.get(id) || { standId:id, status:'available', company:'' };
+      paintNode(node, info.status);
     });
   }
 
   function renderPreview(info){
-    if(!info){ previewEl.style.display='none'; return; }
+    if (!info){ previewEl.style.display='none'; return; }
     previewEl.style.display='block';
     pvStand.textContent = info.standId;
-    const sold = normalizeStatus(info.status)==='sold';
+    const sold = normalizeStatus(info.status) === 'sold';
     pvStatus.innerHTML = sold ? '<span class="badge sold">Sold</span>' : '<span class="badge avail">Available</span>';
-    pvCompany.textContent = sold ? (info.company||'') : '';
+    pvCompany.textContent = sold ? (info.company || '') : '';
   }
 
   function renderList(){
-    const q=String(searchEl.value||'').toLowerCase().trim();
-    const f=String(filterEl.value||'all');
+    const q = String(searchEl.value || '').toLowerCase().trim();
+    const f = String(filterEl.value || 'all');
 
-    const items=Array.from(byId.values()).sort((a,b)=>a.standId.localeCompare(b.standId,undefined,{numeric:true}));
+    const items = Array.from(byId.values()).sort((a,b)=>a.standId.localeCompare(b.standId, undefined, { numeric:true }));
 
     const filtered = items.filter(r=>{
-      const s=normalizeStatus(r.status);
-      if (f!=='all' && s!==f) return false;
+      const s = normalizeStatus(r.status);
+      if (f !== 'all' && s !== f) return false;
       if (!q) return true;
       return r.standId.toLowerCase().includes(q) ||
              (r.company||'').toLowerCase().includes(q) ||
              s.includes(q);
     });
 
-    tbody.innerHTML='';
+    tbody.innerHTML = '';
     filtered.forEach(r=>{
-      const tr=document.createElement('tr');
-      if(r.standId===selectedId) tr.classList.add('selected');
+      const tr = document.createElement('tr');
+      if (r.standId === selectedId) tr.classList.add('selected');
 
-      const tdId=document.createElement('td'); tdId.textContent=r.standId;
-      const tdSt=document.createElement('td');
-      const badge=document.createElement('span');
-      const sold = normalizeStatus(r.status)==='sold';
-      badge.className='badge '+(sold?'sold':'avail');
-      badge.textContent=sold?'Sold':'Available';
+      const tdId = document.createElement('td'); tdId.textContent = r.standId;
+
+      const tdSt = document.createElement('td');
+      const badge = document.createElement('span');
+      const sold = normalizeStatus(r.status) === 'sold';
+      badge.className = 'badge ' + (sold ? 'sold' : 'avail');
+      badge.textContent = sold ? 'Sold' : 'Available';
       tdSt.appendChild(badge);
 
-      const tdCo=document.createElement('td'); tdCo.textContent = sold ? (r.company||'') : '';
+      const tdCo = document.createElement('td'); tdCo.textContent = sold ? (r.company || '') : '';
 
       tr.appendChild(tdId); tr.appendChild(tdSt); tr.appendChild(tdCo);
-      tr.addEventListener('click',()=>selectStand(r.standId,true));
+      tr.addEventListener('click', ()=>selectStand(r.standId, true));
       tbody.appendChild(tr);
     });
 
-    countEl.textContent = filtered.length+' / '+items.length;
+    countEl.textContent = filtered.length + ' / ' + items.length;
   }
 
-    
-  
+  function selectStand(standId, scrollToRow){
+    const info = byId.get(standId) || { standId, status:'available', company:'' };
+    selectedId = standId;
+    dirty = false;
+
+    standIdEl.value = info.standId;
+    statusSel.value = normalizeStatus(info.status);
+    companyEl.value = info.company || '';
+
+    btnSave.disabled = false;
+    btnClear.disabled = false;
+
+    renderPreview(info);
+    renderList();
+
+    if (scrollToRow){
+      const row = Array.from(tbody.querySelectorAll('tr')).find(tr=>tr.firstChild && tr.firstChild.textContent===standId);
+      if (row) row.scrollIntoView({ block:'center' });
+    }
+  }
+
+  function setDirty(){ if (selectedId) dirty = true; }
+
+  function scheduleTooltipUpdate(){
+    if (tipRaf) return;
+    tipRaf = requestAnimationFrame(() => {
+      tipRaf = 0;
+      if (!lastTip) return;
+      if (isSafari) return;
+      if (isPointerDown || Date.now() < hoverDisabledUntil) return;
+      tooltip.textContent = lastTip.text;
+      tooltip.style.left = (lastTip.x + 12) + 'px';
+      tooltip.style.top  = (lastTip.y + 12) + 'px';
+      tooltip.style.display = 'block';
+    });
+  }
+
   function showTooltipAtStand(standId, info){
     if (!svgRoot) return;
-    const box = getStandBox(standId);
-    if (!box) return;
-    const bb = box.bb;
+    const node = svgRoot.querySelector('#' + CSS.escape(standId));
+    if (!node) return;
+    let bb = null;
+    try { bb = node.getBBox(); } catch(_) { return; }
     const pt = svgRoot.createSVGPoint();
     pt.x = bb.x + bb.width/2;
     pt.y = bb.y + bb.height/2;
@@ -480,153 +526,10 @@ let svgRoot = null;
     tooltip.style.display = 'block';
   }
 
-
-  function prewarmBBoxes(){
-    if (!isSafari || !svgRoot) return;
-    const nodes = Array.from(svgRoot.querySelectorAll('[id]'))
-      .filter(n => /^[A-Z]{1,2}\d+$/i.test(n.id));
-    let i = 0;
-    const batch = 12;
-    function step(){
-      const end = Math.min(nodes.length, i + batch);
-      for (; i < end; i++){
-        getStandBox(nodes[i].id);
-      }
-      if (i < nodes.length) requestAnimationFrame(step);
-    }
-    requestAnimationFrame(step);
-  }
-
-function getStandBox(standId){
-    if (bboxCache.has(standId)) return bboxCache.get(standId);
-    const node = svgRoot?.querySelector('#' + CSS.escape(standId));
-    if (!node) return null;
-    try{
-      const bb = node.getBBox();
-      const info = { bb };
-      bboxCache.set(standId, info);
-      return info;
-    }catch{
-      return null;
-    }
-  }
-
-  function warmBBoxCache(){
-    // Precompute stand bounding boxes gradually to keep Safari responsive on first clicks
-    const nodes = getStandNodes();
-    let i = 0;
-    function step(){
-      const start = performance.now();
-      while (i < nodes.length && (performance.now() - start) < 8){
-        const id = String(nodes[i].id || '').trim();
-        if (id) getStandBox(id);
-        i++;
-      }
-      if (i < nodes.length) requestAnimationFrame(step);
-    }
-    requestAnimationFrame(step);
-  }
-
-  function scheduleUpdateZoom(standId){
-    if (!standId) return;
-    if (zoomRaf) cancelAnimationFrame(zoomRaf);
-    zoomRaf = requestAnimationFrame(() => {
-      zoomRaf = 0;
-      updateZoom(standId);
-    });
-  }
-
-  function scheduleTooltipUpdate(){
-    if (tipRaf) return;
-    tipRaf = requestAnimationFrame(() => {
-      tipRaf = 0;
-      if (!lastTip) return;
-      if (isSafari) return;
-      if (isPointerDown || Date.now() < hoverDisabledUntil) return;
-      const { x, y, text } = lastTip;
-      tooltip.textContent = text;
-      tooltip.style.left = (x + 12) + 'px';
-      tooltip.style.top  = (y + 12) + 'px';
-      tooltip.style.display = 'block';
-    });
-  }
-
-function initZoomSvg(){
-    if(!zoomHost || !svgRoot) return;
-    zoomHost.innerHTML='';
-    zoomSvgRoot = svgRoot.cloneNode(true);
-
-    // Remove explicit sizing so it can scale in the zoom panel
-    zoomSvgRoot.removeAttribute('width');
-    zoomSvgRoot.removeAttribute('height');
-    zoomSvgRoot.style.width='100%';
-    zoomSvgRoot.style.height='100%';
-    zoomSvgRoot.setAttribute('preserveAspectRatio','xMidYMid meet');
-
-    // Make zoom non-interactive
-    zoomSvgRoot.querySelectorAll('*').forEach(el=>{ el.style.pointerEvents='none'; });
-
-    // Ensure we have a usable viewBox (some SVG exports omit it)
-    const vb = zoomSvgRoot.getAttribute('viewBox');
-    if(!vb){
-      try{
-        const b = svgRoot.getBBox();
-        zoomSvgRoot.setAttribute('viewBox', `${b.x} ${b.y} ${b.width} ${b.height}`);
-      }catch{
-        zoomSvgRoot.setAttribute('viewBox', '0 0 1000 1000');
-      }
-    }
-
-    zoomHost.appendChild(zoomSvgRoot);
-  }
-
-  function updateZoom(standId){
-    if(!zoomSvgRoot || !svgRoot || !standId) return;
-    const box = getStandBox(standId);
-    if(!box) return;
-    const bb = box.bb;
-    const pad = Math.max(20, Math.max(bb.width, bb.height) * 0.6);
-    const x = bb.x - pad, y = bb.y - pad, w = bb.width + pad*2, h = bb.height + pad*2;
-    zoomSvgRoot.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
-
-    // highlight outline
-    zoomSvgRoot.querySelectorAll('.__zoomHighlight').forEach(n=>n.remove());
-    const hi = document.createElementNS('http://www.w3.org/2000/svg','rect');
-    hi.setAttribute('class','__zoomHighlight');
-    hi.setAttribute('x', bb.x - 2); hi.setAttribute('y', bb.y - 2);
-    hi.setAttribute('width', bb.width + 4); hi.setAttribute('height', bb.height + 4);
-    hi.setAttribute('fill','none'); hi.setAttribute('stroke','#111'); hi.setAttribute('stroke-width','3');
-    hi.setAttribute('rx','6'); hi.setAttribute('ry','6');
-    hi.style.opacity='0.85';
-    zoomSvgRoot.appendChild(hi);
-  }
-
-  function selectStand(standId, scrollToRow){
-    const info=byId.get(standId)||{standId,status:'available',company:''};
-    selectedId=standId;
-    dirty=false;
-    standIdEl.value=info.standId;
-    statusSel.value=normalizeStatus(info.status);
-    companyEl.value=info.company||'';
-    btnSave.disabled=false; btnClear.disabled=false;
-
-    renderPreview(info);
-    renderList();
-    scheduleUpdateZoom(info.standId);
-
-    if(scrollToRow){
-      const row=Array.from(tbody.querySelectorAll('tr')).find(tr=>tr.firstChild && tr.firstChild.textContent===standId);
-      if(row) row.scrollIntoView({block:'center'});
-    }
-  }
-
-  function setDirty(){ if(selectedId) dirty=true; }
-
   function bindNodeEvents(node){
-    const standId = String(node.id||'').trim();
-    if(!standId) return;
+    const standId = String(node.id || '').trim();
+    if (!standId) return;
 
-    // Tooltip: Safari uses static tooltip (no mousemove tracking)
     node.addEventListener('mouseenter', () => {
       if (isSafari && !(isPointerDown || Date.now() < hoverDisabledUntil)){
         const info = byId.get(standId) || { standId, status:'available', company:'' };
@@ -644,81 +547,110 @@ function initZoomSvg(){
 
     node.addEventListener('mouseleave', ()=>{ tooltip.style.display='none'; });
 
-    // Click/tap: use pointerup on Safari to avoid delayed click issues
+    node.addEventListener('pointerdown', ()=>{ isPointerDown = true; });
+    node.addEventListener('pointerup', ()=>{ isPointerDown = false; });
+
     node.addEventListener('pointerup', e=>{
+      // Safari: pointerup is more reliable than click
       if (!isSafari) return;
       e.preventDefault();
       e.stopPropagation();
       tooltip.style.display='none';
-      hoverDisabledUntil = Date.now() + 1200;
-      try{ svgRoot.style.pointerEvents='none'; }catch{}
-      setTimeout(()=>{ try{ svgRoot.style.pointerEvents='auto'; }catch{}; selectStand(standId,true); }, 0);
+      hoverDisabledUntil = Date.now() + 800;
+      selectStand(standId, true);
     });
 
     node.addEventListener('click', e=>{
       if (isSafari) return;
       e.preventDefault();
       e.stopPropagation();
-      selectStand(standId,true);
+      selectStand(standId, true);
     });
   }
 
-  async function syncOnce(force=false){
-    if(!autoSyncEnabled && !force) return;
+  async function syncOnce(force){
+    if (!autoSyncEnabled && !force) return;
     try{
-      const data = await fetchJson(API_BASE+'/stands?ts='+Date.now());
-      byId = new Map((Array.isArray(data)?data:[]).map(r=>[String(r.standId).trim(),{
-        standId:String(r.standId).trim(),
-        status:normalizeStatus(r.status),
-        company:String(r.company||'').trim()
+      const data = await fetchJson(API_BASE + '/stands?ts=' + Date.now());
+      const arr = Array.isArray(data) ? data : (Array.isArray(data.stands) ? data.stands : []);
+      byId = new Map(arr.map(r => [String(r.standId).trim(), {
+        standId: String(r.standId).trim(),
+        status: normalizeStatus(r.status),
+        company: String(r.company || '').trim()
       }]));
 
       renderPlan();
       renderList();
 
-      if(selectedId && !dirty){
+      if (selectedId && !dirty){
         const info = byId.get(selectedId);
-        if(info){
+        if (info){
           standIdEl.value = info.standId;
           statusSel.value = normalizeStatus(info.status);
-          companyEl.value = info.company||'';
+          companyEl.value = info.company || '';
           renderPreview(info);
-          scheduleUpdateZoom(info.standId);
         }
       }
 
-      setStatus('Synced: '+new Date().toLocaleTimeString());
-    }catch(e){
-      setStatus('Sync error: '+e.message,true);
+      setStatus('Synced: ' + new Date().toLocaleTimeString());
+    } catch (e){
+      setStatus('Sync error: ' + e.message, true);
       console.error(e);
+    }
+  }
+
+  async function saveCurrent(statusOverride){
+    if (!selectedId) return;
+    const standId = standIdEl.value.trim();
+    const status = normalizeStatus(statusOverride != null ? statusOverride : statusSel.value);
+    const company = (status === 'sold') ? companyEl.value.trim() : '';
+
+    btnSave.disabled = true;
+    btnClear.disabled = true;
+
+    try{
+      setStatus('Saving…');
+      await postJson(API_BASE + '/stand', { standId, status, company });
+      dirty = false;
+      await syncOnce(true);
+      setStatus('Saved: ' + new Date().toLocaleTimeString());
+    } catch (e){
+      setStatus('Save error: ' + e.message, true);
+      console.error(e);
+    } finally {
+      btnSave.disabled = false;
+      btnClear.disabled = false;
     }
   }
 
   function toCsvRow(values){
     return values.map(v=>{
-      const s=String(v??'');
+      const s = String(v ?? '');
       return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
     }).join(',');
   }
+
   function exportCsv(){
-    const rows=[['standId','status','company']];
-    const items=Array.from(byId.values()).sort((a,b)=>a.standId.localeCompare(b.standId,undefined,{numeric:true}));
-    items.forEach(r=>rows.push([r.standId, normalizeStatus(r.status), r.company||'']));
-    const csv=rows.map(toCsvRow).join('\n');
-    const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
-    const a=document.createElement('a');
-    a.href=URL.createObjectURL(blob);
-    a.download='floorplan-stands-'+new Date().toISOString().replace(/[:.]/g,'-')+'.csv';
+    const rows = [['standId','status','company']];
+    const items = Array.from(byId.values()).sort((a,b)=>a.standId.localeCompare(b.standId, undefined, {numeric:true}));
+    items.forEach(r=>rows.push([r.standId, normalizeStatus(r.status), r.company || '']));
+    const csv = rows.map(toCsvRow).join('\n');
+
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'floorplan-stands-' + new Date().toISOString().replace(/[:.]/g,'-') + '.csv';
     document.body.appendChild(a); a.click(); a.remove();
   }
+
   async function parseCsv(text){
     const rows=[]; let i=0,field='',row=[],inQuotes=false;
     while(i<text.length){
       const c=text[i];
       if(inQuotes){
-        if(c==='"'){ if(text[i+1]==='"'){ field+='"'; i+=2; continue;} inQuotes=false; i++; continue; }
+        if(c==='"'){ if(text[i+1]==='"'){ field+='"'; i+=2; continue; } inQuotes=false; i++; continue; }
         field+=c; i++; continue;
-      }else{
+      } else {
         if(c==='"'){ inQuotes=true; i++; continue; }
         if(c===','){ row.push(field); field=''; i++; continue; }
         if(c==='\r'){ i++; continue; }
@@ -729,73 +661,51 @@ function initZoomSvg(){
     row.push(field); rows.push(row);
     return rows.filter(r=>r.some(x=>String(x||'').trim()!=='')); 
   }
+
   async function importCsvFile(file){
-    const text=await file.text();
-    const rows=await parseCsv(text);
-    if(!rows.length) throw new Error('CSV is empty');
-    const header=rows[0].map(h=>String(h||'').trim().toLowerCase());
-    const idxStand=header.indexOf('standid');
-    const idxStatus=header.indexOf('status');
-    const idxCompany=header.indexOf('company');
-    if(idxStand===-1 || idxStatus===-1) throw new Error('CSV must have headers: standId,status,company');
+    const text = await file.text();
+    const rows = await parseCsv(text);
+    if (!rows.length) throw new Error('CSV is empty');
 
-    const prev=autoSyncEnabled;
-    autoSyncEnabled=false; btnToggleSync.textContent='Resume sync';
+    const header = rows[0].map(h=>String(h||'').trim().toLowerCase());
+    const idxStand = header.indexOf('standid');
+    const idxStatus = header.indexOf('status');
+    const idxCompany = header.indexOf('company');
+    if (idxStand === -1 || idxStatus === -1) throw new Error('CSV must have headers: standId,status,company');
+
+    const prev = autoSyncEnabled;
+    autoSyncEnabled = false;
+    btnToggleSync.textContent = 'Resume sync';
+
     try{
-      for(let r=1;r<rows.length;r++){
-        const rr=rows[r];
-        const standId=String(rr[idxStand]||'').trim(); if(!standId) continue;
-        const status=normalizeStatus(rr[idxStatus]);
-        const company=(status==='sold')?String((idxCompany>=0?rr[idxCompany]:'')||'').trim():'';
-        await postJson(API_BASE+'/stand',{standId,status,company});
+      setStatus('Importing…');
+      for (let r=1; r<rows.length; r++){
+        const rr = rows[r];
+        const standId = String(rr[idxStand] || '').trim();
+        if (!standId) continue;
+        const status = normalizeStatus(rr[idxStatus]);
+        const company = (status === 'sold') ? String((idxCompany>=0?rr[idxCompany]:'')||'').trim() : '';
+        await postJson(API_BASE + '/stand', { standId, status, company });
       }
-      await syncOnce();
-      setStatus('Import complete: '+new Date().toLocaleTimeString());
-    }finally{
-      autoSyncEnabled=prev; btnToggleSync.textContent=autoSyncEnabled?'Pause sync':'Resume sync';
+      await syncOnce(true);
+      setStatus('Import complete: ' + new Date().toLocaleTimeString());
+    } finally {
+      autoSyncEnabled = prev;
+      btnToggleSync.textContent = autoSyncEnabled ? 'Pause sync' : 'Resume sync';
     }
   }
 
-  async function saveCurrent(statusOverride=null){
-    if(!selectedId) return;
-    const standId=standIdEl.value.trim();
-    const status=normalizeStatus(statusOverride??statusSel.value);
-    const company=(status==='sold')?companyEl.value.trim():'';
-    btnSave.disabled=true; btnClear.disabled=true;
-    try{
-      setStatus('Saving…');
-      await postJson(API_BASE+'/stand',{standId,status,company});
-      dirty=false;
-      await syncOnce();
-      setStatus('Saved: '+new Date().toLocaleTimeString());
-    }catch(e){
-      setStatus('Save error: '+e.message,true);
-      console.error(e);
-    }finally{
-      btnSave.disabled=false; btnClear.disabled=false;
-    }
-  }
-
-  
   async function resetAll(){
-    // Extra safety prompts
     const confirmWord = prompt('Type RESET to mark ALL stands as AVAILABLE:');
     if (confirmWord !== 'RESET') return;
 
-    const pw = prompt('Admin password to proceed:');
-    if (pw !== RESET_PASSWORD){
-      setStatus('Reset cancelled (wrong password).', true);
-      return;
-    }
-
-    const prevAuto = autoSyncEnabled;
+    const prev = autoSyncEnabled;
     autoSyncEnabled = false;
     btnToggleSync.textContent = 'Resume sync';
 
     try{
       setStatus('Resetting…');
       const items = Array.from(byId.values());
-      // Do sequential updates to keep it reliable with Apps Script behind the worker
       for (let i=0; i<items.length; i++){
         const s = items[i];
         await postJson(API_BASE + '/stand', { standId: s.standId, status: 'available', company: '' });
@@ -803,86 +713,94 @@ function initZoomSvg(){
       }
       await syncOnce(true);
       setStatus('Reset complete: ' + new Date().toLocaleTimeString());
-    }catch(e){
+    } catch (e){
       setStatus('Reset error: ' + e.message, true);
       console.error(e);
-    }finally{
-      autoSyncEnabled = prevAuto;
+    } finally {
+      autoSyncEnabled = prev;
       btnToggleSync.textContent = autoSyncEnabled ? 'Pause sync' : 'Resume sync';
     }
   }
 
-statusSel.addEventListener('change', setDirty);
-  companyEl.addEventListener('input', setDirty);
-  btnSave.addEventListener('click', ()=>saveCurrent(null));
-  btnClear.addEventListener('click', ()=>saveCurrent('available'));
-  btnToggleSync.addEventListener('click', ()=>{
-    autoSyncEnabled=!autoSyncEnabled;
-    btnToggleSync.textContent = autoSyncEnabled ? 'Pause sync' : 'Resume sync';
-    if(autoSyncEnabled) syncOnce();
-  });
-  btnExport.addEventListener('click', exportCsv);
-  fileImport.addEventListener('change', async e=>{
-    const f=e.target.files && e.target.files[0];
-    if(!f) return;
-    try{
+  function bindUI(){
+    statusSel.addEventListener('change', setDirty);
+    companyEl.addEventListener('input', setDirty);
+
+    btnSave.addEventListener('click', function(){ saveCurrent(null); });
+    btnClear.addEventListener('click', function(){ saveCurrent('available'); });
+
+    btnToggleSync.addEventListener('click', function(){
+      autoSyncEnabled = !autoSyncEnabled;
+      btnToggleSync.textContent = autoSyncEnabled ? 'Pause sync' : 'Resume sync';
+      if (autoSyncEnabled) syncOnce(true);
+    });
+
+    btnExport.addEventListener('click', exportCsv);
+
+    fileImport.addEventListener('change', function(e){
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
       setStatus('Importing…');
-      await importCsvFile(f);
-    }catch(err){
-      setStatus('Import error: '+err.message,true);
-      console.error(err);
-    }finally{
-      fileImport.value='';
+      importCsvFile(f).catch(err=>{
+        setStatus('Import error: ' + err.message, true);
+        console.error(err);
+      }).finally(()=>{ fileImport.value=''; });
+    });
+
+    searchEl.addEventListener('input', renderList);
+    filterEl.addEventListener('change', renderList);
+
+    btnResetAll.addEventListener('click', resetAll);
+
+    // Save event name on change/blur (requires auth, auto-attached by postJson)
+    function saveEventName(){
+      const v = String(eventNameEl.value || '').trim() || 'New Event';
+      postJson(API_BASE + '/settings', { eventName: v })
+        .then(()=> setStatus('Event name saved'))
+        .catch(err=>{
+          setStatus('Event name save error: ' + err.message, true);
+          console.error(err);
+        });
     }
-  });
-  searchEl.addEventListener('input', renderList);
-  filterEl.addEventListener('change', renderList);
-  btnResetAll?.addEventListener('click', resetAll);
+    eventNameEl.addEventListener('change', saveEventName);
+    eventNameEl.addEventListener('blur', saveEventName);
+  }
 
-btnResetAll?.addEventListener('click', resetAll);
+  function showDenied(){
+    document.body.innerHTML =
+      '<div style="font-family:Arial,Helvetica,sans-serif;padding:24px;max-width:720px;margin:0 auto;">' +
+      '<h2>Floorplan Admin</h2>' +
+      '<p>Access cancelled or password incorrect.</p>' +
+      '<p><a href="./admin.html">Try again</a></p>' +
+      '</div>';
+  }
 
-  (async () => {
-    try{
-      if (!(await requireAdminLogin())){
-        document.body.innerHTML = '<div style="font-family:Arial,Helvetica,sans-serif;padding:24px;max-width:720px;margin:0 auto;"><h2>Floorplan Admin</h2><p>Access cancelled or password incorrect.</p><p><a href="./admin.html">Try again</a></p></div>';
-        return;
-      }
-      setStatus('Loading…');
-      // Load shared settings (Event name) from backend
-      try{
-        const s = await fetchJson(API_BASE + '/settings?ts=' + Date.now());
-        const ev = (s && typeof s.eventName === 'string') ? s.eventName : 'New Event';
-        const evEl = document.getElementById('eventNameAdmin');
-        if(evEl) evEl.value = ev;
-      }catch(_){/* ignore */}
-      // Save event name on change/blur (requires admin password)
-      const evEl2 = document.getElementById('eventNameAdmin');
-      if(evEl2){
-        const saveEv = async () => {
-          const v = String(evEl2.value || '').trim() || 'New Event';
-          try{
-            await postJson(API_BASE + '/settings', { eventName: v, adminPassword: sessionPassword });
-            setStatus('Event name saved');
-          }catch(err){
-            setStatus('Event name save error: ' + err.message, true);
-            console.error(err);
-          }
-        };
-        evEl2.addEventListener('change', saveEv);
-        evEl2.addEventListener('blur', saveEv);
-      }
-      await loadSvg();
-      bboxCache = new Map();
-      warmBBoxCache();
+  // ===== INIT (Safari-safe) =====
+  (function init(){
+    bindUI();
+    setStatus('Loading…');
+
+    requireAdminLogin().then(function(ok){
+      if (!ok){ showDenied(); return Promise.reject(new Error('Denied')); }
+
+      // Load current settings
+      return fetchJson(API_BASE + '/settings?ts=' + Date.now()).then(function(s){
+        if (s && typeof s.eventName === 'string') eventNameEl.value = s.eventName || '';
+      }).catch(function(){ /* ignore settings load */ });
+    }).then(function(){
+      return loadSvg();
+    }).then(function(){
       getStandNodes().forEach(bindNodeEvents);
-      initZoomSvg();
-      await syncOnce();
-      setInterval(syncOnce, SYNC_INTERVAL_MS);
-    }catch(e){
-      setStatus('Load error: '+e.message,true);
+      return syncOnce(true);
+    }).then(function(){
+      setInterval(function(){ syncOnce(false); }, SYNC_INTERVAL_MS);
+    }).catch(function(e){
+      if (String(e.message || '') === 'Denied') return;
+      setStatus('Load error: ' + e.message, true);
       console.error(e);
-    }
+    });
   })();
+
 })();
 </script>
 </body>
