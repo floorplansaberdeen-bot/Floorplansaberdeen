@@ -346,12 +346,36 @@ let svgRoot = null;
     if(!res.ok) throw new Error('HTTP '+res.status);
     return await res.json();
   }
-  async function postJson(url,payload){
-    const res = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-    const text = await res.text();
-    let json=null; try{json=JSON.parse(text);}catch{}
-    if(!res.ok || (json && json.success===false)) throw new Error((json&&json.error)?json.error:(text||('HTTP '+res.status)));
-    return json||{success:true};
+  async function postJson(url, data) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  const text = await res.text();
+
+  // ✅ always log the response for debugging
+  console.log("POST", url, "status", res.status, "raw response:", text);
+
+  let out;
+  try {
+    out = JSON.parse(text);
+  } catch (e) {
+    throw new Error("Non-JSON response: " + text.slice(0, 120));
+  }
+
+  // If backend says error, throw it (but now we’ve logged the debug object)
+  if (out && out.success === false) {
+    throw new Error(out.error || "Request failed");
+  }
+  if (out && out.error) {
+    throw new Error(out.error);
+  }
+
+  return out;
+}
+
   }
 
   async function loadSvg(){
