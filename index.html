@@ -5,152 +5,59 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Exhibition Floorplan</title>
 
-<!-- PDF export libraries -->
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
 <style>
-  :root{
-    --green:#2ecc71;
-    --red:#e53935;
-    --border:#d9d9d9;
-    --muted:#666;
-    --bg:#fff;
-  }
-
-  body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:#111;}
-  header{
-    padding:12px 16px;border-bottom:1px solid var(--border);
-    display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
-  }
+  :root{--green:#2ecc71;--red:#e53935;--border:#d9d9d9;--muted:#666;}
+  body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#111;}
+  header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
   h1{margin:0;font-size:18px;font-weight:900;}
   #updated{font-size:12px;color:var(--muted);}
-  .btn{
-    padding:8px 10px;border:1px solid var(--border);
-    background:#f7f7f7;border-radius:10px;
-    cursor:pointer;font-weight:800;font-size:13px;
-  }
+  #stage{font-size:12px;color:#111;font-weight:800;margin-top:4px;}
+  .btn{padding:8px 10px;border:1px solid var(--border);background:#f7f7f7;border-radius:10px;cursor:pointer;font-weight:800;font-size:13px;}
   .btn:disabled{opacity:.5;cursor:not-allowed;}
-
   .wrap{padding:12px;display:grid;grid-template-columns:1fr 360px;gap:12px;}
   @media(max-width:960px){.wrap{grid-template-columns:1fr;}}
-
   .card{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#fff;}
 
-  /* Plan */
-  #planHost{
-    position:relative;
-    min-height:520px;
-    overflow:auto;
-    -webkit-overflow-scrolling:touch;
-    background:#fff;
-  }
+  #planHost{position:relative;min-height:520px;overflow:auto;-webkit-overflow-scrolling:touch;background:#fff;}
   #planHost svg{width:100%;height:auto;display:block;}
+  #planHost svg text, #planHost svg tspan{pointer-events:none;user-select:none;font-size:14px;font-weight:800;opacity:.45;}
+  @media(max-width:960px){#planHost svg text,#planHost svg tspan{opacity:0;}}
 
-  /* Stand numbers inside SVG: reduce dominance; hide on mobile */
-  #planHost svg text, #planHost svg tspan{
-    pointer-events:none;
-    user-select:none;
-    font-size:14px;
-    font-weight:800;
-    opacity:0.45;               /* less dominant */
-  }
-  @media(max-width:960px){
-    #planHost svg text, #planHost svg tspan{
-      opacity:0;                 /* hide on phone (too small/cluttered) */
-    }
-  }
-
-  /* Bottom-centre legend */
   .legend{
     position:absolute;left:50%;bottom:12px;transform:translateX(-50%);
-    background:rgba(255,255,255,.92);
-    border:1px solid var(--border);
-    border-radius:999px;
-    padding:10px 16px;
-    display:flex;gap:16px;align-items:center;
-    font-size:15px;font-weight:900;
-    box-shadow:0 6px 18px rgba(0,0,0,.1);
-    z-index:10;
-    pointer-events:none;
+    background:rgba(255,255,255,.92);border:1px solid var(--border);border-radius:999px;
+    padding:10px 16px;display:flex;gap:16px;align-items:center;font-size:15px;font-weight:900;
+    box-shadow:0 6px 18px rgba(0,0,0,.1);z-index:10;pointer-events:none;
   }
   .pill{display:flex;align-items:center;gap:10px;white-space:nowrap;}
   .dot{width:14px;height:14px;border-radius:50%;}
-  .dot.green{background:var(--green);}
-  .dot.red{background:var(--red);}
+  .dot.green{background:var(--green);} .dot.red{background:var(--red);}
 
-  /* Callout overlay (label in middle + leader line) */
-  #leaderLayer{
-    position:absolute; inset:0;
-    width:100%; height:100%;
-    z-index:9;
-    pointer-events:none;
-  }
+  #leaderLayer{position:absolute;inset:0;width:100%;height:100%;z-index:9;pointer-events:none;}
   #callout{
-    position:absolute;
-    left:50%; top:50%;
-    transform:translate(-50%,-50%);
-    z-index:11;
-    display:none;
-    pointer-events:none;
-    background:rgba(255,255,255,.96);
-    border:1px solid var(--border);
-    border-radius:14px;
-    box-shadow:0 10px 26px rgba(0,0,0,.12);
-    padding:12px 14px;
-    min-width:220px;
-    max-width:min(360px, 80vw);
-    text-align:center;
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    z-index:11;display:none;pointer-events:none;
+    background:rgba(255,255,255,.96);border:1px solid var(--border);border-radius:14px;
+    box-shadow:0 10px 26px rgba(0,0,0,.12);padding:12px 14px;min-width:220px;max-width:min(360px,80vw);text-align:center;
   }
-  #callout .stand{
-    font-size:22px;   /* bigger label */
-    font-weight:900;
-    margin:0;
-  }
-  #callout .company{
-    font-size:16px;   /* bigger label */
-    font-weight:800;
-    margin:6px 0 0 0;
-    color:#222;
-    word-break:break-word;
-  }
-  #callout .hint{
-    margin-top:6px;
-    font-size:12px;
-    color:var(--muted);
-  }
+  #callout .stand{font-size:22px;font-weight:900;margin:0;}
+  #callout .company{font-size:16px;font-weight:800;margin:6px 0 0 0;color:#222;word-break:break-word;}
+  #callout .hint{margin-top:6px;font-size:12px;color:var(--muted);}
 
-  /* Sidebar */
   .side{padding:12px;display:grid;gap:12px;}
   .box{border:1px solid var(--border);border-radius:12px;padding:10px 12px;}
   .title{font-size:14px;font-weight:900;margin:0 0 8px 0;}
   .muted{font-size:12px;color:var(--muted);line-height:1.35;}
   .big{font-size:20px;font-weight:900;margin:0;}
-  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
-  input, select{
-    width:100%;
-    padding:10px 10px;
-    border:1px solid var(--border);
-    border-radius:10px;
-    font-size:14px;
-    box-sizing:border-box;
-  }
-  .list{
-    max-height:420px;
-    overflow:auto;
-    border:1px solid var(--border);
-    border-radius:12px;
-    background:#fff;
-  }
-  .item{
-    padding:10px 10px;
-    border-bottom:1px solid #eee;
-    cursor:pointer;
-  }
+  input{width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;font-size:14px;box-sizing:border-box;}
+  .list{max-height:420px;overflow:auto;border:1px solid var(--border);border-radius:12px;background:#fff;}
+  .item{padding:10px 10px;border-bottom:1px solid #eee;cursor:pointer;}
   .item:last-child{border-bottom:0;}
   .item:hover{background:#f7f7f7;}
   .item .id{font-weight:900;}
-  .item .co{font-weight:700;color:#222;margin-top:2px;}
   .item .sub{font-size:12px;color:var(--muted);margin-top:2px;}
 </style>
 </head>
@@ -160,8 +67,9 @@
   <div>
     <h1 id="eventName">Loading…</h1>
     <div id="updated"></div>
+    <div id="stage">Starting…</div>
   </div>
-  <div class="row">
+  <div>
     <button class="btn" id="btnPdf">Export PDF</button>
     <button class="btn" id="btnClear" disabled>Clear selection</button>
   </div>
@@ -170,13 +78,11 @@
 <div class="wrap">
   <div class="card">
     <div id="planHost">
-      <!-- overlay line -->
       <svg id="leaderLayer" xmlns="http://www.w3.org/2000/svg">
-        <line id="leaderLine" x1="0" y1="0" x2="0" y2="0" stroke="#111" stroke-width="3" stroke-linecap="round" opacity="0.85"/>
-        <circle id="leaderDot" cx="0" cy="0" r="6" fill="#111" opacity="0.85"/>
+        <line id="leaderLine" x1="0" y1="0" x2="0" y2="0" stroke="#111" stroke-width="3" stroke-linecap="round" opacity="0"/>
+        <circle id="leaderDot" cx="0" cy="0" r="6" fill="#111" opacity="0"/>
       </svg>
 
-      <!-- centre callout -->
       <div id="callout">
         <p class="stand" id="coStand">—</p>
         <p class="company" id="coCompany"></p>
@@ -205,4 +111,289 @@
       <div class="box">
         <p class="title">Sold exhibitors</p>
         <input id="search" placeholder="Search company or stand…" />
-        <div class="muted" style="margin
+        <div class="list" id="soldList" style="margin-top:10px;"></div>
+      </div>
+
+      <div class="box">
+        <p class="title">Help</p>
+        <div class="muted">
+          All stands are green. Selecting an exhibitor makes their stand red with a label + line.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  /* ONLY EDIT THESE IF NEEDED */
+  var API_BASE = "https://floorplansaberdeen.floorplansaberdeen.workers.dev";
+  var SVG_URL  = "./event_plan.svg";
+
+  var GREEN="#2ecc71", RED="#e53935", OPACITY=0.75;
+  var STAND_ID_RE=/^([A-Z]{1,3})(\d{1,3})$/;
+  var isPhone = window.matchMedia("(max-width: 960px)").matches || (navigator.maxTouchPoints > 1);
+
+  if(!window.CSS) window.CSS={};
+  if(typeof CSS.escape!=="function"){
+    CSS.escape=function(v){return String(v).replace(/[^a-zA-Z0-9_\-]/g,function(ch){
+      return "\\"+ch.codePointAt(0).toString(16).toUpperCase()+" ";
+    });};
+  }
+
+  var planHost=document.getElementById("planHost");
+  var eventNameEl=document.getElementById("eventName");
+  var updatedEl=document.getElementById("updated");
+  var stageEl=document.getElementById("stage");
+  var btnPdf=document.getElementById("btnPdf");
+  var btnClear=document.getElementById("btnClear");
+  var selStandEl=document.getElementById("selStand");
+  var selCompanyEl=document.getElementById("selCompany");
+  var searchEl=document.getElementById("search");
+  var soldListEl=document.getElementById("soldList");
+
+  var callout=document.getElementById("callout");
+  var coStand=document.getElementById("coStand");
+  var coCompany=document.getElementById("coCompany");
+  var coHint=document.getElementById("coHint");
+
+  var leaderLayer=document.getElementById("leaderLayer");
+  var leaderLine=document.getElementById("leaderLine");
+  var leaderDot=document.getElementById("leaderDot");
+
+  var svgRoot=null;
+  var stands=[];
+  var byId=new Map();
+  var selectedId="";
+
+  function setStage(t,isErr){
+    stageEl.textContent=t;
+    stageEl.style.color=isErr ? "#b00020" : "#111";
+  }
+
+  function withTimeout(promise, ms, label){
+    return Promise.race([
+      promise,
+      new Promise(function(_,rej){ setTimeout(function(){ rej(new Error("Timeout: "+label)); }, ms); })
+    ]);
+  }
+
+  function fetchText(url){
+    return withTimeout(fetch(url,{cache:"no-store"}).then(function(r){
+      if(!r.ok) throw new Error("HTTP "+r.status+" for "+url);
+      return r.text();
+    }), 10000, url);
+  }
+
+  function fetchJson(url){
+    return fetchText(url).then(function(t){
+      try { return JSON.parse(t); } catch(e){ throw new Error("Bad JSON from "+url); }
+    });
+  }
+
+  function isStandId(id){ return STAND_ID_RE.test(String(id||"").trim()); }
+  function normStatus(v){ return String(v||"").toLowerCase().trim()==="sold" ? "sold" : "available"; }
+
+  function getStandNodes(){
+    var groups=[].slice.call(svgRoot.querySelectorAll("g[id]")).filter(function(g){return isStandId(g.id);});
+    var shapes=[].slice.call(svgRoot.querySelectorAll("path[id],rect[id],polygon[id],circle[id],ellipse[id],polyline[id],line[id]"))
+      .filter(function(el){return isStandId(el.id);});
+    return groups.length ? groups : shapes;
+  }
+
+  function paintNode(node, color){
+    var targets=(node.tagName.toLowerCase()==="g") ? node.querySelectorAll("path,rect,polygon,circle,ellipse,polyline,line") : [node];
+    [].forEach.call(targets,function(el){
+      el.style.fill=color;
+      el.style.fillOpacity=String(OPACITY);
+      el.style.stroke="rgba(0,0,0,0.45)";
+      el.style.strokeOpacity="0.6";
+      el.style.cursor=isPhone ? "default" : "pointer";
+    });
+  }
+
+  function renderPlan(){
+    getStandNodes().forEach(function(n){ paintNode(n, GREEN); });
+    if(selectedId){
+      var n=svgRoot.querySelector("#"+CSS.escape(selectedId));
+      if(n) paintNode(n, RED);
+    }
+  }
+
+  function updateLeader(){
+    if(!selectedId || !svgRoot) return;
+    var target=svgRoot.querySelector("#"+CSS.escape(selectedId));
+    if(!target) return;
+
+    var w=planHost.clientWidth, h=planHost.clientHeight;
+    leaderLayer.setAttribute("viewBox","0 0 "+w+" "+h);
+    leaderLayer.setAttribute("width",w);
+    leaderLayer.setAttribute("height",h);
+
+    var cx=w/2, cy=h/2;
+
+    var rPlan=planHost.getBoundingClientRect();
+    var rStand=target.getBoundingClientRect();
+    var standX=(rStand.left + rStand.width/2) - rPlan.left;
+    var standY=(rStand.top  + rStand.height/2) - rPlan.top;
+
+    leaderLine.setAttribute("x1",cx); leaderLine.setAttribute("y1",cy);
+    leaderLine.setAttribute("x2",standX); leaderLine.setAttribute("y2",standY);
+    leaderDot.setAttribute("cx",standX); leaderDot.setAttribute("cy",standY);
+
+    leaderLine.style.opacity="0.85";
+    leaderDot.style.opacity="0.85";
+  }
+
+  function setSelected(id){
+    selectedId=id||"";
+    btnClear.disabled=!selectedId;
+
+    if(!selectedId){
+      selStandEl.textContent="None";
+      selCompanyEl.textContent="";
+      callout.style.display="none";
+      leaderLine.style.opacity="0";
+      leaderDot.style.opacity="0";
+      renderPlan();
+      return;
+    }
+
+    var info=byId.get(selectedId) || { standId:selectedId, company:"" };
+    selStandEl.textContent=info.standId;
+    selCompanyEl.textContent=info.company || "";
+
+    coStand.textContent=info.standId;
+    coCompany.textContent=info.company || "";
+    coHint.textContent=info.company ? "" : "No company name set";
+    callout.style.display="block";
+
+    renderPlan();
+    updateLeader();
+  }
+
+  function buildSoldList(){
+    var q=String(searchEl.value||"").toLowerCase().trim();
+    var sold=stands.map(function(s){
+      return { standId:String(s.standId||"").trim(), status:normStatus(s.status), company:String(s.company||"").trim() };
+    }).filter(function(s){
+      if(!s.standId) return false;
+      if(s.status!=="sold") return false;
+      if(!s.company) return false;
+      if(!q) return true;
+      return s.standId.toLowerCase().includes(q) || s.company.toLowerCase().includes(q);
+    }).sort(function(a,b){ return a.company.localeCompare(b.company); });
+
+    soldListEl.innerHTML="";
+    if(!sold.length){
+      soldListEl.innerHTML='<div class="item" style="cursor:default;"><div class="sub">No matches.</div></div>';
+      return;
+    }
+
+    sold.forEach(function(s){
+      var div=document.createElement("div");
+      div.className="item";
+      div.innerHTML='<div class="id">'+s.company+'</div><div class="sub">Stand '+s.standId+'</div>';
+      div.addEventListener("click",function(){
+        setSelected(s.standId);
+        if(svgRoot && !isPhone){
+          var node=svgRoot.querySelector("#"+CSS.escape(s.standId));
+          if(node && node.scrollIntoView) node.scrollIntoView({behavior:"smooth",block:"center",inline:"center"});
+        }
+      });
+      soldListEl.appendChild(div);
+    });
+  }
+
+  function bindStandClicks(){
+    if(isPhone) return;
+    getStandNodes().forEach(function(node){
+      var id=String(node.id||"").trim();
+      if(!id) return;
+      node.addEventListener("click",function(e){
+        e.preventDefault(); e.stopPropagation();
+        setSelected(id);
+      });
+    });
+  }
+
+  function exportPdf(){
+    try{
+      btnPdf.disabled=true; btnPdf.textContent="Exporting…";
+      updateLeader();
+      html2canvas(planHost,{scale:2,backgroundColor:"#fff"}).then(function(canvas){
+        var jsPDF = window.jspdf && window.jspdf.jsPDF ? window.jspdf.jsPDF : null;
+        if(!jsPDF) throw new Error("jsPDF not loaded");
+        var pdf=new jsPDF({orientation:"landscape",unit:"pt",format:"a4"});
+        var pw=pdf.internal.pageSize.getWidth(), ph=pdf.internal.pageSize.getHeight();
+        var scale=Math.min(pw/canvas.width, ph/canvas.height);
+        var w=canvas.width*scale, h=canvas.height*scale;
+        pdf.addImage(canvas.toDataURL("image/png"),"PNG",(pw-w)/2,(ph-h)/2,w,h);
+        var name=(eventNameEl.textContent||"floorplan").replace(/[^\w\-]+/g,"_") + (selectedId?("_"+selectedId):"") + ".pdf";
+        pdf.save(name);
+      }).catch(function(){ window.print(); })
+      .finally(function(){ btnPdf.disabled=false; btnPdf.textContent="Export PDF"; });
+    }catch(_){
+      window.print();
+      btnPdf.disabled=false; btnPdf.textContent="Export PDF";
+    }
+  }
+
+  function wireLeader(){
+    planHost.addEventListener("scroll",function(){ if(selectedId) updateLeader(); },{passive:true});
+    window.addEventListener("resize",function(){ if(selectedId) updateLeader(); });
+  }
+
+  function loadSvg(){
+    // cache-bust SVG on GitHub Pages
+    var url = SVG_URL + "?v=" + Date.now();
+    return fetchText(url).then(function(svgText){
+      planHost.insertAdjacentHTML("afterbegin", svgText);
+      svgRoot = planHost.querySelector("svg");
+      if(!svgRoot) throw new Error("SVG root not found");
+    });
+  }
+
+  function init(){
+    setStage("Loading settings…");
+    return fetchJson(API_BASE+"/settings?ts="+Date.now())
+      .catch(function(){ return {eventName:"Event"}; })
+      .then(function(s){
+        eventNameEl.textContent = (s && s.eventName) ? s.eventName : "Event";
+        setStage("Loading stands…");
+        return fetchJson(API_BASE+"/stands?ts="+Date.now());
+      })
+      .then(function(data){
+        if(!Array.isArray(data)) throw new Error("Stands API did not return an array");
+        stands=data;
+        byId=new Map(stands.map(function(s){
+          return [String(s.standId||"").trim(), { standId:String(s.standId||"").trim(), status:normStatus(s.status), company:String(s.company||"").trim() }];
+        }));
+        setStage("Loading floorplan SVG…");
+        return loadSvg();
+      })
+      .then(function(){
+        renderPlan();
+        bindStandClicks();
+        wireLeader();
+        buildSoldList();
+        updatedEl.textContent="Updated: "+new Date().toLocaleTimeString();
+        setStage("Ready ✅");
+      });
+  }
+
+  btnClear.addEventListener("click",function(){ setSelected(""); });
+  btnPdf.addEventListener("click",exportPdf);
+  searchEl.addEventListener("input",buildSoldList);
+
+  init().catch(function(err){
+    eventNameEl.textContent="Load error";
+    updatedEl.textContent=String(err.message || err);
+    setStage("Error: "+String(err.message || err), true);
+    console.error(err);
+  });
+
+})();
+</script>
+</body>
+</html>
