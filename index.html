@@ -46,7 +46,7 @@
   }
   #planHost svg{width:100%;height:auto;display:block;}
 
-  /* ✅ Remove stand numbers completely (all SVG text) */
+  /* ✅ Remove stand numbers completely */
   #planHost svg text,
   #planHost svg tspan{
     display:none !important;
@@ -61,7 +61,7 @@
     padding:10px 16px;
     display:flex;gap:16px;align-items:center;
     font-size:15px;font-weight:900;
-    box-shadow:0 6px 18px rgba(0,0,0,.1);
+    box-shadow:0 6px 18px rgba(0,0,0,.10);
     z-index:10;
     pointer-events:none;
   }
@@ -70,7 +70,7 @@
   .dot.green{background:var(--green);}
   .dot.red{background:var(--red);}
 
-  /* Callout overlay (label + leader line) */
+  /* Leader line overlay */
   #leaderLayer{
     position:absolute; inset:0;
     width:100%; height:100%;
@@ -78,19 +78,25 @@
     pointer-events:none;
   }
 
-  /* ✅ label moved down (top:62%) and red background with white text */
+  /* ✅ Smart-placed callout (absolute px positioning set in JS) */
   #callout{
     position:absolute;
     left:50%;
-    top:62%;
-    transform:translate(-50%,-50%);
+    top:70%;
+    transform:translate(-50%,-50%); /* only for initial; JS switches to translate(0,0) */
     z-index:11;
     display:none;
     pointer-events:none;
+
     background:var(--red);
     border:1px solid rgba(0,0,0,.15);
     border-radius:14px;
-    box-shadow:0 10px 26px rgba(0,0,0,.18);
+
+    /* ✅ subtle drop shadow */
+    box-shadow:
+      0 10px 26px rgba(0,0,0,.16),
+      0 2px 8px rgba(0,0,0,.12);
+
     padding:12px 14px;
     min-width:220px;
     max-width:min(360px, 80vw);
@@ -262,6 +268,9 @@
   var byId=new Map();
   var selectedId="";
 
+  // cache stand rects for "smart placement"
+  var standNodesCache=null;
+
   function setStage(t,isErr){
     stageEl.textContent=t;
     stageEl.style.color=isErr ? "#b00020" : "#111";
@@ -319,6 +328,128 @@
     }
   }
 
+  function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
+
+  function rectOverlapArea(a, b){
+    var x1=Math.max(a.x, b.x);
+    var y1=Math.max(a.y, b.y);
+    var x2=Math.min(a.x+a.w, b.x+b.w);
+    var y2=Math.min(a.y+a.h, b.y+b.h);
+    var w=Math.max(0, x2-x1);
+    var h=Math.max(0, y2-y1);
+    return w*h;
+  }
+
+  function getStandRectsRelativeToPlan(){
+    // Approximate stands as their screen bounding rectangles.
+    // Convert to planHost-relative coordinates.
+    if(!standNodesCache) standNodesCache = getStandNodes();
+    var rPlan = planHost.getBoundingClientRect();
+    var rects=[];
+    for(var i=0;i<standNodesCache.length;i++){
+      var n = standNodesCache[i];
+      try{
+        var r = n.getBoundingClientRect();
+        // Ignore tiny rects (can happen with hidden elements)
+        var w=r.width, h=r.height;
+        if(w<2 || h<2) continue;
+        rects.push({
+          x: (r.left - rPlan.left),
+          y: (r.top  - rPlan.top),
+          w: w,
+          h: h
+        });
+      }catch(_){}
+    }
+    return rects;
+  }
+
+  function smartPlaceCallout(){
+    if(!selectedId || !svgRoot) return;
+
+    // Make callout visible so we can measure it
+    callout.style.display="block";
+    // We'll set explicit px positioning (no translate)
+    callout.style.transform="translate(0,0)";
+
+    var pad = 14; // padding from edges
+    var w = planHost.clientWidth;
+    var h = planHost.clientHeight;
+
+    // Callout size (measured)
+    // Temporarily place offscreen to get stable measurement
+    callout.style.left = "-9999px";
+    callout.style.top  = "-9999px";
+    var callRect = callout.getBoundingClientRect();
+    var cw = callRect.width;
+    var ch = callRect.height;
+
+    // Candidate anchor points (planHost-relative)
+    // We bias toward lower positions, but it can move anywhere to avoid overlaps.
+    var candidates = [
+      { name:"bottom-center", x:(w-cw)/2, y:h - ch - 64 },
+      { name:"bottom-left",   x:pad,       y:h - ch - 64 },
+      { name:"bottom-right",  x:w - cw - pad, y:h - ch - 64 },
+
+      { name:"mid-left",      x:pad,       y:(h-ch)/2 },
+      { name:"mid-right",     x:w - cw - pad, y:(h-ch)/2 },
+
+      { name:"top-center",    x:(w-cw)/2,  y:pad + 8 },
+      { name:"top-left",      x:pad,       y:pad + 8 },
+      { name:"top-right",     x:w - cw - pad, y:pad + 8 }
+    ];
+
+    // Clamp candidates into view
+    for(var i=0;i<candidates.length;i++){
+      candidates[i].x = clamp(candidates[i].x, pad, w - cw - pad);
+      candidates[i].y = clamp(candidates[i].y, pad, h - ch - pad);
+    }
+
+    // Selected stand center (for tie-break)
+    var rPlan = planHost.getBoundingClientRect();
+    var target = svgRoot.querySelector("#"+CSS.escape(selectedId));
+    var standX = w/2, standY = h/2;
+    if(target){
+      var rs = target.getBoundingClientRect();
+      standX = (rs.left + rs.width/2) - rPlan.left;
+      standY = (rs.top  + rs.height/2) - rPlan.top;
+    }
+
+    var standRects = getStandRectsRelativeToPlan();
+
+    var best = null;
+    for(var j=0;j<candidates.length;j++){
+      var c = candidates[j];
+      var testRect = { x:c.x, y:c.y, w:cw, h:ch };
+
+      // Overlap score with all stands (we want minimal)
+      var overlap = 0;
+      for(var k=0;k<standRects.length;k++){
+        overlap += rectOverlapArea(testRect, standRects[k]);
+        // small early exit if it's already worse
+        if(best && overlap > best.overlap) break;
+      }
+
+      // Tie-break: prefer being not too far from selected stand (so line is shorter)
+      var cx = c.x + cw/2;
+      var cy = c.y + ch/2;
+      var dx = cx - standX;
+      var dy = cy - standY;
+      var dist = Math.sqrt(dx*dx + dy*dy);
+
+      // Combined score: prioritize overlap strongly, then distance
+      var score = overlap * 1000000 + dist;
+
+      if(!best || score < best.score){
+        best = { x:c.x, y:c.y, overlap:overlap, dist:dist, score:score, cw:cw, ch:ch };
+      }
+    }
+
+    // Apply best
+    callout.style.left = best.x + "px";
+    callout.style.top  = best.y + "px";
+  }
+
   function updateLeader(){
     if(!selectedId || !svgRoot) return;
     var target=svgRoot.querySelector("#"+CSS.escape(selectedId));
@@ -329,16 +460,17 @@
     leaderLayer.setAttribute("width",w);
     leaderLayer.setAttribute("height",h);
 
-    /* ✅ line starts from the callout position (top:62%) */
-    var cx=w/2;
-    var cy=h*0.62;
+    // Start line from callout center (dynamic smart placement)
+    var rPlan = planHost.getBoundingClientRect();
+    var rCall = callout.getBoundingClientRect();
+    var callX = (rCall.left + rCall.width/2) - rPlan.left;
+    var callY = (rCall.top  + rCall.height/2) - rPlan.top;
 
-    var rPlan=planHost.getBoundingClientRect();
     var rStand=target.getBoundingClientRect();
     var standX=(rStand.left + rStand.width/2) - rPlan.left;
     var standY=(rStand.top  + rStand.height/2) - rPlan.top;
 
-    leaderLine.setAttribute("x1",cx); leaderLine.setAttribute("y1",cy);
+    leaderLine.setAttribute("x1",callX); leaderLine.setAttribute("y1",callY);
     leaderLine.setAttribute("x2",standX); leaderLine.setAttribute("y2",standY);
     leaderDot.setAttribute("cx",standX); leaderDot.setAttribute("cy",standY);
 
@@ -367,8 +499,9 @@
     coStand.textContent=info.standId;
     coCompany.textContent=info.company || "";
     coHint.textContent=info.company ? "" : "No company name set";
-    callout.style.display="block";
 
+    // smart position + draw
+    smartPlaceCallout();
     renderPlan();
     updateLeader();
   }
@@ -421,7 +554,7 @@
   function exportPdf(){
     try{
       btnPdf.disabled=true; btnPdf.textContent="Exporting…";
-      updateLeader();
+      if(selectedId){ smartPlaceCallout(); updateLeader(); }
 
       html2canvas(planHost,{scale:2,backgroundColor:"#fff"})
         .then(function(canvas){
@@ -447,8 +580,12 @@
   }
 
   function wireLeader(){
-    planHost.addEventListener("scroll",function(){ if(selectedId) updateLeader(); },{passive:true});
-    window.addEventListener("resize",function(){ if(selectedId) updateLeader(); });
+    planHost.addEventListener("scroll",function(){
+      if(selectedId){ smartPlaceCallout(); updateLeader(); }
+    },{passive:true});
+    window.addEventListener("resize",function(){
+      if(selectedId){ smartPlaceCallout(); updateLeader(); }
+    });
   }
 
   function loadSvg(){
@@ -457,6 +594,7 @@
       planHost.insertAdjacentHTML("afterbegin", svgText);
       svgRoot = planHost.querySelector("svg");
       if(!svgRoot) throw new Error("SVG root not found");
+      standNodesCache = null; // reset cache now SVG is loaded
     });
   }
 
