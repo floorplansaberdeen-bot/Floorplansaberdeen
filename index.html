@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <title>Exhibition Floorplan</title>
 <style>
   :root{
@@ -10,7 +10,6 @@
     --muted:#666;
     --card:#fff;
     --shadow: 0 10px 25px rgba(0,0,0,.10);
-    --shadow2: 0 14px 28px rgba(0,0,0,.18);
     --selected:#e53935;
     --standRGB: 213,109,50;
   }
@@ -41,9 +40,7 @@
     padding:14px;
     align-items:start;
   }
-  @media (max-width: 980px){
-    .layout{grid-template-columns:1fr;}
-  }
+  @media (max-width: 980px){ .layout{grid-template-columns:1fr;} }
 
   .card{background:var(--card);border:1px solid var(--border);border-radius:16px;}
 
@@ -54,9 +51,7 @@
     align-self:start;
     z-index:10;
   }
-  @media (max-width: 980px){
-    .planCol{ position:relative; top:auto; }
-  }
+  @media (max-width: 980px){ .planCol{ position:relative; top:auto; } }
 
   .planCard{position:relative;overflow:hidden;}
   #svgHost{
@@ -67,7 +62,7 @@
   #svgHost svg{width:100%;height:auto;display:block;}
   svg text, svg tspan{pointer-events:none;user-select:none;}
 
-  /* Legend lozenges - moved up */
+  /* Legend lozenges - moved up a bit */
   .legend{
     position:absolute;left:50%;transform:translateX(-50%);
     bottom:10px;
@@ -81,41 +76,6 @@
   .dot.stand{background:rgba(var(--standRGB),.75);}
   .dot.sel{background:var(--selected);}
 
-  /* Callout bar OUTSIDE SVG */
-  .calloutBar{
-    border-top:1px solid var(--border);
-    background:#fff;
-    padding:10px 12px;
-    display:none;
-  }
-  .calloutInner{
-    margin:0 auto;
-    max-width:540px;
-    background:var(--selected);
-    color:#fff;
-    border-radius:16px;
-    padding:10px 12px;
-    box-shadow: var(--shadow2);
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:10px;
-  }
-  .calloutLeft{display:grid;gap:2px;}
-  .calloutStand{font-weight:900;font-size:22px;line-height:1;}
-  .calloutCompany{font-weight:800;font-size:15px;line-height:1.2;opacity:.98;}
-  .calloutBtn{
-    border:1px solid rgba(255,255,255,.35);
-    background:rgba(255,255,255,.16);
-    color:#fff;
-    border-radius:12px;
-    padding:8px 10px;
-    font-weight:900;
-    cursor:pointer;
-    white-space:nowrap;
-  }
-
-  /* Right column panels */
   .side{display:grid;gap:12px;}
   .panelTitle{font-weight:900;margin:0 0 6px 0;}
   .selBox{
@@ -128,7 +88,16 @@
   .listBox{border:1px solid var(--border);border-radius:14px;background:#fff;overflow:hidden;}
   .listHead{padding:12px;border-bottom:1px solid var(--border);}
   #search{width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--border);font-size:14px;}
-  #list{max-height:520px;overflow:auto;}
+
+  /* list scroller */
+  #list{
+    max-height:520px;
+    overflow:auto;
+    -webkit-overflow-scrolling:touch;
+    /* IMPORTANT: bottom padding so last row isn’t hidden by browser bar */
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px) + 70px);
+  }
+
   .row{
     padding:10px 12px;border-bottom:1px solid #f0f0f0;cursor:pointer;
     display:grid;gap:2px;
@@ -138,34 +107,32 @@
   .row small{color:var(--muted);font-weight:700;}
   .row.active{outline:2px solid rgba(0,0,0,.12);background:#fff;}
 
-  /* ===========================
-     PHONE FIXED PLAN + SCROLL LIST
-     =========================== */
+  /* Phone: fixed plan at top, list scrolls */
   @media (max-width: 600px){
     header{padding:12px 12px;}
     #eventName{font-size:22px;}
 
-    /* Turn the whole page into fixed regions */
+    /* fixed regions */
     body{height:100vh;overflow:hidden;}
 
-    /* Replace desktop layout with a fixed grid:
-       - plan area (fixed)
-       - list area (scroll)
-    */
     .layout{
-      height:calc(100vh - 86px); /* header height approx */
+      height:calc(100vh - 86px); /* header */
       padding:10px;
       display:grid;
       grid-template-columns:1fr;
-      grid-template-rows:auto 1fr;
+      grid-template-rows:auto 1fr; /* plan then list */
       gap:10px;
       overflow:hidden;
     }
 
+    /* plan fixed at top */
     .planCol{position:relative;top:auto;}
+    .planCard{
+      height:44vh;               /* ✅ less dead white space than before */
+      display:flex;
+      flex-direction:column;
+    }
 
-    /* Plan card gets a fixed height region */
-    .planCard{height:46vh; display:flex; flex-direction:column;}
     #svgHost{
       flex:1;
       max-height:none;
@@ -173,33 +140,23 @@
       overflow:auto;
     }
 
-    /* Keep legend higher so it doesn't clip */
     .legend{bottom:12px;}
 
-    /* Callout smaller */
-    .calloutStand{font-size:18px;}
-    .calloutCompany{font-size:13px;}
-    .calloutBtn{padding:7px 9px;font-size:13px;}
-
-    /* Side becomes the scrollable list panel only */
-    .side{
-      height:100%;
-      overflow:hidden;
-    }
-
-    /* Hide the selected summary + help boxes on phone to save space */
+    /* hide extra panels on phone to save space */
+    .side{height:100%;overflow:hidden;}
     .side .selBox{display:none;}
 
     .listBox{
       height:100%;
       display:flex;
       flex-direction:column;
+      overflow:hidden;
     }
     #list{
+      flex:1;
       max-height:none;
       overflow:auto;
-      -webkit-overflow-scrolling:touch;
-      flex:1;
+      padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px) + 90px); /* ✅ extra bottom padding */
     }
   }
 </style>
@@ -229,16 +186,6 @@
         <span style="display:flex;align-items:center;gap:8px;"><span class="dot stand"></span>Stands</span>
         <span style="display:flex;align-items:center;gap:8px;"><span class="dot sel"></span>Selected</span>
       </div>
-
-      <div class="calloutBar" id="calloutBar">
-        <div class="calloutInner">
-          <div class="calloutLeft">
-            <div class="calloutStand" id="calloutStand">—</div>
-            <div class="calloutCompany" id="calloutCompany"></div>
-          </div>
-          <button class="calloutBtn" id="btnCenter">Center</button>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -264,7 +211,7 @@
 
     <div class="selBox">
       <div class="panelTitle">Help</div>
-      <div class="hint">Selecting an exhibitor makes their stand red.</div>
+      <div class="hint">Selecting an exhibitor makes their stand red with label + line.</div>
     </div>
   </div>
 </div>
@@ -291,18 +238,12 @@
   const listEl   = document.getElementById("list");
   const searchEl = document.getElementById("search");
 
-  const selStand = document.getElementById("selStand");
-  const selCo    = document.getElementById("selCompany");
-
-  const calloutBar = document.getElementById("calloutBar");
-  const calloutStand = document.getElementById("calloutStand");
-  const calloutCompany = document.getElementById("calloutCompany");
-  const btnCenter = document.getElementById("btnCenter");
-
   const btnClear = document.getElementById("btnClear");
   const btnPdf   = document.getElementById("btnPdf");
 
   let svgRoot = null;
+  let calloutG = null;
+
   let stands = [];
   let byId = new Map();
   let selectedId = "";
@@ -348,8 +289,12 @@
     svgRoot = svgHost.querySelector("svg");
     if(!svgRoot) throw new Error("SVG missing <svg> root");
 
-    // keep plan clean (no numbers)
+    // keep plan clean (remove any text labels exported with svg)
     svgRoot.querySelectorAll("text,tspan").forEach(t=>t.remove());
+
+    calloutG = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    calloutG.setAttribute("id","__callout");
+    svgRoot.appendChild(calloutG);
   }
 
   function getStandNodes(){
@@ -390,50 +335,148 @@
     try{ return node.getBBox(); }catch(_){ return null; }
   }
 
-  function centerOnStand(standId){
+  function getViewBox(){
+    let vb = svgRoot.viewBox && svgRoot.viewBox.baseVal ? svgRoot.viewBox.baseVal : null;
+    if(!vb || !vb.width){
+      try{
+        const rootBB = svgRoot.getBBox();
+        svgRoot.setAttribute("viewBox", `${rootBB.x} ${rootBB.y} ${rootBB.width} ${rootBB.height}`);
+        vb = svgRoot.viewBox.baseVal;
+      }catch(_){
+        vb = {x:0,y:0,width:1000,height:700};
+      }
+    }
+    return vb;
+  }
+
+  function clearCallout(){
+    if(calloutG) calloutG.innerHTML = "";
+  }
+
+  // Smart callout placement (inside SVG) but avoids the bottom legend area on phone
+  function chooseCalloutPosition(bb){
+    const vb = getViewBox();
+
+    const w = isPhone ? 260 : 320;
+    const h = isPhone ? 92  : 104;
+
+    const pad = 18;
+    const standCx = bb.x + bb.width/2;
+
+    // Put label ABOVE the plan on phone more often (reduces "dead space" feeling)
+    // but clamp within viewBox.
+    const preferTop = isPhone;
+
+    const x = Math.max(vb.x + pad, Math.min(standCx - w/2, vb.x + vb.width - w - pad));
+
+    // y candidates: above stand or below stand
+    const yAbove = bb.y - h - 22;
+    const yBelow = bb.y + bb.height + 22;
+
+    // On phone: try above first, else below, else clamp
+    let y = preferTop ? yAbove : yBelow;
+
+    // Avoid going off top
+    if (y < vb.y + pad) y = yBelow;
+
+    // Avoid colliding with legend bottom area (approx)
+    // Keep callout away from bottom 120 units of viewBox (legend zone)
+    const legendZoneTop = (vb.y + vb.height) - (isPhone ? 160 : 130);
+    if (y + h > legendZoneTop) y = Math.min(yAbove, legendZoneTop - h - 10);
+
+    // Final clamp
+    y = Math.max(vb.y + pad, Math.min(y, vb.y + vb.height - h - pad));
+
+    return {x,y,w,h};
+  }
+
+  function drawCallout(standId){
+    clearCallout();
     if(!standId) return;
+
+    const info = byId.get(standId) || { standId, company:"" };
     const bb = standBBox(standId);
     if(!bb) return;
 
-    // Convert SVG coords roughly to scroll coords
-    const svgRect = svgRoot.getBoundingClientRect();
-    const hostRect = svgHost.getBoundingClientRect();
-    const vb = svgRoot.viewBox && svgRoot.viewBox.baseVal ? svgRoot.viewBox.baseVal : null;
+    const box = chooseCalloutPosition(bb);
 
-    const sx = vb && vb.width ? (svgRect.width / vb.width) : 1;
-    const sy = vb && vb.height ? (svgRect.height / vb.height) : 1;
+    const standCx = bb.x + bb.width/2;
+    const standCy = bb.y + bb.height/2;
 
-    const cx = (bb.x + bb.width/2) * sx;
-    const cy = (bb.y + bb.height/2) * sy;
+    // anchor point on box (bottom-center if box above, else top-center)
+    const boxCenterX = box.x + box.w/2;
+    const boxIsAbove = box.y < bb.y;
 
-    const targetLeft = Math.max(0, cx - hostRect.width/2);
-    const targetTop  = Math.max(0, cy - hostRect.height/2);
+    const ax = boxCenterX;
+    const ay = boxIsAbove ? (box.y + box.h) : box.y;
 
-    svgHost.scrollTo({ left: targetLeft, top: targetTop, behavior: "smooth" });
+    const line = document.createElementNS("http://www.w3.org/2000/svg","line");
+    line.setAttribute("x1", ax);
+    line.setAttribute("y1", ay);
+    line.setAttribute("x2", standCx);
+    line.setAttribute("y2", standCy);
+    line.setAttribute("stroke", "rgba(0,0,0,.75)");
+    line.setAttribute("stroke-width", isPhone ? "6" : "4");
+    line.setAttribute("stroke-linecap","round");
+
+    const pin = document.createElementNS("http://www.w3.org/2000/svg","circle");
+    pin.setAttribute("cx", standCx);
+    pin.setAttribute("cy", standCy);
+    pin.setAttribute("r", isPhone ? "16" : "12");
+    pin.setAttribute("fill", "rgba(0,0,0,.75)");
+
+    const rect = document.createElementNS("http://www.w3.org/2000/svg","rect");
+    rect.setAttribute("x", box.x);
+    rect.setAttribute("y", box.y);
+    rect.setAttribute("width", box.w);
+    rect.setAttribute("height", box.h);
+    rect.setAttribute("rx", "16");
+    rect.setAttribute("ry", "16");
+    rect.setAttribute("fill", SELECTED_FILL);
+    rect.setAttribute("fill-opacity","0.95");
+    rect.style.filter = "drop-shadow(0px 10px 16px rgba(0,0,0,.22))";
+
+    const t1 = document.createElementNS("http://www.w3.org/2000/svg","text");
+    t1.setAttribute("x", box.x + box.w/2);
+    t1.setAttribute("y", box.y + (isPhone ? 42 : 46));
+    t1.setAttribute("text-anchor","middle");
+    t1.setAttribute("fill","#fff");
+    t1.style.fontFamily = "Arial, Helvetica, sans-serif";
+    t1.style.fontWeight = "900";
+    t1.style.fontSize = isPhone ? "28px" : "34px";
+    t1.textContent = info.standId;
+
+    const company = (info.company || "").trim();
+    if(company){
+      const t2 = document.createElementNS("http://www.w3.org/2000/svg","text");
+      t2.setAttribute("x", box.x + box.w/2);
+      t2.setAttribute("y", box.y + (isPhone ? 74 : 82));
+      t2.setAttribute("text-anchor","middle");
+      t2.setAttribute("fill","#fff");
+      t2.style.fontFamily = "Arial, Helvetica, sans-serif";
+      t2.style.fontWeight = "800";
+      t2.style.fontSize = isPhone ? "16px" : "18px";
+      t2.textContent = company;
+      calloutG.appendChild(t2);
+    }
+
+    calloutG.appendChild(line);
+    calloutG.appendChild(pin);
+    calloutG.appendChild(rect);
+    calloutG.appendChild(t1);
   }
 
   function setSelected(standId){
     selectedId = standId || "";
-
     if(!selectedId){
-      selStand.textContent = "None";
-      selCo.textContent = "";
-      calloutBar.style.display = "none";
+      clearCallout();
       repaintAll();
       renderList();
       return;
     }
-
-    const info = byId.get(selectedId) || { standId:selectedId, company:"" };
-    selStand.textContent = info.standId;
-    selCo.textContent = (info.company || "").trim();
-
-    calloutStand.textContent = info.standId;
-    calloutCompany.textContent = (info.company || "").trim();
-    calloutBar.style.display = "block";
-
     repaintAll();
     renderList();
+    drawCallout(selectedId);
   }
 
   function escapeHtml(s){
@@ -462,7 +505,6 @@
       row.innerHTML = `<strong>${title}</strong><small>Stand ${escapeHtml(item.standId)}</small>`;
       row.addEventListener("click", ()=>{
         setSelected(item.standId);
-        centerOnStand(item.standId);
       });
       listEl.appendChild(row);
     });
@@ -495,6 +537,7 @@
 
     if(selectedId && !byId.has(selectedId)) selectedId = "";
     repaintAll();
+    if(selectedId) drawCallout(selectedId);
   }
 
   function bindStandClick(){
@@ -505,7 +548,6 @@
         e.preventDefault();
         e.stopPropagation();
         setSelected(id);
-        centerOnStand(id);
       });
     });
   }
@@ -582,7 +624,6 @@
   searchEl.addEventListener("input", renderList);
   btnClear.addEventListener("click", ()=>setSelected(""));
   btnPdf.addEventListener("click", exportPdf);
-  btnCenter.addEventListener("click", ()=>centerOnStand(selectedId));
 
 })();
 </script>
