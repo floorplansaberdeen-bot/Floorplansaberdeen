@@ -35,7 +35,7 @@
   .btn:disabled{opacity:.5;cursor:not-allowed;}
   .btn.primary{background:#fff;}
 
-  /* Layout: on desktop we keep two columns, plan column is sticky */
+  /* Desktop layout */
   .layout{
     display:grid;grid-template-columns:2.3fr 1fr;gap:14px;
     padding:14px;
@@ -50,7 +50,7 @@
   /* Sticky plan column (desktop) */
   .planCol{
     position:sticky;
-    top:92px; /* header height-ish */
+    top:92px;
     align-self:start;
     z-index:10;
   }
@@ -62,7 +62,7 @@
   #svgHost{
     overflow:auto;
     padding:12px;
-    max-height: min(72vh, 760px); /* prevent tall whitespace + keep it viewable */
+    max-height: min(72vh, 760px);
   }
   #svgHost svg{width:100%;height:auto;display:block;}
   svg text, svg tspan{pointer-events:none;user-select:none;}
@@ -70,17 +70,18 @@
   /* Legend lozenges - moved up */
   .legend{
     position:absolute;left:50%;transform:translateX(-50%);
-    bottom:10px; /* higher than before */
+    bottom:10px;
     background:#fff;border:1px solid var(--border);border-radius:999px;
     padding:9px 12px;display:flex;gap:16px;align-items:center;
     box-shadow: var(--shadow);
     font-weight:800;
+    z-index:5;
   }
   .dot{width:12px;height:12px;border-radius:50%;}
   .dot.stand{background:rgba(var(--standRGB),.75);}
   .dot.sel{background:var(--selected);}
 
-  /* NEW: Callout bar OUTSIDE the SVG, below the plan, no covering */
+  /* Callout bar OUTSIDE SVG */
   .calloutBar{
     border-top:1px solid var(--border);
     background:#fff;
@@ -100,20 +101,9 @@
     justify-content:space-between;
     gap:10px;
   }
-  .calloutLeft{
-    display:grid;gap:2px;
-  }
-  .calloutStand{
-    font-weight:900;
-    font-size:22px;
-    line-height:1;
-  }
-  .calloutCompany{
-    font-weight:800;
-    font-size:15px;
-    line-height:1.2;
-    opacity:.98;
-  }
+  .calloutLeft{display:grid;gap:2px;}
+  .calloutStand{font-weight:900;font-size:22px;line-height:1;}
+  .calloutCompany{font-weight:800;font-size:15px;line-height:1.2;opacity:.98;}
   .calloutBtn{
     border:1px solid rgba(255,255,255,.35);
     background:rgba(255,255,255,.16);
@@ -148,13 +138,69 @@
   .row small{color:var(--muted);font-weight:700;}
   .row.active{outline:2px solid rgba(0,0,0,.12);background:#fff;}
 
-  /* Phone: make plan fixed area feel “at top”, list scrolls below */
+  /* ===========================
+     PHONE FIXED PLAN + SCROLL LIST
+     =========================== */
   @media (max-width: 600px){
+    header{padding:12px 12px;}
     #eventName{font-size:22px;}
-    #svgHost{max-height: 54vh; padding:10px;}
+
+    /* Turn the whole page into fixed regions */
+    body{height:100vh;overflow:hidden;}
+
+    /* Replace desktop layout with a fixed grid:
+       - plan area (fixed)
+       - list area (scroll)
+    */
+    .layout{
+      height:calc(100vh - 86px); /* header height approx */
+      padding:10px;
+      display:grid;
+      grid-template-columns:1fr;
+      grid-template-rows:auto 1fr;
+      gap:10px;
+      overflow:hidden;
+    }
+
+    .planCol{position:relative;top:auto;}
+
+    /* Plan card gets a fixed height region */
+    .planCard{height:46vh; display:flex; flex-direction:column;}
+    #svgHost{
+      flex:1;
+      max-height:none;
+      padding:10px;
+      overflow:auto;
+    }
+
+    /* Keep legend higher so it doesn't clip */
     .legend{bottom:12px;}
+
+    /* Callout smaller */
     .calloutStand{font-size:18px;}
     .calloutCompany{font-size:13px;}
+    .calloutBtn{padding:7px 9px;font-size:13px;}
+
+    /* Side becomes the scrollable list panel only */
+    .side{
+      height:100%;
+      overflow:hidden;
+    }
+
+    /* Hide the selected summary + help boxes on phone to save space */
+    .side .selBox{display:none;}
+
+    .listBox{
+      height:100%;
+      display:flex;
+      flex-direction:column;
+    }
+    #list{
+      max-height:none;
+      overflow:auto;
+      -webkit-overflow-scrolling:touch;
+      flex:1;
+    }
   }
 </style>
 </head>
@@ -169,12 +215,12 @@
 
   <div class="topBtns">
     <button class="btn primary" id="btnPdf">Export PDF</button>
-    <button class="btn" id="btnClear">Clear selection</button>
+    <button class="btn" id="btnClear">Clear</button>
   </div>
 </header>
 
 <div class="layout">
-  <!-- Sticky Plan Column -->
+  <!-- Plan -->
   <div class="planCol">
     <div class="card planCard">
       <div id="svgHost"></div>
@@ -184,20 +230,19 @@
         <span style="display:flex;align-items:center;gap:8px;"><span class="dot sel"></span>Selected</span>
       </div>
 
-      <!-- Callout lives OUTSIDE svg so it never covers stands -->
       <div class="calloutBar" id="calloutBar">
         <div class="calloutInner">
           <div class="calloutLeft">
             <div class="calloutStand" id="calloutStand">—</div>
             <div class="calloutCompany" id="calloutCompany"></div>
           </div>
-          <button class="calloutBtn" id="btnCenter">Center on stand</button>
+          <button class="calloutBtn" id="btnCenter">Center</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Right side -->
+  <!-- List -->
   <div class="side">
     <div class="selBox">
       <div class="panelTitle">Selected exhibitor</div>
@@ -205,7 +250,7 @@
       <div id="selCompany"></div>
       <div class="hint">
         Desktop: click a stand or choose from the list.<br>
-        Phone: use the list (stand tapping is disabled).
+        Phone: use the list.
       </div>
     </div>
 
@@ -219,7 +264,7 @@
 
     <div class="selBox">
       <div class="panelTitle">Help</div>
-      <div class="hint">All stands are in the main colour. Selecting an exhibitor makes their stand red.</div>
+      <div class="hint">Selecting an exhibitor makes their stand red.</div>
     </div>
   </div>
 </div>
@@ -303,7 +348,7 @@
     svgRoot = svgHost.querySelector("svg");
     if(!svgRoot) throw new Error("SVG missing <svg> root");
 
-    // remove any svg text to keep it clean (no stand numbers)
+    // keep plan clean (no numbers)
     svgRoot.querySelectorAll("text,tspan").forEach(t=>t.remove());
   }
 
@@ -349,14 +394,17 @@
     if(!standId) return;
     const bb = standBBox(standId);
     if(!bb) return;
-    // Scroll inside svgHost to center bbox
+
+    // Convert SVG coords roughly to scroll coords
     const svgRect = svgRoot.getBoundingClientRect();
     const hostRect = svgHost.getBoundingClientRect();
-    const scaleX = svgRect.width / (svgRoot.viewBox.baseVal.width || svgRect.width);
-    const scaleY = svgRect.height / (svgRoot.viewBox.baseVal.height || svgRect.height);
+    const vb = svgRoot.viewBox && svgRoot.viewBox.baseVal ? svgRoot.viewBox.baseVal : null;
 
-    const cx = (bb.x + bb.width/2) * scaleX;
-    const cy = (bb.y + bb.height/2) * scaleY;
+    const sx = vb && vb.width ? (svgRect.width / vb.width) : 1;
+    const sy = vb && vb.height ? (svgRect.height / vb.height) : 1;
+
+    const cx = (bb.x + bb.width/2) * sx;
+    const cy = (bb.y + bb.height/2) * sy;
 
     const targetLeft = Math.max(0, cx - hostRect.width/2);
     const targetTop  = Math.max(0, cy - hostRect.height/2);
@@ -414,7 +462,6 @@
       row.innerHTML = `<strong>${title}</strong><small>Stand ${escapeHtml(item.standId)}</small>`;
       row.addEventListener("click", ()=>{
         setSelected(item.standId);
-        // Keep plan visible and center stand when chosen from list
         centerOnStand(item.standId);
       });
       listEl.appendChild(row);
@@ -451,7 +498,7 @@
   }
 
   function bindStandClick(){
-    if(isPhone) return;
+    if(isPhone) return; // phone uses list
     getStandNodes().forEach(node=>{
       const id = String(node.id||"").trim();
       node.addEventListener("click", (e)=>{
