@@ -8,7 +8,7 @@
   :root{
     --border:#d9d9d9;--muted:#666;--row:#fafafa;--row2:#f3f6ff;
     --sold:#e53935;
-    --availRGB: 213,109,50;   /* <- your requested colour */
+    --availRGB: 213,109,50;
   }
   body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#111;}
   header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
@@ -18,13 +18,16 @@
   .btn:disabled{opacity:.5;cursor:not-allowed;}
   .btn.green{background:#ecfff3;border-color:#bfe9cf;}
   .btn.red{background:#fff0f0;border-color:#f1bcbc;}
+
   .layout{display:grid;grid-template-columns:2.2fr 1.1fr;gap:12px;padding:12px;}
   @media (max-width:1000px){.layout{grid-template-columns:1fr;}}
+
   .card{border:1px solid var(--border);background:#fff;border-radius:14px;overflow:hidden;}
   .card h2{margin:0;padding:10px 12px;border-bottom:1px solid var(--border);font-size:14px;color:#333;}
   #svgHost{min-height:420px;overflow:auto;padding:10px;}
   #svgHost svg{width:100%;height:auto;display:block;}
   svg text, svg tspan{pointer-events:none;user-select:none;}
+
   .pill{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:#222;border:1px solid var(--border);padding:6px 10px;border-radius:999px;background:#fff;font-weight:800;}
   .dot{width:10px;height:10px;border-radius:50%;}
   .dot.sold{background:var(--sold);} .dot.avail{background:rgba(var(--availRGB),.75);}
@@ -34,6 +37,7 @@
   input,select{width:100%;padding:9px 10px;border:1px solid var(--border);border-radius:10px;font-size:14px;}
   .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
   .help{font-size:12px;color:var(--muted);line-height:1.35;}
+
   .preview{border:1px solid var(--border);border-radius:12px;padding:10px 12px;background:#fff;}
   .previewTitle{font-weight:900;margin-bottom:6px;}
   .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-weight:900;font-size:12px;line-height:1.6;border:1px solid transparent;}
@@ -44,6 +48,7 @@
   .listTop{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
   #search{flex:1;min-width:180px;}
   #filter{min-width:170px;}
+
   table{width:100%;border-collapse:collapse;font-size:13px;}
   thead th{text-align:left;padding:8px;background:#f5f5f5;border-top:1px solid var(--border);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:1;}
   tbody td{padding:7px 8px;border-bottom:1px solid #eee;vertical-align:top;}
@@ -51,7 +56,6 @@
   tbody tr:nth-child(odd){background:var(--row);}
   tbody tr.selected{background:var(--row2)!important;outline:2px solid #b8c7ff;outline-offset:-2px;}
 
-  /* Zoom */
   #zoomHost{border:1px solid var(--border);border-radius:12px;overflow:hidden;height:240px;background:#fff;}
 </style>
 </head>
@@ -144,7 +148,6 @@
   </div>
 </div>
 
-<!-- Login modal (simple page-gate) -->
 <div id="loginModal" style="position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:10000;">
   <div style="background:#fff;border-radius:14px;max-width:420px;width:calc(100% - 32px);box-shadow:0 20px 60px rgba(0,0,0,.25);border:1px solid #ddd;overflow:hidden;">
     <div style="padding:14px 16px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;gap:10px;">
@@ -161,27 +164,25 @@
         <button id="loginCancel" class="btn" style="background:#fff;">Cancel</button>
         <button id="loginOk" class="btn green">Unlock</button>
       </div>
-      <div style="font-size:12px;color:#666;line-height:1.35;">Tip: This is a client-side lock to prevent accidental access (not a secure login).</div>
+      <div style="font-size:12px;color:#666;line-height:1.35;">Tip: This is a client-side lock to prevent accidental access.</div>
     </div>
   </div>
 </div>
 
 <script>
 (() => {
-  // ===== CONFIG =====
   const API_BASE = "https://floorplansaberdeen.floorplansaberdeen.workers.dev";
   const SVG_URL  = "./event_plan.svg";
+
   const FILL_OPACITY = 0.75;
   const SOLD = "#e53935";
-  const AVAIL = "rgb(213,109,50)"; // requested available colour
+  const AVAIL = "rgb(213,109,50)";
   const STAND_ID_RE = /^([A-Z]{1,3})(\d{1,3})$/;
 
-  // This matches your Script Property / Worker secret
   const ADMIN_PASSWORD = "FLOORPASS1";
   const RESET_PASSWORD = ADMIN_PASSWORD;
   let sessionPassword = "";
 
-  // ===== DOM =====
   const elStatus = document.getElementById("status");
   const svgHost  = document.getElementById("svgHost");
   const zoomHost = document.getElementById("zoomHost");
@@ -207,15 +208,16 @@
   const tbody = document.getElementById("tbody");
   const countEl = document.getElementById("count");
 
-  // ===== STATE =====
   let svgRoot = null;
   let zoomSvgRoot = null;
+  let calloutG = null;
+  let planBBox = null;
+
   let byId = new Map();
   let selectedId = "";
   let autoSyncEnabled = true;
   let dirty = false;
 
-  // ===== HELPERS =====
   function setStatus(text, isError=false){
     elStatus.textContent = text;
     elStatus.style.color = isError ? "#b00020" : "#555";
@@ -226,8 +228,7 @@
   async function fetchJson(url){
     const res = await fetch(url,{cache:"no-store"});
     const text = await res.text();
-    let json = null;
-    try{ json = JSON.parse(text); }catch(_){}
+    const json = JSON.parse(text);
     if(!res.ok) throw new Error("HTTP "+res.status);
     return json;
   }
@@ -251,14 +252,21 @@
     svgHost.innerHTML = await res.text();
     svgRoot = svgHost.querySelector("svg");
     if(!svgRoot) throw new Error("SVG root <svg> not found");
+
+    // Callout overlay group
+    calloutG = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    calloutG.setAttribute("id","__admin_callout");
+    svgRoot.appendChild(calloutG);
+
+    computePlanBBox();
+    ensureLabelLaneSpace();
   }
 
   function getStandNodes(){
     const shapes = Array.from(svgRoot.querySelectorAll("path[id],rect[id],polygon[id],circle[id],ellipse[id],polyline[id]"))
       .filter(el=>isStandId(el.id));
     if(shapes.length) return shapes;
-    const groups = Array.from(svgRoot.querySelectorAll("g[id]")).filter(g=>isStandId(g.id));
-    return groups;
+    return Array.from(svgRoot.querySelectorAll("g[id]")).filter(g=>isStandId(g.id));
   }
 
   function paintNode(node,status){
@@ -335,7 +343,6 @@
   }
 
   function initZoomSvg(){
-    if(!zoomHost || !svgRoot) return;
     zoomHost.innerHTML="";
     zoomSvgRoot = svgRoot.cloneNode(true);
     zoomSvgRoot.removeAttribute("width");
@@ -365,7 +372,6 @@
     const x = bb.x - pad, y = bb.y - pad, w = bb.width + pad*2, h = bb.height + pad*2;
     zoomSvgRoot.setAttribute("viewBox", `${x} ${y} ${w} ${h}`);
 
-    // highlight
     zoomSvgRoot.querySelectorAll(".__zoomHighlight").forEach(n=>n.remove());
     const hi = document.createElementNS("http://www.w3.org/2000/svg","rect");
     hi.setAttribute("class","__zoomHighlight");
@@ -377,10 +383,131 @@
     zoomSvgRoot.appendChild(hi);
   }
 
+  // ===== NEW: Callout BELOW PLAN (never on top) =====
+  function getViewBox(){
+    let vb = svgRoot.viewBox && svgRoot.viewBox.baseVal ? svgRoot.viewBox.baseVal : null;
+    if(!vb || !vb.width){
+      try{
+        const rootBB = svgRoot.getBBox();
+        svgRoot.setAttribute("viewBox", `${rootBB.x} ${rootBB.y} ${rootBB.width} ${rootBB.height}`);
+        vb = svgRoot.viewBox.baseVal;
+      }catch(_){
+        vb = {x:0,y:0,width:1000,height:700};
+      }
+    }
+    return vb;
+  }
+
+  function computePlanBBox(){
+    const nodes = getStandNodes();
+    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+    nodes.forEach(n=>{
+      try{
+        const b = n.getBBox();
+        minX = Math.min(minX, b.x);
+        minY = Math.min(minY, b.y);
+        maxX = Math.max(maxX, b.x + b.width);
+        maxY = Math.max(maxY, b.y + b.height);
+      }catch(_){}
+    });
+    if(minX!==Infinity){
+      planBBox = { x:minX, y:minY, width:maxX-minX, height:maxY-minY };
+    }else{
+      planBBox = null;
+    }
+  }
+
+  function ensureLabelLaneSpace(){
+    const vb = getViewBox();
+    if(!planBBox) return;
+    const laneHeight = 190;
+    const needBottom = planBBox.y + planBBox.height + laneHeight;
+    const vbBottom   = vb.y + vb.height;
+    if(vbBottom < needBottom){
+      const extra = needBottom - vbBottom;
+      svgRoot.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.width} ${vb.height + extra}`);
+    }
+  }
+
+  function clearCallout(){
+    if(calloutG) calloutG.innerHTML = "";
+  }
+
+  function drawCallout(standId){
+    clearCallout();
+    if(!standId) return;
+
+    computePlanBBox();
+    ensureLabelLaneSpace();
+
+    const bb = getStandBox(standId);
+    if(!bb) return;
+
+    const vb = getViewBox();
+    const standCx = bb.x + bb.width/2;
+    const standCy = bb.y + bb.height/2;
+
+    const w = 280, h = 92;
+    const pad = 18;
+    const laneTop = planBBox ? (planBBox.y + planBBox.height + 30) : (vb.y + vb.height - h - 30);
+
+    const x = Math.max(vb.x + pad, Math.min(standCx - w/2, vb.x + vb.width - w - pad));
+    const y = laneTop;
+
+    const ax = x + w/2;
+    const ay = y;
+
+    const line = document.createElementNS("http://www.w3.org/2000/svg","line");
+    line.setAttribute("x1", ax); line.setAttribute("y1", ay);
+    line.setAttribute("x2", standCx); line.setAttribute("y2", standCy);
+    line.setAttribute("stroke", "rgba(0,0,0,.75)");
+    line.setAttribute("stroke-width", "4");
+    line.setAttribute("stroke-linecap","round");
+
+    const pin = document.createElementNS("http://www.w3.org/2000/svg","circle");
+    pin.setAttribute("cx", standCx); pin.setAttribute("cy", standCy);
+    pin.setAttribute("r", "12");
+    pin.setAttribute("fill", "rgba(0,0,0,.75)");
+
+    const rect = document.createElementNS("http://www.w3.org/2000/svg","rect");
+    rect.setAttribute("x", x); rect.setAttribute("y", y);
+    rect.setAttribute("width", w); rect.setAttribute("height", h);
+    rect.setAttribute("rx", "16"); rect.setAttribute("ry", "16");
+    rect.setAttribute("fill", "#e53935"); rect.setAttribute("fill-opacity","0.95");
+    rect.style.filter = "drop-shadow(0px 10px 16px rgba(0,0,0,.22))";
+
+    const info = byId.get(standId) || { standId, status:"available", company:"" };
+
+    const t1 = document.createElementNS("http://www.w3.org/2000/svg","text");
+    t1.setAttribute("x", x + w/2); t1.setAttribute("y", y + 42);
+    t1.setAttribute("text-anchor","middle");
+    t1.setAttribute("fill","#fff");
+    t1.style.fontFamily="Arial, Helvetica, sans-serif";
+    t1.style.fontWeight="900";
+    t1.style.fontSize="30px";
+    t1.textContent = info.standId;
+
+    const t2 = document.createElementNS("http://www.w3.org/2000/svg","text");
+    t2.setAttribute("x", x + w/2); t2.setAttribute("y", y + 74);
+    t2.setAttribute("text-anchor","middle");
+    t2.setAttribute("fill","#fff");
+    t2.style.fontFamily="Arial, Helvetica, sans-serif";
+    t2.style.fontWeight="800";
+    t2.style.fontSize="16px";
+    t2.textContent = normalizeStatus(info.status)==="sold" ? (info.company||"") : "";
+
+    calloutG.appendChild(line);
+    calloutG.appendChild(pin);
+    calloutG.appendChild(rect);
+    calloutG.appendChild(t1);
+    if(t2.textContent) calloutG.appendChild(t2);
+  }
+
   function selectStand(standId, scrollToRow){
     const info=byId.get(standId)||{standId,status:"available",company:""};
     selectedId=standId;
     dirty=false;
+
     standIdEl.value=info.standId;
     statusSel.value=normalizeStatus(info.status);
     companyEl.value=info.company||"";
@@ -389,6 +516,7 @@
     renderPreview(info);
     renderList();
     updateZoom(info.standId);
+    drawCallout(info.standId);
 
     if(scrollToRow){
       const row=Array.from(tbody.querySelectorAll("tr")).find(tr=>tr.firstChild && tr.firstChild.textContent===standId);
@@ -425,6 +553,7 @@
         companyEl.value = info.company||"";
         renderPreview(info);
         updateZoom(info.standId);
+        drawCallout(info.standId);
       }
     }
     setStatus("Synced: "+new Date().toLocaleTimeString());
@@ -440,14 +569,13 @@
     try{
       setStatus("Saving…");
 
-      // Optimistic local update so the plan changes immediately:
       byId.set(standId, { standId, status, company });
       renderPlan();
       renderList();
       renderPreview({ standId, status, company });
       updateZoom(standId);
+      drawCallout(standId);
 
-      // Send to backend (include adminPassword for robustness)
       await postJson(API_BASE+"/stand", { standId, status, company, adminPassword: sessionPassword });
 
       dirty=false;
@@ -456,7 +584,6 @@
     }catch(e){
       setStatus("Save error: "+e.message,true);
       console.error(e);
-      // Re-sync to recover if optimistic paint diverged
       try{ await syncOnce(true); }catch(_){}
     }finally{
       btnSave.disabled=false; btnClear.disabled=false;
@@ -465,7 +592,7 @@
 
   function setDirty(){ if(selectedId) dirty=true; }
 
-  // CSV helpers
+  // CSV helpers (unchanged)
   function toCsvRow(values){
     return values.map(v=>{
       const s=String(v??"");
@@ -632,7 +759,6 @@
     });
   }
 
-  // ===== EVENTS =====
   statusSel.addEventListener("change", ()=>{ setDirty(); });
   companyEl.addEventListener("input", ()=>{ setDirty(); });
 
@@ -665,7 +791,6 @@
   filterEl.addEventListener("change", renderList);
   btnResetAll.addEventListener("click", resetAll);
 
-  // ===== INIT =====
   (async () => {
     try{
       if(!(await requireAdminLogin())){
@@ -678,7 +803,6 @@
 
       setStatus("Loading…");
 
-      // Load shared settings
       try{
         const s = await fetchJson(API_BASE + "/settings?ts=" + Date.now());
         const ev = (s && typeof s.eventName === "string") ? s.eventName : "New Event";
@@ -686,7 +810,6 @@
         if(evEl) evEl.value = ev;
       }catch(_){}
 
-      // Save event name on change/blur
       const evEl2 = document.getElementById("eventNameAdmin");
       if(evEl2){
         const saveEv = async () => {
