@@ -14,12 +14,18 @@
     --red:#e53935;
     --border:#d9d9d9;
     --muted:#666;
+
+    /* dynamic values set by JS (mobile) */
+    --headerH: 64px;
+    --vh: 1vh;
+    --planH: 46vh; /* mobile plan height */
   }
 
   body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#111;}
   header{
     padding:12px 16px;border-bottom:1px solid var(--border);
     display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
+    background:#fff;
   }
   h1{margin:0;font-size:18px;font-weight:900;}
   #updated{font-size:12px;color:var(--muted);}
@@ -152,11 +158,50 @@
   .item:hover{background:#f7f7f7;}
   .item .id{font-weight:900;}
   .item .sub{font-size:12px;color:var(--muted);margin-top:2px;}
+
+  /* =========================
+     MOBILE: keep plan fixed at top,
+     scroll the exhibitor list below
+     ========================= */
+  @media(max-width:960px){
+    body{
+      height: calc(var(--vh) * 100);
+      overflow:hidden; /* prevent whole-page scroll */
+    }
+    header{
+      position:sticky; top:0;
+      z-index:1000;
+    }
+    .wrap{
+      padding:12px;
+      height: calc((var(--vh) * 100) - var(--headerH) - 24px);
+      overflow:hidden;
+    }
+    .planCard{
+      position:sticky;
+      top:0;
+      z-index:20;
+    }
+    #planHost{
+      min-height:unset;
+      height: var(--planH);
+      overflow:auto; /* allow panning if needed */
+    }
+    .side{
+      /* The sidebar becomes a scrolling panel under the fixed plan */
+      height: calc((var(--vh) * 100) - var(--headerH) - 24px - var(--planH) - 12px);
+      overflow:auto;
+      -webkit-overflow-scrolling:touch;
+    }
+    .list{
+      max-height:none; /* let it fill the scrolling sidebar */
+    }
+  }
 </style>
 </head>
 
 <body>
-<header>
+<header id="topHeader">
   <div>
     <h1 id="eventName">Loading…</h1>
     <div id="updated"></div>
@@ -169,7 +214,7 @@
 </header>
 
 <div class="wrap">
-  <div class="card">
+  <div class="card planCard">
     <div id="planHost">
       <svg id="leaderLayer" xmlns="http://www.w3.org/2000/svg">
         <line id="leaderLine" x1="0" y1="0" x2="0" y2="0" stroke="#111" stroke-width="3" stroke-linecap="round" opacity="0"/>
@@ -190,7 +235,7 @@
   </div>
 
   <div class="card">
-    <div class="side">
+    <div class="side" id="sidePanel">
       <div class="box">
         <p class="title">Selected exhibitor</p>
         <p class="big" id="selStand">None</p>
@@ -263,6 +308,8 @@
   var leaderLine=document.getElementById("leaderLine");
   var leaderDot=document.getElementById("leaderDot");
 
+  var headerEl=document.getElementById("topHeader");
+
   var svgRoot=null;
   var stands=[];
   var byId=new Map();
@@ -309,30 +356,23 @@
     return groups.length ? groups : shapes;
   }
 
-  /* ========= IMPORTANT FIX =========
-     Prevent "double highlight" when a stand is a <g id="SB3"> containing
-     shapes that belong to another stand-group.
-  */
+  /* Prevent "double highlight" when a stand group contains other stands */
   function paintNode(node, color){
     var tag = node.tagName.toLowerCase();
     var targets;
 
     if (tag === "g") {
       targets = [].slice.call(node.querySelectorAll("path,rect,polygon,circle,ellipse,polyline,line"));
-
       targets = targets.filter(function(el){
-        // If a shape has its own id and it's a different stand, don't paint it
         if (el.id && el.id !== node.id && isStandId(el.id)) return false;
 
-        // Find nearest ancestor stand-group for this shape
         var p = el.parentElement;
         while (p && p !== svgRoot) {
           if (p.tagName && p.tagName.toLowerCase() === "g" && p.id && isStandId(p.id)) {
-            return p === node; // only paint if nearest stand-group is THIS group
+            return p === node;
           }
           p = p.parentElement;
         }
-        // No stand-group ancestor => assume it belongs to this group
         return true;
       });
     } else {
@@ -351,7 +391,6 @@
   function renderPlan(){
     if(!svgRoot) return;
 
-    // Paint all stands green by standId (handles duplicate IDs safely)
     stands.forEach(function(s){
       var id = String(s.standId || "").trim();
       if(!id) return;
@@ -359,7 +398,6 @@
       nodes.forEach(function(n){ paintNode(n, GREEN); });
     });
 
-    // Paint selected stand red
     if(selectedId){
       var selNodes = svgRoot.querySelectorAll("#" + CSS.escape(selectedId));
       selNodes.forEach(function(n){ paintNode(n, RED); });
@@ -408,7 +446,6 @@
     var w = planHost.clientWidth;
     var h = planHost.clientHeight;
 
-    // Measure callout
     callout.style.left = "-9999px";
     callout.style.top  = "-9999px";
     var callRect = callout.getBoundingClientRect();
@@ -416,16 +453,16 @@
     var ch = callRect.height;
 
     var candidates = [
-      { x:(w-cw)/2,     y:h - ch - 70 },          // bottom center
-      { x:pad,          y:h - ch - 70 },          // bottom left
-      { x:w - cw - pad, y:h - ch - 70 },          // bottom right
+      { x:(w-cw)/2,     y:h - ch - 70 },
+      { x:pad,          y:h - ch - 70 },
+      { x:w - cw - pad, y:h - ch - 70 },
 
-      { x:pad,          y:(h-ch)/2 },             // mid left
-      { x:w - cw - pad, y:(h-ch)/2 },             // mid right
+      { x:pad,          y:(h-ch)/2 },
+      { x:w - cw - pad, y:(h-ch)/2 },
 
-      { x:(w-cw)/2,     y:pad + 8 },              // top center
-      { x:pad,          y:pad + 8 },              // top left
-      { x:w - cw - pad, y:pad + 8 }               // top right
+      { x:(w-cw)/2,     y:pad + 8 },
+      { x:pad,          y:pad + 8 },
+      { x:w - cw - pad, y:pad + 8 }
     ];
 
     for(var i=0;i<candidates.length;i++){
@@ -482,7 +519,6 @@
     leaderLayer.setAttribute("width",w);
     leaderLayer.setAttribute("height",h);
 
-    // Start from callout center (smart placement)
     var rPlan = planHost.getBoundingClientRect();
     var rCall = callout.getBoundingClientRect();
     var callX = (rCall.left + rCall.width/2) - rPlan.left;
@@ -562,7 +598,6 @@
 
   function bindStandClicks(){
     if(isPhone) return;
-    // Bind to every node that matches a stand id (including duplicates)
     stands.forEach(function(s){
       var id = String(s.standId || "").trim();
       if(!id) return;
@@ -610,6 +645,7 @@
     },{passive:true});
     window.addEventListener("resize",function(){
       if(selectedId){ smartPlaceCallout(); updateLeader(); }
+      setMobileSizingVars();
     });
   }
 
@@ -623,7 +659,18 @@
     });
   }
 
+  function setMobileSizingVars(){
+    // iPhone-safe viewport unit
+    var vh = window.innerHeight * 0.01;
+    document.documentElement.style.setProperty("--vh", vh + "px");
+
+    // header height
+    var hh = headerEl ? headerEl.getBoundingClientRect().height : 64;
+    document.documentElement.style.setProperty("--headerH", hh + "px");
+  }
+
   function init(){
+    setMobileSizingVars();
     setStage("Loading settings…");
     return fetchJson(API_BASE+"/settings?ts="+Date.now())
       .catch(function(){ return {eventName:"Event"}; })
