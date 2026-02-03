@@ -46,7 +46,7 @@
   }
   #planHost svg{width:100%;height:auto;display:block;}
 
-  /* ✅ Remove stand numbers completely */
+  /* Hide stand numbers/text inside the SVG */
   #planHost svg text,
   #planHost svg tspan{
     display:none !important;
@@ -78,12 +78,12 @@
     pointer-events:none;
   }
 
-  /* ✅ Smart-placed callout (absolute px positioning set in JS) */
+  /* Smart-placed callout (absolute px positioning set in JS) */
   #callout{
     position:absolute;
     left:50%;
     top:70%;
-    transform:translate(-50%,-50%); /* only for initial; JS switches to translate(0,0) */
+    transform:translate(-50%,-50%); /* initial; JS switches to translate(0,0) */
     z-index:11;
     display:none;
     pointer-events:none;
@@ -92,7 +92,7 @@
     border:1px solid rgba(0,0,0,.15);
     border-radius:14px;
 
-    /* ✅ subtle drop shadow */
+    /* subtle drop shadow */
     box-shadow:
       0 10px 26px rgba(0,0,0,.16),
       0 2px 8px rgba(0,0,0,.12);
@@ -268,7 +268,7 @@
   var byId=new Map();
   var selectedId="";
 
-  // cache stand rects for "smart placement"
+  // cache stand nodes for "smart placement"
   var standNodesCache=null;
 
   function setStage(t,isErr){
@@ -309,22 +309,60 @@
     return groups.length ? groups : shapes;
   }
 
+  /* ========= IMPORTANT FIX =========
+     Prevent "double highlight" when a stand is a <g id="SB3"> containing
+     shapes that belong to another stand-group.
+  */
   function paintNode(node, color){
-    var targets=(node.tagName.toLowerCase()==="g") ? node.querySelectorAll("path,rect,polygon,circle,ellipse,polyline,line") : [node];
-    [].forEach.call(targets,function(el){
-      el.style.fill=color;
-      el.style.fillOpacity=String(OPACITY);
-      el.style.stroke="rgba(0,0,0,0.45)";
-      el.style.strokeOpacity="0.6";
-      el.style.cursor=isPhone ? "default" : "pointer";
+    var tag = node.tagName.toLowerCase();
+    var targets;
+
+    if (tag === "g") {
+      targets = [].slice.call(node.querySelectorAll("path,rect,polygon,circle,ellipse,polyline,line"));
+
+      targets = targets.filter(function(el){
+        // If a shape has its own id and it's a different stand, don't paint it
+        if (el.id && el.id !== node.id && isStandId(el.id)) return false;
+
+        // Find nearest ancestor stand-group for this shape
+        var p = el.parentElement;
+        while (p && p !== svgRoot) {
+          if (p.tagName && p.tagName.toLowerCase() === "g" && p.id && isStandId(p.id)) {
+            return p === node; // only paint if nearest stand-group is THIS group
+          }
+          p = p.parentElement;
+        }
+        // No stand-group ancestor => assume it belongs to this group
+        return true;
+      });
+    } else {
+      targets = [node];
+    }
+
+    targets.forEach(function(el){
+      el.style.fill = color;
+      el.style.fillOpacity = String(OPACITY);
+      el.style.stroke = "rgba(0,0,0,0.45)";
+      el.style.strokeOpacity = "0.6";
+      el.style.cursor = isPhone ? "default" : "pointer";
     });
   }
 
   function renderPlan(){
-    getStandNodes().forEach(function(n){ paintNode(n, GREEN); });
+    if(!svgRoot) return;
+
+    // Paint all stands green by standId (handles duplicate IDs safely)
+    stands.forEach(function(s){
+      var id = String(s.standId || "").trim();
+      if(!id) return;
+      var nodes = svgRoot.querySelectorAll("#" + CSS.escape(id));
+      nodes.forEach(function(n){ paintNode(n, GREEN); });
+    });
+
+    // Paint selected stand red
     if(selectedId){
-      var n=svgRoot.querySelector("#"+CSS.escape(selectedId));
-      if(n) paintNode(n, RED);
+      var selNodes = svgRoot.querySelectorAll("#" + CSS.escape(selectedId));
+      selNodes.forEach(function(n){ paintNode(n, RED); });
     }
   }
 
@@ -341,8 +379,6 @@
   }
 
   function getStandRectsRelativeToPlan(){
-    // Approximate stands as their screen bounding rectangles.
-    // Convert to planHost-relative coordinates.
     if(!standNodesCache) standNodesCache = getStandNodes();
     var rPlan = planHost.getBoundingClientRect();
     var rects=[];
@@ -350,14 +386,12 @@
       var n = standNodesCache[i];
       try{
         var r = n.getBoundingClientRect();
-        // Ignore tiny rects (can happen with hidden elements)
-        var w=r.width, h=r.height;
-        if(w<2 || h<2) continue;
+        if(r.width<2 || r.height<2) continue;
         rects.push({
           x: (r.left - rPlan.left),
           y: (r.top  - rPlan.top),
-          w: w,
-          h: h
+          w: r.width,
+          h: r.height
         });
       }catch(_){}
     }
@@ -367,45 +401,38 @@
   function smartPlaceCallout(){
     if(!selectedId || !svgRoot) return;
 
-    // Make callout visible so we can measure it
     callout.style.display="block";
-    // We'll set explicit px positioning (no translate)
     callout.style.transform="translate(0,0)";
 
-    var pad = 14; // padding from edges
+    var pad = 14;
     var w = planHost.clientWidth;
     var h = planHost.clientHeight;
 
-    // Callout size (measured)
-    // Temporarily place offscreen to get stable measurement
+    // Measure callout
     callout.style.left = "-9999px";
     callout.style.top  = "-9999px";
     var callRect = callout.getBoundingClientRect();
     var cw = callRect.width;
     var ch = callRect.height;
 
-    // Candidate anchor points (planHost-relative)
-    // We bias toward lower positions, but it can move anywhere to avoid overlaps.
     var candidates = [
-      { name:"bottom-center", x:(w-cw)/2, y:h - ch - 64 },
-      { name:"bottom-left",   x:pad,       y:h - ch - 64 },
-      { name:"bottom-right",  x:w - cw - pad, y:h - ch - 64 },
+      { x:(w-cw)/2,     y:h - ch - 70 },          // bottom center
+      { x:pad,          y:h - ch - 70 },          // bottom left
+      { x:w - cw - pad, y:h - ch - 70 },          // bottom right
 
-      { name:"mid-left",      x:pad,       y:(h-ch)/2 },
-      { name:"mid-right",     x:w - cw - pad, y:(h-ch)/2 },
+      { x:pad,          y:(h-ch)/2 },             // mid left
+      { x:w - cw - pad, y:(h-ch)/2 },             // mid right
 
-      { name:"top-center",    x:(w-cw)/2,  y:pad + 8 },
-      { name:"top-left",      x:pad,       y:pad + 8 },
-      { name:"top-right",     x:w - cw - pad, y:pad + 8 }
+      { x:(w-cw)/2,     y:pad + 8 },              // top center
+      { x:pad,          y:pad + 8 },              // top left
+      { x:w - cw - pad, y:pad + 8 }               // top right
     ];
 
-    // Clamp candidates into view
     for(var i=0;i<candidates.length;i++){
       candidates[i].x = clamp(candidates[i].x, pad, w - cw - pad);
       candidates[i].y = clamp(candidates[i].y, pad, h - ch - pad);
     }
 
-    // Selected stand center (for tie-break)
     var rPlan = planHost.getBoundingClientRect();
     var target = svgRoot.querySelector("#"+CSS.escape(selectedId));
     var standX = w/2, standY = h/2;
@@ -422,30 +449,25 @@
       var c = candidates[j];
       var testRect = { x:c.x, y:c.y, w:cw, h:ch };
 
-      // Overlap score with all stands (we want minimal)
       var overlap = 0;
       for(var k=0;k<standRects.length;k++){
         overlap += rectOverlapArea(testRect, standRects[k]);
-        // small early exit if it's already worse
         if(best && overlap > best.overlap) break;
       }
 
-      // Tie-break: prefer being not too far from selected stand (so line is shorter)
       var cx = c.x + cw/2;
       var cy = c.y + ch/2;
       var dx = cx - standX;
       var dy = cy - standY;
       var dist = Math.sqrt(dx*dx + dy*dy);
 
-      // Combined score: prioritize overlap strongly, then distance
       var score = overlap * 1000000 + dist;
 
       if(!best || score < best.score){
-        best = { x:c.x, y:c.y, overlap:overlap, dist:dist, score:score, cw:cw, ch:ch };
+        best = { x:c.x, y:c.y, overlap:overlap, score:score };
       }
     }
 
-    // Apply best
     callout.style.left = best.x + "px";
     callout.style.top  = best.y + "px";
   }
@@ -460,7 +482,7 @@
     leaderLayer.setAttribute("width",w);
     leaderLayer.setAttribute("height",h);
 
-    // Start line from callout center (dynamic smart placement)
+    // Start from callout center (smart placement)
     var rPlan = planHost.getBoundingClientRect();
     var rCall = callout.getBoundingClientRect();
     var callX = (rCall.left + rCall.width/2) - rPlan.left;
@@ -500,7 +522,6 @@
     coCompany.textContent=info.company || "";
     coHint.textContent=info.company ? "" : "No company name set";
 
-    // smart position + draw
     smartPlaceCallout();
     renderPlan();
     updateLeader();
@@ -541,12 +562,16 @@
 
   function bindStandClicks(){
     if(isPhone) return;
-    getStandNodes().forEach(function(node){
-      var id=String(node.id||"").trim();
+    // Bind to every node that matches a stand id (including duplicates)
+    stands.forEach(function(s){
+      var id = String(s.standId || "").trim();
       if(!id) return;
-      node.addEventListener("click",function(e){
-        e.preventDefault(); e.stopPropagation();
-        setSelected(id);
+      var nodes = svgRoot.querySelectorAll("#"+CSS.escape(id));
+      nodes.forEach(function(node){
+        node.addEventListener("click",function(e){
+          e.preventDefault(); e.stopPropagation();
+          setSelected(id);
+        });
       });
     });
   }
@@ -594,7 +619,7 @@
       planHost.insertAdjacentHTML("afterbegin", svgText);
       svgRoot = planHost.querySelector("svg");
       if(!svgRoot) throw new Error("SVG root not found");
-      standNodesCache = null; // reset cache now SVG is loaded
+      standNodesCache = null;
     });
   }
 
@@ -611,7 +636,11 @@
         if(!Array.isArray(data)) throw new Error("Stands API did not return an array");
         stands=data;
         byId=new Map(stands.map(function(s){
-          return [String(s.standId||"").trim(), { standId:String(s.standId||"").trim(), status:normStatus(s.status), company:String(s.company||"").trim() }];
+          return [String(s.standId||"").trim(), {
+            standId:String(s.standId||"").trim(),
+            status:normStatus(s.status),
+            company:String(s.company||"").trim()
+          }];
         }));
         setStage("Loading floorplan SVG…");
         return loadSvg();
