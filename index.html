@@ -4,193 +4,228 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Exhibition Floorplan</title>
-
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-
 <style>
   :root{
-    --stand: rgba(213, 109, 50, 0.75);
-    --selected: rgb(229, 57, 53);
-    --border:#d9d9d9;
+    --border:#e3e3e3;
     --muted:#666;
+    --bg:#fafafa;
 
-    /* mobile sizing vars set by JS */
-    --headerH: 64px;
-    --vh: 1vh;
-    --planH: 46vh;
+    /* Stand colours */
+    --stand: rgba(213,109,50,0.75);
+    --selected: rgba(229,57,53,0.92);
+
+    --panel:#fff;
   }
 
+  *{box-sizing:border-box}
   body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#111;}
   header{
-    padding:12px 16px;border-bottom:1px solid var(--border);
-    display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
-    background:#fff;
+    display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
+    padding:14px 16px;border-bottom:1px solid var(--border);background:#fff;
   }
-  h1{margin:0;font-size:18px;font-weight:900;}
-  #updated{font-size:12px;color:var(--muted);}
-  #stage{font-size:12px;color:#111;font-weight:800;margin-top:4px;}
+  .hleft{min-width:200px}
+  #eventTitle{font-size:26px;font-weight:900;margin:0;line-height:1.1}
+  #updated{margin-top:4px;color:var(--muted);font-size:13px}
+  #statusLine{margin-top:6px;font-size:14px;font-weight:700}
+  .ok{color:#0f7a2a}
+  .bad{color:#b00020}
 
+  .hright{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .btn{
-    padding:8px 10px;border:1px solid var(--border);
+    padding:10px 12px;border:1px solid var(--border);
     background:#f7f7f7;border-radius:10px;cursor:pointer;
-    font-weight:800;font-size:13px;
+    font-weight:800;font-size:14px;
   }
-  .btn:disabled{opacity:.5;cursor:not-allowed;}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
 
-  .wrap{padding:12px;display:grid;grid-template-columns:1fr 360px;gap:12px;}
-  @media(max-width:960px){.wrap{grid-template-columns:1fr;}}
+  .wrap{
+    display:grid;
+    grid-template-columns: 2.3fr 1fr;
+    gap:12px;
+    padding:12px;
+  }
+  @media (max-width: 980px){
+    .wrap{grid-template-columns: 1fr;}
+  }
 
-  .card{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#fff;}
-
-  /* Plan */
-  #planHost{
+  .card{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:16px;
+    overflow:hidden;
     position:relative;
+  }
+
+  /* PLAN CARD */
+  .planCard{
     min-height:520px;
-    overflow:auto;
-    -webkit-overflow-scrolling:touch;
+  }
+  .planInner{
+    position:relative;
+    width:100%;
+    height:100%;
+    min-height:520px;
     background:#fff;
   }
-  #planHost svg{width:100%;height:auto;display:block;}
+  #planHost{
+    position:absolute; inset:0;
+    overflow:hidden;
+  }
+  #planHost svg{width:100%;height:100%;display:block}
+  #overlaySvg{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    pointer-events:none;
+  }
 
-  /* Hide SVG text/stand numbers */
-  #planHost svg text,
-  #planHost svg tspan{display:none !important;}
-
-  /* Legend */
-  .legend{
-    position:absolute;left:50%;bottom:12px;transform:translateX(-50%);
-    background:rgba(255,255,255,.92);
+  /* legend pill */
+  .legendPill{
+    position:absolute;
+    left:50%;
+    transform:translateX(-50%);
+    bottom: 18px;
+    display:flex;gap:18px;align-items:center;
+    background:#fff;
     border:1px solid var(--border);
     border-radius:999px;
     padding:10px 16px;
-    display:flex;gap:16px;align-items:center;
-    font-size:15px;font-weight:900;
-    box-shadow:0 6px 18px rgba(0,0,0,.10);
-    z-index:10;
-    pointer-events:none;
+    box-shadow:0 8px 18px rgba(0,0,0,.08);
+    font-weight:800;
+    user-select:none;
   }
-  .pill{display:flex;align-items:center;gap:10px;white-space:nowrap;}
-  .dot{width:14px;height:14px;border-radius:50%;}
-  .dot.stand{background:rgba(213,109,50,0.75);}
-  .dot.sel{background:rgb(229,57,53);}
+  .dot{width:12px;height:12px;border-radius:50%}
+  .dot.stand{background: rgba(213,109,50,0.95)}
+  .dot.sel{background: rgba(229,57,53,0.95)}
 
-  /* Leader overlay */
-  #leaderLayer{position:absolute;inset:0;width:100%;height:100%;z-index:9;pointer-events:none;}
-
-  /* Callout */
-  #callout{
-    position:absolute; z-index:11; display:none; pointer-events:none;
-    background:var(--selected);
-    border:1px solid rgba(0,0,0,.15);
-    border-radius:14px;
-    box-shadow:0 10px 26px rgba(0,0,0,.16), 0 2px 8px rgba(0,0,0,.12);
-    padding:12px 14px;
-    min-width:220px;
-    max-width:min(360px, 80vw);
-    text-align:center;
-    color:#fff;
-    transform:translate(0,0);
+  /* SIDE PANEL */
+  .side{
+    padding:12px;
+    display:grid;
+    gap:12px;
   }
-  #callout .stand{font-size:24px;font-weight:900;margin:0;color:#fff;}
-  #callout .company{font-size:16px;font-weight:800;margin:6px 0 0 0;color:#fff;word-break:break-word;}
-
-  /* Sidebar */
-  .side{padding:12px;display:grid;gap:12px;}
-  .box{border:1px solid var(--border);border-radius:12px;padding:10px 12px;}
-  .title{font-size:14px;font-weight:900;margin:0 0 8px 0;}
-  .muted{font-size:12px;color:var(--muted);line-height:1.35;}
-  .big{font-size:20px;font-weight:900;margin:0;}
-  input{
-    width:100%;padding:10px 10px;border:1px solid var(--border);
-    border-radius:10px;font-size:14px;box-sizing:border-box;
+  .panel{
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:12px;
+    background:#fff;
+  }
+  .panel h3{margin:0 0 8px 0;font-size:15px}
+  .selBox strong{display:block;font-size:30px;letter-spacing:.3px}
+  .selBox .co{font-size:18px;font-weight:800;margin-top:2px}
+  .help{font-size:13px;color:var(--muted);line-height:1.35;margin-top:8px}
+  .searchRow{
+    display:flex; gap:10px; align-items:center;
+  }
+  #q{
+    width:100%;
+    padding:10px 12px;
+    border:1px solid var(--border);
+    border-radius:12px;
+    font-size:15px;
   }
   .list{
-    max-height:420px; overflow:auto;
-    border:1px solid var(--border);border-radius:12px;background:#fff;
+    margin-top:10px;
+    border:1px solid var(--border);
+    border-radius:14px;
+    overflow:auto;
+    max-height: 420px;
+    background:#fff;
   }
-  .item{padding:10px 10px;border-bottom:1px solid #eee;cursor:pointer;}
-  .item:last-child{border-bottom:0;}
-  .item:hover{background:#f7f7f7;}
-  .item .id{font-weight:900;}
-  .item .sub{font-size:12px;color:var(--muted);margin-top:2px;}
+  .item{
+    padding:10px 12px;
+    border-bottom:1px solid #efefef;
+    cursor:pointer;
+  }
+  .item:last-child{border-bottom:0}
+  .item:hover{background:#fafafa}
+  .item .name{font-weight:900}
+  .item .meta{font-size:12px;color:var(--muted);margin-top:2px}
+  .empty{padding:14px;color:var(--muted);font-size:13px}
 
-  /* Mobile: fixed plan at top, scroll list below */
-  @media(max-width:960px){
-    body{height: calc(var(--vh) * 100); overflow:hidden;}
-    header{position:sticky; top:0; z-index:1000;}
-    .wrap{
-      padding:12px;
-      height: calc((var(--vh) * 100) - var(--headerH) - 24px);
-      overflow:hidden;
+  /* MOBILE: keep plan visible at top; list scrolls below */
+  @media (max-width: 820px){
+    header{gap:10px}
+    #eventTitle{font-size:24px}
+    .wrap{padding:10px;gap:10px}
+    .planCard{min-height:420px}
+
+    /* sticky plan */
+    .planCard{
+      position:sticky;
+      top: 0;
+      z-index: 5;
     }
-    .planCard{position:sticky; top:0; z-index:20;}
-    #planHost{min-height:unset;height: var(--planH);overflow:auto;}
-    .side{
-      height: calc((var(--vh) * 100) - var(--headerH) - 24px - var(--planH) - 12px);
-      overflow:auto;
-      -webkit-overflow-scrolling:touch;
+    .planInner{min-height:420px}
+    .list{max-height: 360px}
+
+    /* smaller label by scaling overlay elements a touch */
+    /* (overlay label is in SVG units; we scale the whole overlay visually on phones) */
+    #overlaySvg{
+      transform: scale(0.90);
+      transform-origin: 50% 50%;
     }
-    .list{max-height:none;}
+
+    /* raise legend so Safari UI doesn't clip it */
+    .legendPill{
+      bottom: calc(34px + env(safe-area-inset-bottom));
+    }
+    .planInner{
+      padding-bottom: calc(68px + env(safe-area-inset-bottom));
+    }
   }
 </style>
 </head>
-
 <body>
-<header id="topHeader">
-  <div>
-    <h1 id="eventName">Loading…</h1>
-    <div id="updated"></div>
-    <div id="stage">Starting…</div>
+
+<header>
+  <div class="hleft">
+    <div id="eventTitle">Loading…</div>
+    <div id="updated">Updated: —</div>
+    <div id="statusLine"><span class="bad">Loading…</span></div>
   </div>
-  <div>
+  <div class="hright">
     <button class="btn" id="btnPdf">Export PDF</button>
-    <button class="btn" id="btnClear" disabled>Clear selection</button>
+    <button class="btn" id="btnClear">Clear selection</button>
   </div>
 </header>
 
 <div class="wrap">
   <div class="card planCard">
-    <div id="planHost">
-      <svg id="leaderLayer" xmlns="http://www.w3.org/2000/svg">
-        <line id="leaderLine" x1="0" y1="0" x2="0" y2="0" stroke="#111" stroke-width="3" stroke-linecap="round" opacity="0"/>
-        <circle id="leaderDot" cx="0" cy="0" r="6" fill="#111" opacity="0"/>
-      </svg>
+    <div class="planInner">
+      <div id="planHost"></div>
+      <svg id="overlaySvg"></svg>
 
-      <div id="callout">
-        <p class="stand" id="coStand">—</p>
-        <p class="company" id="coCompany"></p>
-      </div>
-
-      <div class="legend">
-        <span class="pill"><span class="dot stand"></span>Stands</span>
-        <span class="pill"><span class="dot sel"></span>Selected</span>
+      <div class="legendPill">
+        <span style="display:flex;align-items:center;gap:10px;"><span class="dot stand"></span> Stands</span>
+        <span style="display:flex;align-items:center;gap:10px;"><span class="dot sel"></span> Selected</span>
       </div>
     </div>
   </div>
 
   <div class="card">
     <div class="side">
-      <div class="box">
-        <p class="title">Selected exhibitor</p>
-        <p class="big" id="selStand">None</p>
-        <div id="selCompany" style="font-weight:800;color:#222;margin-top:4px;"></div>
-        <div class="muted" style="margin-top:8px;">
+      <div class="panel selBox">
+        <h3>Selected exhibitor</h3>
+        <strong id="selStand">None</strong>
+        <div class="co" id="selCompany"></div>
+        <div class="help">
           Desktop: click a stand or choose from the list.<br>
           Phone: use the list (stand tapping is disabled).
         </div>
       </div>
 
-      <div class="box">
-        <p class="title">Sold exhibitors</p>
-        <input id="search" placeholder="Search company or stand…" />
-        <div class="list" id="soldList" style="margin-top:10px;"></div>
+      <div class="panel">
+        <h3>Sold exhibitors</h3>
+        <div class="searchRow">
+          <input id="q" type="text" placeholder="Search company or stand…" />
+        </div>
+        <div class="list" id="list"></div>
       </div>
 
-      <div class="box">
-        <p class="title">Help</p>
-        <div class="muted">
-          All stands are orange. Selecting an exhibitor makes their stand red with a label + line.
+      <div class="panel">
+        <h3>Help</h3>
+        <div class="help">
+          All stands are in the main colour. Selecting an exhibitor makes their stand red with a label + line.
         </div>
       </div>
     </div>
@@ -198,438 +233,530 @@
 </div>
 
 <script>
-(function(){
-  /* ===== ONLY EDIT THESE TWO LINES IF NEEDED ===== */
-  var API_BASE = "https://floorplansaberdeen.floorplansaberdeen.workers.dev";
-  var SVG_URL  = "./event_plan.svg";
-  /* ============================================== */
+(() => {
+  const API_BASE = 'https://floorplansaberdeen.floorplansaberdeen.workers.dev';
+  const SVG_URL  = './event_plan.svg';
 
-  var STAND_COLOUR = "rgba(213, 109, 50, 0.75)";
-  var SELECTED_COLOUR = "rgb(229, 57, 53)";
-  var STAND_ID_RE=/^([A-Z]{1,3})(\d{1,3})$/;
+  const STAND_FILL    = getComputedStyle(document.documentElement).getPropertyValue('--stand').trim() || 'rgba(213,109,50,0.75)';
+  const SELECTED_FILL = getComputedStyle(document.documentElement).getPropertyValue('--selected').trim() || 'rgba(229,57,53,0.92)';
 
-  var isPhone = window.matchMedia("(max-width: 960px)").matches || (navigator.maxTouchPoints > 1);
+  const elTitle   = document.getElementById('eventTitle');
+  const elUpdated = document.getElementById('updated');
+  const elStatus  = document.getElementById('statusLine');
 
-  if(!window.CSS) window.CSS = {};
-  if(typeof CSS.escape !== "function"){
-    CSS.escape = function(value){
-      return String(value).replace(/[^a-zA-Z0-9_\-]/g, function(ch){
-        return "\\" + ch.codePointAt(0).toString(16).toUpperCase() + " ";
-      });
-    };
+  const planHost  = document.getElementById('planHost');
+  const overlay   = document.getElementById('overlaySvg');
+
+  const selStand  = document.getElementById('selStand');
+  const selCompany= document.getElementById('selCompany');
+
+  const qEl       = document.getElementById('q');
+  const listEl    = document.getElementById('list');
+
+  const btnClear  = document.getElementById('btnClear');
+  const btnPdf    = document.getElementById('btnPdf');
+
+  let svgRoot = null;
+  let viewBox = null;
+
+  let stands = [];               // raw from API
+  let byId = new Map();          // standId -> {standId,status,company}
+  let selectedId = '';           // one selection only
+
+  const isPhone = matchMedia('(max-width: 820px)').matches;
+
+  function setStatus(text, ok=true){
+    elStatus.innerHTML = ok ? `<span class="ok">${escapeHtml(text)} ✅</span>` : `<span class="bad">${escapeHtml(text)}</span>`;
   }
 
-  var planHost=document.getElementById("planHost");
-  var eventNameEl=document.getElementById("eventName");
-  var updatedEl=document.getElementById("updated");
-  var stageEl=document.getElementById("stage");
-
-  var btnPdf=document.getElementById("btnPdf");
-  var btnClear=document.getElementById("btnClear");
-
-  var selStandEl=document.getElementById("selStand");
-  var selCompanyEl=document.getElementById("selCompany");
-
-  var searchEl=document.getElementById("search");
-  var soldListEl=document.getElementById("soldList");
-
-  var callout=document.getElementById("callout");
-  var coStand=document.getElementById("coStand");
-  var coCompany=document.getElementById("coCompany");
-
-  var leaderLayer=document.getElementById("leaderLayer");
-  var leaderLine=document.getElementById("leaderLine");
-  var leaderDot=document.getElementById("leaderDot");
-
-  var headerEl=document.getElementById("topHeader");
-
-  var svgRoot=null;
-  var stands=[];
-  var byId=new Map();
-  var selectedId="";
-
-  var standNodesCache=null;
-
-  function setStage(t,isErr){
-    stageEl.textContent=t;
-    stageEl.style.color=isErr ? "#b00020" : "#111";
+  function escapeHtml(s){
+    return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   }
 
-  function withTimeout(promise, ms, label){
-    return Promise.race([
-      promise,
-      new Promise(function(_,rej){ setTimeout(function(){ rej(new Error("Timeout: "+label)); }, ms); })
-    ]);
+  function normalizeStatus(v){
+    return String(v||'').toLowerCase().trim() === 'sold' ? 'sold' : 'available';
   }
 
-  function fetchText(url){
-    return withTimeout(fetch(url,{cache:"no-store"}).then(function(r){
-      if(!r.ok) throw new Error("HTTP "+r.status+" for "+url);
-      return r.text();
-    }), 12000, url);
+  async function fetchJson(url){
+    const res = await fetch(url, { cache: 'no-store' });
+    const text = await res.text();
+    let json;
+    try{ json = JSON.parse(text); }catch(e){
+      throw new Error('Bad JSON from server');
+    }
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    return json;
   }
 
-  function fetchJson(url){
-    return fetchText(url).then(function(t){
-      try { return JSON.parse(t); }
-      catch(e){ throw new Error("Bad JSON from "+url); }
-    });
+  async function loadSettings(){
+    try{
+      const s = await fetchJson(API_BASE + '/settings?ts=' + Date.now());
+      const name = (s && typeof s.eventName === 'string' && s.eventName.trim()) ? s.eventName.trim() : 'New Event';
+      elTitle.textContent = name;
+    }catch{
+      elTitle.textContent = 'New Event';
+    }
   }
 
-  function isStandId(id){ return STAND_ID_RE.test(String(id||"").trim()); }
-  function normStatus(v){ return String(v||"").toLowerCase().trim()==="sold" ? "sold" : "available"; }
+  async function loadSvg(){
+    const res = await fetch(SVG_URL, { cache: 'no-store' });
+    if(!res.ok) throw new Error('SVG not found at ' + SVG_URL);
+    planHost.innerHTML = await res.text();
+    svgRoot = planHost.querySelector('svg');
+    if(!svgRoot) throw new Error('SVG root <svg> not found');
 
-  function getStandNodes(){
-    var groups=[].slice.call(svgRoot.querySelectorAll("g[id]")).filter(function(g){return isStandId(g.id);});
-    var shapes=[].slice.call(svgRoot.querySelectorAll("path[id],rect[id],polygon[id],circle[id],ellipse[id],polyline[id],line[id]"))
-      .filter(function(el){return isStandId(el.id);});
-    return groups.length ? groups : shapes;
-  }
+    // make responsive
+    svgRoot.removeAttribute('width');
+    svgRoot.removeAttribute('height');
+    svgRoot.style.width = '100%';
+    svgRoot.style.height = '100%';
 
-  function paintNode(node, color){
-    var tag = node.tagName.toLowerCase();
-    var targets;
-
-    if (tag === "g") {
-      targets = [].slice.call(node.querySelectorAll("path,rect,polygon,circle,ellipse,polyline,line"));
-      targets = targets.filter(function(el){
-        if (el.id && el.id !== node.id && isStandId(el.id)) return false;
-        var p = el.parentElement;
-        while (p && p !== svgRoot) {
-          if (p.tagName && p.tagName.toLowerCase() === "g" && p.id && isStandId(p.id)) return p === node;
-          p = p.parentElement;
-        }
-        return true;
-      });
-    } else {
-      targets = [node];
+    // ensure viewBox
+    const vb = svgRoot.getAttribute('viewBox');
+    if(vb){
+      const parts = vb.split(/\s+/).map(Number);
+      viewBox = { x:parts[0], y:parts[1], w:parts[2], h:parts[3] };
+    }else{
+      // compute after it's in DOM
+      const b = svgRoot.getBBox();
+      svgRoot.setAttribute('viewBox', `${b.x} ${b.y} ${b.width} ${b.height}`);
+      viewBox = { x:b.x, y:b.y, w:b.width, h:b.height };
     }
 
-    targets.forEach(function(el){
-      el.style.fill = color;
-      el.style.stroke = "rgba(0,0,0,0.45)";
-      el.style.strokeOpacity = "0.6";
-      el.style.cursor = isPhone ? "default" : "pointer";
+    // overlay uses same viewBox
+    overlay.setAttribute('viewBox', `${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`);
+    overlay.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+    // add shadow filter once
+    injectOverlayDefs();
+  }
+
+  function injectOverlayDefs(){
+    overlay.innerHTML = `
+      <defs>
+        <filter id="labelShadow" x="-40%" y="-40%" width="180%" height="180%">
+          <feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#000" flood-opacity="0.22"/>
+        </filter>
+      </defs>
+    `;
+  }
+
+  function getStandNodes(){
+    // Supports common exports: stands as <g id="A1"> or shape with id
+    const groups = Array.from(svgRoot.querySelectorAll('g[id]'));
+    const shapes = Array.from(svgRoot.querySelectorAll('path[id],rect[id],polygon[id],circle[id],ellipse[id],polyline[id],line[id]'));
+    // keep only those IDs that exist in the sheet data, so we don't treat random svg ids as stands
+    const exists = (id) => byId.has(id);
+
+    const filteredGroups = groups.filter(g => exists(g.id));
+    if(filteredGroups.length) return filteredGroups;
+
+    return shapes.filter(s => exists(s.id));
+  }
+
+  function paintAll(){
+    if(!svgRoot) return;
+
+    // paint only known stands (those in the sheet)
+    getStandNodes().forEach(node => {
+      const id = String(node.id||'').trim();
+      const isSel = (id && id === selectedId);
+      const fill = isSel ? SELECTED_FILL : STAND_FILL;
+
+      const targets = (node.tagName.toLowerCase()==='g')
+        ? node.querySelectorAll('path,rect,polygon,circle,ellipse,polyline,line')
+        : [node];
+
+      targets.forEach(el => {
+        el.style.fill = fill;
+        el.style.fillOpacity = '1';
+        el.style.stroke = 'rgba(0,0,0,0.40)';
+        el.style.strokeOpacity = '0.65';
+        el.style.cursor = (isPhone ? 'default' : 'pointer');
+      });
+
+      // disable taps on phone (as requested)
+      if(isPhone){
+        node.style.pointerEvents = 'none';
+      }else{
+        node.style.pointerEvents = 'auto';
+      }
     });
   }
 
-  function renderPlan(){
-    if(!svgRoot) return;
+  function bindClicks(){
+    if(isPhone) return; // list-only on phone
 
-    // all stands = stand colour
-    stands.forEach(function(s){
-      var id = String(s.standId || "").trim();
-      if(!id) return;
-      var nodes = svgRoot.querySelectorAll("#" + CSS.escape(id));
-      nodes.forEach(function(n){ paintNode(n, STAND_COLOUR); });
+    getStandNodes().forEach(node => {
+      node.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const id = String(node.id||'').trim();
+        if(!id) return;
+        selectStand(id);
+      });
     });
+  }
 
-    // selected = red
-    if(selectedId){
-      var selNodes = svgRoot.querySelectorAll("#" + CSS.escape(selectedId));
-      selNodes.forEach(function(n){ paintNode(n, SELECTED_COLOUR); });
+  function soldListItems(){
+    // public list: SOLD + company not blank
+    const q = String(qEl.value||'').toLowerCase().trim();
+
+    const sold = stands
+      .map(s => ({
+        standId: String(s.standId||'').trim(),
+        status: normalizeStatus(s.status),
+        company: String(s.company||'').trim()
+      }))
+      .filter(s => s.standId && s.status === 'sold' && s.company);
+
+    sold.sort((a,b) => a.company.localeCompare(b.company, undefined, {numeric:true}));
+
+    if(!q) return sold;
+
+    return sold.filter(s =>
+      s.company.toLowerCase().includes(q) ||
+      s.standId.toLowerCase().includes(q)
+    );
+  }
+
+  function renderList(){
+    const items = soldListItems();
+    listEl.innerHTML = '';
+    if(!items.length){
+      listEl.innerHTML = `<div class="empty">No sold exhibitors found.</div>`;
+      return;
+    }
+    items.forEach(s => {
+      const div = document.createElement('div');
+      div.className = 'item';
+      div.innerHTML = `
+        <div class="name">${escapeHtml(s.company)}</div>
+        <div class="meta">Stand ${escapeHtml(s.standId)}</div>
+      `;
+      div.addEventListener('click', () => selectStand(s.standId));
+      listEl.appendChild(div);
+    });
+  }
+
+  function selectStand(id){
+    const info = byId.get(id);
+    if(!info) return;
+
+    selectedId = id;
+
+    selStand.textContent = info.standId;
+    selCompany.textContent = (normalizeStatus(info.status)==='sold' && info.company) ? info.company : '';
+
+    paintAll();
+    drawOverlay(info);
+  }
+
+  function clearSelection(){
+    selectedId = '';
+    selStand.textContent = 'None';
+    selCompany.textContent = '';
+    paintAll();
+    // keep defs, clear everything else
+    injectOverlayDefs();
+  }
+
+  function getBBoxForStand(id){
+    const node = svgRoot.querySelector('#' + CSS.escape(id));
+    if(!node) return null;
+    try{
+      // if it's a group, bbox works across children
+      return node.getBBox();
+    }catch{
+      return null;
     }
   }
 
   function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
 
-  function rectOverlapArea(a, b){
-    var x1=Math.max(a.x, b.x);
-    var y1=Math.max(a.y, b.y);
-    var x2=Math.min(a.x+a.w, b.x+b.w);
-    var y2=Math.min(a.y+a.h, b.y+b.h);
-    var w=Math.max(0, x2-x1);
-    var h=Math.max(0, y2-y1);
-    return w*h;
-  }
+  function drawOverlay(info){
+    injectOverlayDefs();
 
-  function getStandRectsRelativeToPlan(){
-    if(!standNodesCache) standNodesCache = getStandNodes();
-    var rPlan = planHost.getBoundingClientRect();
-    var rects=[];
-    for(var i=0;i<standNodesCache.length;i++){
-      var n = standNodesCache[i];
-      try{
-        var r = n.getBoundingClientRect();
-        if(r.width<2 || r.height<2) continue;
-        rects.push({ x:(r.left-rPlan.left), y:(r.top-rPlan.top), w:r.width, h:r.height });
-      }catch(_){}
-    }
-    return rects;
-  }
+    const bb = getBBoxForStand(info.standId);
+    if(!bb || !viewBox) return;
 
-  function smartPlaceCallout(){
-    if(!selectedId || !svgRoot) return;
+    // anchor point on the stand (center)
+    const ax = bb.x + bb.width/2;
+    const ay = bb.y + bb.height/2;
 
-    callout.style.display="block";
-    callout.style.transform="translate(0,0)";
+    // Create label group first (so we can measure and then place)
+    const g = svgEl('g', { filter:'url(#labelShadow)' });
 
-    var pad = 14;
-    var w = planHost.clientWidth;
-    var h = planHost.clientHeight;
+    const titleSize = Math.max(viewBox.w / 26, 26);   // scales nicely
+    const subSize   = Math.max(viewBox.w / 42, 18);
 
-    callout.style.left = "-9999px";
-    callout.style.top  = "-9999px";
-    var callRect = callout.getBoundingClientRect();
-    var cw = callRect.width;
-    var ch = callRect.height;
+    const t1 = svgEl('text', { 'font-size': titleSize, 'font-weight':'900', 'text-anchor':'middle', fill:'#fff' });
+    t1.textContent = info.standId;
 
-    var candidates = [
-      { x:(w-cw)/2,     y:h - ch - 70 },
-      { x:pad,          y:h - ch - 70 },
-      { x:w - cw - pad, y:h - ch - 70 },
+    const t2 = svgEl('text', { 'font-size': subSize, 'font-weight':'800', 'text-anchor':'middle', fill:'#fff' });
+    t2.textContent = (normalizeStatus(info.status)==='sold' && info.company) ? info.company : '';
 
-      { x:pad,          y:(h-ch)/2 },
-      { x:w - cw - pad, y:(h-ch)/2 },
+    const padX = Math.max(viewBox.w * 0.012, 18);
+    const padY = Math.max(viewBox.h * 0.012, 14);
+    const gap  = Math.max(viewBox.h * 0.008, 10);
 
-      { x:(w-cw)/2,     y:pad + 8 },
-      { x:pad,          y:pad + 8 },
-      { x:w - cw - pad, y:pad + 8 }
+    // Temporarily position at 0,0 to measure
+    t1.setAttribute('x', 0); t1.setAttribute('y', 0);
+    t2.setAttribute('x', 0); t2.setAttribute('y', (t2.textContent ? (titleSize + gap) : 0));
+
+    g.appendChild(t1);
+    if(t2.textContent) g.appendChild(t2);
+    overlay.appendChild(g);
+
+    const gb = g.getBBox();
+    const w = gb.width + padX*2;
+    const h = gb.height + padY*2;
+
+    // Candidate placements (prefer DOWN so label doesn't cover stands)
+    const offset = Math.max(viewBox.w * 0.06, 60);
+    const candidates = [
+      { name:'down',  x: ax,             y: ay + offset },
+      { name:'right', x: ax + offset*1.1,y: ay          },
+      { name:'left',  x: ax - offset*1.1,y: ay          },
+      { name:'up',    x: ax,             y: ay - offset }
     ];
 
-    for(var i=0;i<candidates.length;i++){
-      candidates[i].x = clamp(candidates[i].x, pad, w - cw - pad);
-      candidates[i].y = clamp(candidates[i].y, pad, h - ch - pad);
+    function score(pos){
+      // keep inside viewbox
+      const left = pos.x - w/2, right = pos.x + w/2;
+      const top = pos.y - h/2, bottom = pos.y + h/2;
+
+      let penalty = 0;
+
+      // outside penalties
+      if(left < viewBox.x) penalty += (viewBox.x - left) * 10;
+      if(right > viewBox.x + viewBox.w) penalty += (right - (viewBox.x+viewBox.w)) * 10;
+      if(top < viewBox.y) penalty += (viewBox.y - top) * 10;
+      if(bottom > viewBox.y + viewBox.h) penalty += (bottom - (viewBox.y+viewBox.h)) * 10;
+
+      // overlap with stand bbox penalty (avoid covering stand)
+      const ol = Math.max(left, bb.x);
+      const or = Math.min(right, bb.x + bb.width);
+      const ot = Math.max(top, bb.y);
+      const ob = Math.min(bottom, bb.y + bb.height);
+      const ow = Math.max(0, or - ol);
+      const oh = Math.max(0, ob - ot);
+      const overlapArea = ow * oh;
+      penalty += overlapArea * 0.02;
+
+      // prefer down
+      if(pos.name==='down') penalty -= 200;
+
+      return penalty;
     }
 
-    var rPlan = planHost.getBoundingClientRect();
-    var target = svgRoot.querySelector("#"+CSS.escape(selectedId));
-    var standX = w/2, standY = h/2;
-    if(target){
-      var rs = target.getBoundingClientRect();
-      standX = (rs.left + rs.width/2) - rPlan.left;
-      standY = (rs.top  + rs.height/2) - rPlan.top;
+    candidates.sort((a,b) => score(a) - score(b));
+    let best = candidates[0];
+
+    // Clamp the best position inside viewbox
+    best = {
+      x: clamp(best.x, viewBox.x + w/2 + 6, viewBox.x + viewBox.w - w/2 - 6),
+      y: clamp(best.y, viewBox.y + h/2 + 6, viewBox.y + viewBox.h - h/2 - 6),
+    };
+
+    // Now draw line + dot
+    const line = svgEl('line', {
+      x1: ax, y1: ay,
+      x2: best.x, y2: best.y,
+      stroke: 'rgba(0,0,0,0.75)',
+      'stroke-width': Math.max(viewBox.w * 0.002, 3),
+      'stroke-linecap':'round'
+    });
+
+    const dot = svgEl('circle', {
+      cx: ax, cy: ay,
+      r: Math.max(viewBox.w * 0.006, 6),
+      fill: 'rgba(0,0,0,0.78)'
+    });
+
+    // Label rect behind text
+    const rx = Math.max(viewBox.w * 0.01, 14);
+
+    const rect = svgEl('rect', {
+      x: best.x - w/2,
+      y: best.y - h/2,
+      width: w,
+      height: h,
+      rx: rx, ry: rx,
+      fill: 'rgba(229,57,53,0.95)'   // red
+    });
+
+    // Move text group into correct place
+    // Place t1 baseline nicely inside rect
+    const textTopY = best.y - h/2 + padY - gb.y;
+    const textX = best.x - gb.x; // center
+
+    t1.setAttribute('x', textX);
+    t1.setAttribute('y', textTopY + titleSize);
+
+    if(t2.textContent){
+      t2.setAttribute('x', textX);
+      t2.setAttribute('y', textTopY + titleSize + gap + subSize);
     }
 
-    var standRects = getStandRectsRelativeToPlan();
+    // Rebuild overlay in desired draw order
+    injectOverlayDefs();
+    overlay.appendChild(line);
+    overlay.appendChild(dot);
 
-    var best = null;
-    for(var j=0;j<candidates.length;j++){
-      var c = candidates[j];
-      var testRect = { x:c.x, y:c.y, w:cw, h:ch };
-
-      var overlap = 0;
-      for(var k=0;k<standRects.length;k++){
-        overlap += rectOverlapArea(testRect, standRects[k]);
-        if(best && overlap > best.overlap) break;
-      }
-
-      var cx = c.x + cw/2;
-      var cy = c.y + ch/2;
-      var dx = cx - standX;
-      var dy = cy - standY;
-      var dist = Math.sqrt(dx*dx + dy*dy);
-
-      var score = overlap * 1000000 + dist;
-
-      if(!best || score < best.score){
-        best = { x:c.x, y:c.y, overlap:overlap, score:score };
-      }
-    }
-
-    callout.style.left = best.x + "px";
-    callout.style.top  = best.y + "px";
+    const labelGroup = svgEl('g', { filter:'url(#labelShadow)' });
+    labelGroup.appendChild(rect);
+    labelGroup.appendChild(t1);
+    if(t2.textContent) labelGroup.appendChild(t2);
+    overlay.appendChild(labelGroup);
   }
 
-  function updateLeader(){
-    if(!selectedId || !svgRoot) return;
-    var target=svgRoot.querySelector("#"+CSS.escape(selectedId));
-    if(!target) return;
-
-    var w=planHost.clientWidth, h=planHost.clientHeight;
-    leaderLayer.setAttribute("viewBox","0 0 "+w+" "+h);
-    leaderLayer.setAttribute("width",w);
-    leaderLayer.setAttribute("height",h);
-
-    var rPlan = planHost.getBoundingClientRect();
-    var rCall = callout.getBoundingClientRect();
-    var callX = (rCall.left + rCall.width/2) - rPlan.left;
-    var callY = (rCall.top  + rCall.height/2) - rPlan.top;
-
-    var rStand=target.getBoundingClientRect();
-    var standX=(rStand.left + rStand.width/2) - rPlan.left;
-    var standY=(rStand.top  + rStand.height/2) - rPlan.top;
-
-    leaderLine.setAttribute("x1",callX); leaderLine.setAttribute("y1",callY);
-    leaderLine.setAttribute("x2",standX); leaderLine.setAttribute("y2",standY);
-    leaderDot.setAttribute("cx",standX); leaderDot.setAttribute("cy",standY);
-
-    leaderLine.style.opacity="0.85";
-    leaderDot.style.opacity="0.85";
+  function svgEl(tag, attrs){
+    const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for(const [k,v] of Object.entries(attrs||{})){
+      el.setAttribute(k, String(v));
+    }
+    return el;
   }
 
-  function setSelected(id){
-    selectedId=id||"";
-    btnClear.disabled=!selectedId;
+  async function sync(){
+    // stands from backend
+    const data = await fetchJson(API_BASE + '/stands?ts=' + Date.now());
+    stands = Array.isArray(data) ? data : [];
 
-    if(!selectedId){
-      selStandEl.textContent="None";
-      selCompanyEl.textContent="";
-      callout.style.display="none";
-      leaderLine.style.opacity="0";
-      leaderDot.style.opacity="0";
-      renderPlan();
-      return;
+    byId = new Map(
+      stands.map(s => [String(s.standId||'').trim(), {
+        standId: String(s.standId||'').trim(),
+        status: normalizeStatus(s.status),
+        company: String(s.company||'').trim()
+      }]).filter(([id]) => id)
+    );
+
+    renderList();
+    paintAll();
+    bindClicks();
+
+    // keep selection if possible
+    if(selectedId && byId.has(selectedId)){
+      drawOverlay(byId.get(selectedId));
+    }else{
+      clearSelection();
     }
 
-    var info=byId.get(selectedId) || { standId:selectedId, company:"" };
-    selStandEl.textContent=info.standId;
-    selCompanyEl.textContent=info.company || "";
-
-    coStand.textContent=info.standId;
-    coCompany.textContent=info.company || "";
-
-    smartPlaceCallout();
-    renderPlan();
-    updateLeader();
+    elUpdated.textContent = 'Updated: ' + new Date().toLocaleTimeString();
+    setStatus('Ready', true);
   }
 
-  function buildSoldList(){
-    var q=String(searchEl.value||"").toLowerCase().trim();
-    var sold=stands.map(function(s){
-      return { standId:String(s.standId||"").trim(), status:normStatus(s.status), company:String(s.company||"").trim() };
-    }).filter(function(s){
-      if(!s.standId) return false;
-      if(s.status!=="sold") return false;
-      if(!s.company) return false;
-      if(!q) return true;
-      return s.standId.toLowerCase().includes(q) || s.company.toLowerCase().includes(q);
-    }).sort(function(a,b){ return a.company.localeCompare(b.company); });
-
-    soldListEl.innerHTML="";
-    if(!sold.length){
-      soldListEl.innerHTML='<div class="item" style="cursor:default;"><div class="sub">No matches.</div></div>';
-      return;
-    }
-
-    sold.forEach(function(s){
-      var div=document.createElement("div");
-      div.className="item";
-      div.innerHTML='<div class="id">'+s.company+'</div><div class="sub">Stand '+s.standId+'</div>';
-      div.addEventListener("click",function(){
-        setSelected(s.standId);
-        if(svgRoot && !isPhone){
-          var node=svgRoot.querySelector("#"+CSS.escape(s.standId));
-          if(node && node.scrollIntoView) node.scrollIntoView({behavior:"smooth",block:"center",inline:"center"});
-        }
-      });
-      soldListEl.appendChild(div);
+  // Simple PDF export: saves a PNG of the plan (including label) into a PDF using jsPDF
+  async function ensureJsPdf(){
+    if(window.jspdf && window.jspdf.jsPDF) return;
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('Failed to load PDF library'));
+      document.head.appendChild(s);
     });
   }
 
-  function bindStandClicks(){
-    if(isPhone) return;
-    stands.forEach(function(s){
-      var id = String(s.standId || "").trim();
-      if(!id) return;
-      var nodes = svgRoot.querySelectorAll("#"+CSS.escape(id));
-      nodes.forEach(function(node){
-        node.addEventListener("click",function(e){
-          e.preventDefault(); e.stopPropagation();
-          setSelected(id);
-        });
-      });
-    });
-  }
-
-  function exportPdf(){
+  async function exportPdf(){
+    btnPdf.disabled = true;
     try{
-      btnPdf.disabled=true; btnPdf.textContent="Exporting…";
-      if(selectedId){ smartPlaceCallout(); updateLeader(); }
+      setStatus('Preparing PDF…', true);
 
-      html2canvas(planHost,{scale:2,backgroundColor:"#fff"})
-        .then(function(canvas){
-          var jsPDF = window.jspdf && window.jspdf.jsPDF ? window.jspdf.jsPDF : null;
-          if(!jsPDF) throw new Error("jsPDF not loaded");
+      // Create a combined SVG (base plan + overlay)
+      const base = svgRoot.cloneNode(true);
+      const over = overlay.cloneNode(true);
 
-          var pdf=new jsPDF({orientation:"landscape",unit:"pt",format:"a4"});
-          var pw=pdf.internal.pageSize.getWidth(), ph=pdf.internal.pageSize.getHeight();
-          var scale=Math.min(pw/canvas.width, ph/canvas.height);
-          var w=canvas.width*scale, h=canvas.height*scale;
-          pdf.addImage(canvas.toDataURL("image/png"),"PNG",(pw-w)/2,(ph-h)/2,w,h);
+      // Remove overlay defs duplicates etc not critical
+      // Put overlay content into base
+      const baseVb = base.getAttribute('viewBox') || `${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`;
+      base.setAttribute('viewBox', baseVb);
+      base.removeAttribute('width');
+      base.removeAttribute('height');
 
-          var name=(eventNameEl.textContent||"floorplan").replace(/[^\w\-]+/g,"_") + (selectedId?("_"+selectedId):"") + ".pdf";
-          pdf.save(name);
-        })
-        .catch(function(){ window.print(); })
-        .finally(function(){ btnPdf.disabled=false; btnPdf.textContent="Export PDF"; });
+      // Wrap overlay children (skip outer <svg>)
+      const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+      Array.from(over.childNodes).forEach(n => g.appendChild(n.cloneNode(true)));
+      base.appendChild(g);
 
-    }catch(_){
-      window.print();
-      btnPdf.disabled=false; btnPdf.textContent="Export PDF";
+      // Serialize to image
+      const svgText = new XMLSerializer().serializeToString(base);
+      const svgBlob = new Blob([svgText], {type:'image/svg+xml;charset=utf-8'});
+      const url = URL.createObjectURL(svgBlob);
+
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      await new Promise((resolve,reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = url;
+      });
+
+      // draw to canvas at decent resolution
+      const canvas = document.createElement('canvas');
+      const scale = 2.0;
+      canvas.width = Math.round(1400 * scale);
+      canvas.height = Math.round(800 * scale);
+
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+
+      // fit image to canvas
+      const iw = img.width, ih = img.height;
+      const r = Math.min(canvas.width/iw, canvas.height/ih);
+      const dw = iw * r, dh = ih * r;
+      const dx = (canvas.width - dw)/2;
+      const dy = (canvas.height - dh)/2;
+      ctx.drawImage(img, dx, dy, dw, dh);
+
+      URL.revokeObjectURL(url);
+
+      await ensureJsPdf();
+      const { jsPDF } = window.jspdf;
+
+      const pdf = new jsPDF({orientation:'landscape', unit:'pt', format:'a4'});
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+
+      const png = canvas.toDataURL('image/png', 1.0);
+
+      // fit PNG to page
+      const pr = Math.min(pageW / canvas.width, pageH / canvas.height);
+      const pw = canvas.width * pr;
+      const ph = canvas.height * pr;
+      const px = (pageW - pw)/2;
+      const py = (pageH - ph)/2;
+
+      pdf.addImage(png, 'PNG', px, py, pw, ph);
+      pdf.save((elTitle.textContent || 'floorplan').replace(/\s+/g,'-').toLowerCase() + '.pdf');
+
+      setStatus('Ready', true);
+    }catch(e){
+      console.error(e);
+      setStatus('PDF error: ' + (e.message || e), false);
+    }finally{
+      btnPdf.disabled = false;
     }
   }
 
-  function setMobileSizingVars(){
-    var vh = window.innerHeight * 0.01;
-    document.documentElement.style.setProperty("--vh", vh + "px");
-    var hh = headerEl ? headerEl.getBoundingClientRect().height : 64;
-    document.documentElement.style.setProperty("--headerH", hh + "px");
-  }
+  btnClear.addEventListener('click', clearSelection);
+  qEl.addEventListener('input', renderList);
+  btnPdf.addEventListener('click', exportPdf);
 
-  function wireLeader(){
-    planHost.addEventListener("scroll",function(){
-      if(selectedId){ smartPlaceCallout(); updateLeader(); }
-    },{passive:true});
-    window.addEventListener("resize",function(){
-      if(selectedId){ smartPlaceCallout(); updateLeader(); }
-      setMobileSizingVars();
-    });
-  }
+  (async () => {
+    try{
+      setStatus('Loading…', false);
+      await loadSettings();
+      await loadSvg();
+      await sync();
+    }catch(e){
+      console.error(e);
+      setStatus('Load error: ' + (e.message || e), false);
+    }
+  })();
 
-  function loadSvg(){
-    var url = SVG_URL + "?v=" + Date.now();
-    return fetchText(url).then(function(svgText){
-      planHost.insertAdjacentHTML("afterbegin", svgText);
-      svgRoot = planHost.querySelector("svg");
-      if(!svgRoot) throw new Error("SVG root not found");
-      standNodesCache = null;
-    });
-  }
-
-  function init(){
-    setMobileSizingVars();
-    setStage("Loading settings…");
-    return fetchJson(API_BASE+"/settings?ts="+Date.now())
-      .catch(function(){ return {eventName:"Event"}; })
-      .then(function(s){
-        eventNameEl.textContent = (s && s.eventName) ? s.eventName : "Event";
-        setStage("Loading stands…");
-        return fetchJson(API_BASE+"/stands?ts="+Date.now());
-      })
-      .then(function(data){
-        if(!Array.isArray(data)) throw new Error("Stands API did not return an array");
-        stands=data;
-        byId=new Map(stands.map(function(s){
-          return [String(s.standId||"").trim(), {
-            standId:String(s.standId||"").trim(),
-            status:normStatus(s.status),
-            company:String(s.company||"").trim()
-          }];
-        }));
-        setStage("Loading floorplan SVG…");
-        return loadSvg();
-      })
-      .then(function(){
-        renderPlan();
-        bindStandClicks();
-        wireLeader();
-        buildSoldList();
-        updatedEl.textContent="Updated: "+new Date().toLocaleTimeString();
-        setStage("Ready ✅");
-      });
-  }
-
-  btnClear.addEventListener("click",function(){ setSelected(""); });
-  btnPdf.addEventListener("click",exportPdf);
-  searchEl.addEventListener("input",buildSoldList);
-
-  init().catch(function(err){
-    eventNameEl.textContent="Load error";
-    updatedEl.textContent=String(err.message || err);
-    setStage("Error: "+String(err.message || err), true);
-    console.error(err);
-  });
 })();
 </script>
 </body>
