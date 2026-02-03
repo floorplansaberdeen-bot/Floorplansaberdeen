@@ -17,27 +17,27 @@
   body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#111;}
 
   header{
-    padding:14px 16px;border-bottom:1px solid var(--border);
-    display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;
+    padding:12px 14px;border-bottom:1px solid var(--border);
+    display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;
     background:#fff; position:sticky; top:0; z-index:30;
   }
-  .titleWrap{display:grid;gap:4px}
-  #eventName{font-size:26px;font-weight:900;line-height:1;}
+  .titleWrap{display:grid;gap:3px}
+  #eventName{font-size:24px;font-weight:900;line-height:1;}
   #updated{font-size:13px;color:var(--muted);}
-  #status{font-size:14px;color:#0a7a2a;font-weight:700;}
+  #status{font-size:14px;color:#0a7a2a;font-weight:800;}
 
   .topBtns{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .btn{
     border:1px solid var(--border);background:#f8f8f8;border-radius:10px;
-    padding:10px 14px;font-weight:800;cursor:pointer;font-size:14px;
+    padding:9px 12px;font-weight:900;cursor:pointer;font-size:14px;
   }
   .btn:disabled{opacity:.5;cursor:not-allowed;}
   .btn.primary{background:#fff;}
 
   /* Desktop layout */
   .layout{
-    display:grid;grid-template-columns:2.3fr 1fr;gap:14px;
-    padding:14px;
+    display:grid;grid-template-columns:2.3fr 1fr;gap:12px;
+    padding:12px;
     align-items:start;
   }
   @media (max-width: 980px){ .layout{grid-template-columns:1fr;} }
@@ -47,29 +47,31 @@
   /* Sticky plan column (desktop) */
   .planCol{
     position:sticky;
-    top:92px;
+    top:86px;
     align-self:start;
     z-index:10;
   }
   @media (max-width: 980px){ .planCol{ position:relative; top:auto; } }
 
   .planCard{position:relative;overflow:hidden;}
+
+  /* tighter padding = less dead space */
   #svgHost{
     overflow:auto;
-    padding:12px;
-    max-height: min(72vh, 760px);
+    padding:8px;
+    max-height: min(70vh, 700px);
   }
   #svgHost svg{width:100%;height:auto;display:block;}
   svg text, svg tspan{pointer-events:none;user-select:none;}
 
-  /* Legend lozenges - moved up a bit */
+  /* Legend lozenges - higher */
   .legend{
     position:absolute;left:50%;transform:translateX(-50%);
     bottom:10px;
     background:#fff;border:1px solid var(--border);border-radius:999px;
-    padding:9px 12px;display:flex;gap:16px;align-items:center;
+    padding:8px 12px;display:flex;gap:14px;align-items:center;
     box-shadow: var(--shadow);
-    font-weight:800;
+    font-weight:900;
     z-index:5;
   }
   .dot{width:12px;height:12px;border-radius:50%;}
@@ -82,19 +84,17 @@
     border:1px solid var(--border);border-radius:14px;padding:12px;background:#fff;
   }
   #selStand{font-size:20px;font-weight:900;line-height:1.1;}
-  #selCompany{font-size:18px;font-weight:800;margin-top:4px;}
+  #selCompany{font-size:16px;font-weight:900;margin-top:4px;}
   .hint{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.35;}
 
   .listBox{border:1px solid var(--border);border-radius:14px;background:#fff;overflow:hidden;}
   .listHead{padding:12px;border-bottom:1px solid var(--border);}
   #search{width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--border);font-size:14px;}
 
-  /* list scroller */
   #list{
     max-height:520px;
     overflow:auto;
     -webkit-overflow-scrolling:touch;
-    /* IMPORTANT: bottom padding so last row isn’t hidden by browser bar */
     padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px) + 70px);
   }
 
@@ -104,31 +104,30 @@
   }
   .row:hover{background:#fafafa;}
   .row strong{font-size:14px;}
-  .row small{color:var(--muted);font-weight:700;}
+  .row small{color:var(--muted);font-weight:800;}
   .row.active{outline:2px solid rgba(0,0,0,.12);background:#fff;}
 
-  /* Phone: fixed plan at top, list scrolls */
+  /* Phone: fixed plan at top, list scrolls, LESS dead space */
   @media (max-width: 600px){
-    header{padding:12px 12px;}
-    #eventName{font-size:22px;}
+    header{padding:10px 10px;}
+    #eventName{font-size:20px;}
 
-    /* fixed regions */
     body{height:100vh;overflow:hidden;}
 
     .layout{
-      height:calc(100vh - 86px); /* header */
+      height:calc(100vh - 80px);
       padding:10px;
       display:grid;
       grid-template-columns:1fr;
-      grid-template-rows:auto 1fr; /* plan then list */
+      grid-template-rows:auto 1fr;
       gap:10px;
       overflow:hidden;
     }
 
-    /* plan fixed at top */
     .planCol{position:relative;top:auto;}
+
     .planCard{
-      height:44vh;               /* ✅ less dead white space than before */
+      height:38vh; /* ✅ tighter than before to reduce dead white space */
       display:flex;
       flex-direction:column;
     }
@@ -136,13 +135,12 @@
     #svgHost{
       flex:1;
       max-height:none;
-      padding:10px;
+      padding:8px;
       overflow:auto;
     }
 
-    .legend{bottom:12px;}
+    .legend{bottom:10px;}
 
-    /* hide extra panels on phone to save space */
     .side{height:100%;overflow:hidden;}
     .side .selBox{display:none;}
 
@@ -152,11 +150,12 @@
       flex-direction:column;
       overflow:hidden;
     }
+
     #list{
       flex:1;
       max-height:none;
       overflow:auto;
-      padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px) + 90px); /* ✅ extra bottom padding */
+      padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px) + 95px);
     }
   }
 </style>
@@ -211,7 +210,7 @@
 
     <div class="selBox">
       <div class="panelTitle">Help</div>
-      <div class="hint">Selecting an exhibitor makes their stand red with label + line.</div>
+      <div class="hint">Selecting an exhibitor makes their stand red with a label + long line (off-plan).</div>
     </div>
   </div>
 </div>
@@ -230,16 +229,19 @@
   const STAND_ID_RE = /^([A-Z]{1,3})(\d{1,3})$/;
   const isPhone = matchMedia("(max-width: 600px)").matches;
 
-  const elEvent  = document.getElementById("eventName");
-  const elUpdated= document.getElementById("updated");
-  const elStatus = document.getElementById("status");
+  const elEvent   = document.getElementById("eventName");
+  const elUpdated = document.getElementById("updated");
+  const elStatus  = document.getElementById("status");
 
-  const svgHost  = document.getElementById("svgHost");
-  const listEl   = document.getElementById("list");
-  const searchEl = document.getElementById("search");
+  const svgHost   = document.getElementById("svgHost");
+  const listEl    = document.getElementById("list");
+  const searchEl  = document.getElementById("search");
 
-  const btnClear = document.getElementById("btnClear");
-  const btnPdf   = document.getElementById("btnPdf");
+  const btnClear  = document.getElementById("btnClear");
+  const btnPdf    = document.getElementById("btnPdf");
+
+  const selStandEl   = document.getElementById("selStand");
+  const selCompanyEl = document.getElementById("selCompany");
 
   let svgRoot = null;
   let calloutG = null;
@@ -289,7 +291,7 @@
     svgRoot = svgHost.querySelector("svg");
     if(!svgRoot) throw new Error("SVG missing <svg> root");
 
-    // keep plan clean (remove any text labels exported with svg)
+    // keep plan clean (remove any exported text labels)
     svgRoot.querySelectorAll("text,tspan").forEach(t=>t.remove());
 
     calloutG = document.createElementNS("http://www.w3.org/2000/svg", "g");
@@ -329,10 +331,30 @@
     });
   }
 
-  function standBBox(standId){
+  function standBBoxForId(standId){
     const node = svgRoot.querySelector("#"+CSS.escape(standId));
     if(!node) return null;
     try{ return node.getBBox(); }catch(_){ return null; }
+  }
+
+  function standsUnionBBox(){
+    const nodes = getStandNodes();
+    let u = null;
+    for(const n of nodes){
+      try{
+        const b = n.getBBox();
+        if(!u){
+          u = {x:b.x,y:b.y,w:b.width,h:b.height};
+        }else{
+          const x1 = Math.min(u.x, b.x);
+          const y1 = Math.min(u.y, b.y);
+          const x2 = Math.max(u.x+u.w, b.x+b.width);
+          const y2 = Math.max(u.y+u.h, b.y+b.height);
+          u = {x:x1,y:y1,w:x2-x1,h:y2-y1};
+        }
+      }catch(_){}
+    }
+    return u;
   }
 
   function getViewBox(){
@@ -353,41 +375,84 @@
     if(calloutG) calloutG.innerHTML = "";
   }
 
-  // Smart callout placement (inside SVG) but avoids the bottom legend area on phone
-  function chooseCalloutPosition(bb){
+  // ✅ Place label OUTSIDE the stands union bbox so it doesn't cover the plan
+  function chooseOffPlanBox(standBB){
     const vb = getViewBox();
+    const plan = standsUnionBBox();
 
-    const w = isPhone ? 260 : 320;
-    const h = isPhone ? 92  : 104;
+    // sizes: smaller + tasteful
+    const boxW = isPhone ? 220 : 260;
+    const boxH = isPhone ? 64  : 74;
 
-    const pad = 18;
-    const standCx = bb.x + bb.width/2;
+    const margin = isPhone ? 22 : 30;
 
-    // Put label ABOVE the plan on phone more often (reduces "dead space" feeling)
-    // but clamp within viewBox.
-    const preferTop = isPhone;
+    const cx = standBB.x + standBB.width/2;
+    const cy = standBB.y + standBB.height/2;
 
-    const x = Math.max(vb.x + pad, Math.min(standCx - w/2, vb.x + vb.width - w - pad));
+    // Fallback if we couldn't compute plan bbox
+    const planX = plan ? plan.x : vb.x + vb.width*0.15;
+    const planY = plan ? plan.y : vb.y + vb.height*0.15;
+    const planW = plan ? plan.w : vb.width*0.7;
+    const planH = plan ? plan.h : vb.height*0.7;
 
-    // y candidates: above stand or below stand
-    const yAbove = bb.y - h - 22;
-    const yBelow = bb.y + bb.height + 22;
+    // Candidate positions: left/right/top/bottom OUTSIDE plan bbox
+    const candidates = [
+      // Right of plan
+      {x: planX + planW + margin, y: cy - boxH/2, side:"right"},
+      // Left of plan
+      {x: planX - boxW - margin, y: cy - boxH/2, side:"left"},
+      // Above plan
+      {x: cx - boxW/2, y: planY - boxH - margin, side:"top"},
+      // Below plan
+      {x: cx - boxW/2, y: planY + planH + margin, side:"bottom"}
+    ];
 
-    // On phone: try above first, else below, else clamp
-    let y = preferTop ? yAbove : yBelow;
+    // clamp helper
+    function clampBox(c){
+      const pad = 8;
+      const x = Math.max(vb.x + pad, Math.min(c.x, vb.x + vb.width  - boxW - pad));
+      const y = Math.max(vb.y + pad, Math.min(c.y, vb.y + vb.height - boxH - pad));
+      return {...c, x, y};
+    }
 
-    // Avoid going off top
-    if (y < vb.y + pad) y = yBelow;
+    // scoring: prefer staying off-plan and visible
+    function score(c){
+      const b = clampBox(c);
 
-    // Avoid colliding with legend bottom area (approx)
-    // Keep callout away from bottom 120 units of viewBox (legend zone)
-    const legendZoneTop = (vb.y + vb.height) - (isPhone ? 160 : 130);
-    if (y + h > legendZoneTop) y = Math.min(yAbove, legendZoneTop - h - 10);
+      // Penalize overlap with plan bbox
+      const ox = Math.max(0, Math.min(b.x+boxW, planX+planW) - Math.max(b.x, planX));
+      const oy = Math.max(0, Math.min(b.y+boxH, planY+planH) - Math.max(b.y, planY));
+      const overlap = ox * oy;
 
-    // Final clamp
-    y = Math.max(vb.y + pad, Math.min(y, vb.y + vb.height - h - pad));
+      // Prefer shorter diagonal but still “long enough” off plan
+      const dx = (b.x + boxW/2) - cx;
+      const dy = (b.y + boxH/2) - cy;
+      const dist = Math.sqrt(dx*dx + dy*dy);
 
-    return {x,y,w,h};
+      // Keep it away from dead-center of plan for taste
+      return (overlap * 1000) + dist;
+    }
+
+    let best = null;
+    let bestScore = Infinity;
+    for(const c of candidates){
+      const sc = score(c);
+      if(sc < bestScore){
+        bestScore = sc;
+        best = clampBox(c);
+      }
+    }
+    return {x:best.x,y:best.y,w:boxW,h:boxH,side:best.side};
+  }
+
+  function setSelectedPanel(info){
+    if(!info){
+      selStandEl.textContent = "None";
+      selCompanyEl.textContent = "";
+      return;
+    }
+    selStandEl.textContent = info.standId || "";
+    selCompanyEl.textContent = (info.company || "").trim();
   }
 
   function drawCallout(standId){
@@ -395,67 +460,72 @@
     if(!standId) return;
 
     const info = byId.get(standId) || { standId, company:"" };
-    const bb = standBBox(standId);
+    const bb = standBBoxForId(standId);
     if(!bb) return;
 
-    const box = chooseCalloutPosition(bb);
+    const box = chooseOffPlanBox(bb);
 
     const standCx = bb.x + bb.width/2;
     const standCy = bb.y + bb.height/2;
 
-    // anchor point on box (bottom-center if box above, else top-center)
-    const boxCenterX = box.x + box.w/2;
-    const boxIsAbove = box.y < bb.y;
+    const boxCx = box.x + box.w/2;
+    const boxCy = box.y + box.h/2;
 
-    const ax = boxCenterX;
-    const ay = boxIsAbove ? (box.y + box.h) : box.y;
+    // anchor on nearest edge of box
+    let ax = boxCx, ay = boxCy;
+    if (box.side === "left"){ ax = box.x + box.w; ay = boxCy; }
+    if (box.side === "right"){ ax = box.x; ay = boxCy; }
+    if (box.side === "top"){ ax = boxCx; ay = box.y + box.h; }
+    if (box.side === "bottom"){ ax = boxCx; ay = box.y; }
 
+    // long leader line
     const line = document.createElementNS("http://www.w3.org/2000/svg","line");
     line.setAttribute("x1", ax);
     line.setAttribute("y1", ay);
     line.setAttribute("x2", standCx);
     line.setAttribute("y2", standCy);
-    line.setAttribute("stroke", "rgba(0,0,0,.75)");
-    line.setAttribute("stroke-width", isPhone ? "6" : "4");
+    line.setAttribute("stroke", "rgba(0,0,0,.78)");
+    line.setAttribute("stroke-width", isPhone ? "5" : "3.5");
     line.setAttribute("stroke-linecap","round");
 
     const pin = document.createElementNS("http://www.w3.org/2000/svg","circle");
     pin.setAttribute("cx", standCx);
     pin.setAttribute("cy", standCy);
-    pin.setAttribute("r", isPhone ? "16" : "12");
-    pin.setAttribute("fill", "rgba(0,0,0,.75)");
+    pin.setAttribute("r", isPhone ? "12" : "9");
+    pin.setAttribute("fill", "rgba(0,0,0,.78)");
 
     const rect = document.createElementNS("http://www.w3.org/2000/svg","rect");
     rect.setAttribute("x", box.x);
     rect.setAttribute("y", box.y);
     rect.setAttribute("width", box.w);
     rect.setAttribute("height", box.h);
-    rect.setAttribute("rx", "16");
-    rect.setAttribute("ry", "16");
+    rect.setAttribute("rx", "14");
+    rect.setAttribute("ry", "14");
     rect.setAttribute("fill", SELECTED_FILL);
     rect.setAttribute("fill-opacity","0.95");
     rect.style.filter = "drop-shadow(0px 10px 16px rgba(0,0,0,.22))";
 
+    // Text sizes: ✅ smaller + tasteful
     const t1 = document.createElementNS("http://www.w3.org/2000/svg","text");
     t1.setAttribute("x", box.x + box.w/2);
-    t1.setAttribute("y", box.y + (isPhone ? 42 : 46));
+    t1.setAttribute("y", box.y + (isPhone ? 30 : 34));
     t1.setAttribute("text-anchor","middle");
     t1.setAttribute("fill","#fff");
     t1.style.fontFamily = "Arial, Helvetica, sans-serif";
     t1.style.fontWeight = "900";
-    t1.style.fontSize = isPhone ? "28px" : "34px";
+    t1.style.fontSize = isPhone ? "20px" : "24px";
     t1.textContent = info.standId;
 
     const company = (info.company || "").trim();
     if(company){
       const t2 = document.createElementNS("http://www.w3.org/2000/svg","text");
       t2.setAttribute("x", box.x + box.w/2);
-      t2.setAttribute("y", box.y + (isPhone ? 74 : 82));
+      t2.setAttribute("y", box.y + (isPhone ? 52 : 58));
       t2.setAttribute("text-anchor","middle");
       t2.setAttribute("fill","#fff");
       t2.style.fontFamily = "Arial, Helvetica, sans-serif";
       t2.style.fontWeight = "800";
-      t2.style.fontSize = isPhone ? "16px" : "18px";
+      t2.style.fontSize = isPhone ? "13px" : "14px";
       t2.textContent = company;
       calloutG.appendChild(t2);
     }
@@ -472,8 +542,13 @@
       clearCallout();
       repaintAll();
       renderList();
+      setSelectedPanel(null);
       return;
     }
+
+    const info = byId.get(selectedId) || { standId:selectedId, company:"" };
+    setSelectedPanel(info);
+
     repaintAll();
     renderList();
     drawCallout(selectedId);
@@ -503,9 +578,7 @@
       row.className = "row" + (item.standId===selectedId ? " active":"");
       const title = item.company ? escapeHtml(item.company) : `<em style="font-weight:900;">(No company)</em>`;
       row.innerHTML = `<strong>${title}</strong><small>Stand ${escapeHtml(item.standId)}</small>`;
-      row.addEventListener("click", ()=>{
-        setSelected(item.standId);
-      });
+      row.addEventListener("click", ()=> setSelected(item.standId));
       listEl.appendChild(row);
     });
 
@@ -537,11 +610,17 @@
 
     if(selectedId && !byId.has(selectedId)) selectedId = "";
     repaintAll();
-    if(selectedId) drawCallout(selectedId);
+    if(selectedId){
+      setSelectedPanel(byId.get(selectedId));
+      drawCallout(selectedId);
+    }else{
+      setSelectedPanel(null);
+      clearCallout();
+    }
   }
 
   function bindStandClick(){
-    if(isPhone) return; // phone uses list
+    if(isPhone) return;
     getStandNodes().forEach(node=>{
       const id = String(node.id||"").trim();
       node.addEventListener("click", (e)=>{
