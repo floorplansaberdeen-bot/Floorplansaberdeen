@@ -2,655 +2,595 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Exhibition Floorplan</title>
 <style>
   :root{
-    --border:#d9d9d9;
+    --border:#e6e6e6;
     --muted:#666;
-
-    /* Main stand colour (available) */
-    --standMain: rgba(213, 109, 50, 0.75);
-
-    /* Selected stand colour */
-    --selected: #e53935;
-
-    --cardRadius: 18px;
+    --card:#fff;
+    --shadow: 0 10px 25px rgba(0,0,0,.10);
+    --selected:#e53935;
+    --standRGB: 213,109,50;          /* <- your requested colour */
   }
 
   body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#111;}
   header{
-    padding:14px 16px;
-    border-bottom:1px solid var(--border);
-    display:flex;
-    align-items:flex-start;
-    justify-content:space-between;
-    gap:12px;
+    padding:14px 16px;border-bottom:1px solid var(--border);
+    display:flex;align-items:flex-start;justify-content:space-between;gap:14px;
   }
-  .titleWrap{display:flex;flex-direction:column;gap:6px;}
-  #eventTitle{font-size:28px;font-weight:900;line-height:1.05;}
+  .titleWrap{display:grid;gap:4px}
+  #eventName{font-size:26px;font-weight:900;line-height:1;}
   #updated{font-size:13px;color:var(--muted);}
-  #ready{font-size:14px;font-weight:900;display:inline-flex;align-items:center;gap:8px;}
-  #ready .tick{font-size:18px}
+  #status{font-size:14px;color:#0a7a2a;font-weight:700;}
 
-  .topBtns{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end;}
+  .topBtns{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .btn{
-    padding:10px 14px;border:1px solid var(--border);background:#f7f7f7;border-radius:12px;
-    font-weight:900;cursor:pointer;
+    border:1px solid var(--border);background:#f8f8f8;border-radius:10px;
+    padding:10px 14px;font-weight:800;cursor:pointer;font-size:14px;
   }
-  .btn:disabled{opacity:.55;cursor:not-allowed;}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+  .btn.primary{background:#fff;}
+  .btn.small{padding:8px 12px;font-size:13px;}
 
-  .layout{
-    display:grid;
-    grid-template-columns: 2.2fr 1fr;
-    gap:12px;
-    padding:12px;
-  }
-  @media (max-width: 900px){
+  .layout{display:grid;grid-template-columns:2.3fr 1fr;gap:14px;padding:14px;}
+  @media (max-width: 980px){
     .layout{grid-template-columns:1fr;}
   }
 
   .card{
-    border:1px solid var(--border);
-    border-radius: var(--cardRadius);
-    background:#fff;
-    overflow:hidden;
+    background:var(--card);border:1px solid var(--border);border-radius:16px;
+    box-shadow: 0 0 0 rgba(0,0,0,0);
   }
-
-  /* PLAN CARD */
-  .planCardInner{position:relative;}
-  #svgHost{
-    min-height:520px;
-    overflow:hidden;
-    position:relative;
-  }
+  .cardPad{padding:12px 12px;}
+  .planCard{position:relative;overflow:hidden;}
+  #svgHost{min-height:480px; overflow:auto; padding:12px;}
   #svgHost svg{width:100%;height:auto;display:block;}
-  svg text, svg tspan{pointer-events:none; user-select:none;}
-
-  /* Overlay for label + line (HTML overlay) */
-  #overlay{
-    position:absolute;
-    inset:0;
-    pointer-events:none;
-    z-index:10;
-  }
-  #pinDot{
-    position:absolute;
-    width:12px;height:12px;border-radius:50%;
-    background:#111;
-    transform:translate(-50%,-50%);
-    display:none;
-  }
-  #pinLine{
-    position:absolute;
-    left:0; top:0;
-    width:100%; height:100%;
-    display:none;
-  }
-
-  /* Label box */
-  #labelBox{
-    position:absolute;
-    min-width:220px;
-    max-width:min(420px, 85vw);
-    border-radius:16px;
-    background: var(--selected);
-    color:#fff;
-    padding:18px 22px;
-    box-shadow: 0 16px 38px rgba(0,0,0,0.22);
-    transform: translate(-50%, -50%);
-    display:none;
-  }
-  #labelStand{
-    font-size:34px;
-    font-weight:1000;
-    line-height:1.0;
-    letter-spacing:0.5px;
-    margin-bottom:8px;
-  }
-  #labelCompany{
-    font-size:22px;
-    font-weight:900;
-    opacity:0.95;
-    line-height:1.15;
-  }
-
-  /* Make label smaller on phones */
-  @media (max-width: 600px){
-    #labelBox{ min-width:200px; padding:14px 16px; border-radius:14px; }
-    #labelStand{ font-size:28px; }
-    #labelCompany{ font-size:18px; }
-  }
+  svg text, svg tspan{pointer-events:none;user-select:none;}
 
   /* Legend lozenge */
   .legend{
-    position:absolute;
-    left:50%;
-    bottom:14px;
-    transform:translateX(-50%);
-    background:#fff;
-    border:1px solid var(--border);
-    border-radius:999px;
-    padding:10px 14px;
-    display:flex;
-    gap:18px;
-    align-items:center;
-    box-shadow:0 6px 20px rgba(0,0,0,0.08);
-    z-index:6;
+    position:absolute;left:50%;transform:translateX(-50%);
+    bottom:14px; /* desktop */
+    background:#fff;border:1px solid var(--border);border-radius:999px;
+    padding:10px 14px;display:flex;gap:18px;align-items:center;
+    box-shadow: var(--shadow);
+    font-weight:800;
   }
-  .legItem{display:flex;align-items:center;gap:8px;font-weight:900;font-size:14px;}
   .dot{width:12px;height:12px;border-radius:50%;}
-  .dot.main{background: rgba(213, 109, 50, 0.95);}
-  .dot.sel{background: var(--selected);}
+  .dot.stand{background:rgba(var(--standRGB),.75);}
+  .dot.sel{background:var(--selected);}
 
-  /* On phones, lift legend a bit so it never gets cut off */
+  /* On phones: keep plan tighter + legend higher */
   @media (max-width: 600px){
-    .legend{bottom:22px;}
+    #eventName{font-size:22px;}
+    #svgHost{min-height:360px; padding:10px;}
+    .legend{bottom:22px;} /* <- higher so it doesn't get cut off */
   }
 
-  /* SIDE PANEL */
-  .panel{padding:12px; display:grid; gap:12px;}
-  .panelCard{
-    border:1px solid var(--border);
-    border-radius:16px;
-    padding:12px;
+  /* Right panel */
+  .side{display:grid;gap:12px;}
+  .panelTitle{font-weight:900;margin:0 0 6px 0;}
+  .selBox{
+    border:1px solid var(--border);border-radius:14px;padding:12px;
     background:#fff;
   }
-  .panelCard h3{margin:0 0 8px 0; font-size:14px; font-weight:1000;}
-  .selBig{font-size:28px;font-weight:1000;margin-top:6px;}
-  .selSmall{font-size:18px;font-weight:900;margin-top:2px;color:#222;}
-  .hint{font-size:12px;color:var(--muted);line-height:1.35;margin-top:8px;}
+  #selStand{font-size:20px;font-weight:900;line-height:1.1;}
+  #selCompany{font-size:18px;font-weight:800;margin-top:4px;}
+  .hint{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.35;}
 
-  .search{
-    width:100%;
-    padding:10px 12px;
-    border:1px solid var(--border);
-    border-radius:12px;
-    font-size:14px;
+  .listBox{
+    border:1px solid var(--border);border-radius:14px;background:#fff;overflow:hidden;
   }
-  .list{
-    border:1px solid var(--border);
-    border-radius:16px;
-    overflow:auto;
-    max-height:480px;
-    background:#fff;
+  .listHead{padding:12px;border-bottom:1px solid var(--border);}
+  #search{width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--border);font-size:14px;}
+  #list{max-height:520px;overflow:auto;}
+  .row{
+    padding:10px 12px;border-bottom:1px solid #f0f0f0;cursor:pointer;
+    display:grid;gap:2px;
   }
-  .item{
-    padding:10px 12px;
-    border-bottom:1px solid #eee;
-    cursor:pointer;
-  }
-  .item:last-child{border-bottom:0;}
-  .item:hover{background:#fafafa;}
-  .item .name{font-weight:1000;}
-  .item .sub{font-size:12px;color:var(--muted);margin-top:2px;}
-  .item.selected{background:#fff3f3;}
+  .row:hover{background:#fafafa;}
+  .row strong{font-size:14px;}
+  .row small{color:var(--muted);font-weight:700;}
+  .row.active{outline:2px solid rgba(0,0,0,.12);background:#fff;}
 
-  /* Phone layout: keep plan visible at top */
+  /* Make label smaller on phone */
+  .calloutTitle{font-weight:900;letter-spacing:.5px;}
+  .calloutSub{font-weight:800;opacity:.98;}
   @media (max-width: 600px){
-    header{position:sticky; top:0; background:#fff; z-index:50;}
-    .planSticky{
-      position: sticky;
-      top: 84px; /* header height-ish */
-      z-index:20;
-      background:#fff;
-    }
-    #svgHost{min-height:420px;}
-    .list{max-height:320px;}
-  }
-
-  /* Print for PDF */
-  @media print{
-    header, .panel, .btn, .legend{display:none !important;}
-    .layout{grid-template-columns:1fr; padding:0;}
-    .card{border:0;}
-    #svgHost{min-height:auto;}
+    .calloutTitle{font-size:18px !important;}
+    .calloutSub{font-size:14px !important;}
   }
 </style>
 </head>
-
 <body>
+
 <header>
   <div class="titleWrap">
-    <div id="eventTitle">Loading…</div>
+    <div id="eventName">Loading…</div>
     <div id="updated">Updated: —</div>
-    <div id="ready"><span>Ready</span> <span class="tick">✅</span></div>
+    <div id="status">Loading…</div>
   </div>
+
   <div class="topBtns">
-    <button class="btn" id="btnPdf">Export PDF</button>
-    <button class="btn" id="btnClear" disabled>Clear selection</button>
+    <button class="btn primary" id="btnPdf">Export PDF</button>
+    <button class="btn" id="btnClear">Clear selection</button>
   </div>
 </header>
 
 <div class="layout">
-  <div class="card planCardInner planSticky">
-    <div id="svgHost">
-      <div id="overlay">
-        <svg id="pinLine"></svg>
-        <div id="pinDot"></div>
-        <div id="labelBox">
-          <div id="labelStand"></div>
-          <div id="labelCompany"></div>
-        </div>
-      </div>
+  <div class="card planCard">
+    <div id="svgHost"></div>
 
-      <div class="legend" id="legend">
-        <div class="legItem"><span class="dot main"></span>Stands</div>
-        <div class="legItem"><span class="dot sel"></span>Selected</div>
-      </div>
+    <div class="legend" aria-hidden="true">
+      <span style="display:flex;align-items:center;gap:8px;"><span class="dot stand"></span>Stands</span>
+      <span style="display:flex;align-items:center;gap:8px;"><span class="dot sel"></span>Selected</span>
     </div>
   </div>
 
-  <div class="card">
-    <div class="panel">
-      <div class="panelCard">
-        <h3>Selected exhibitor</h3>
-        <div class="selBig" id="selStand">None</div>
-        <div class="selSmall" id="selCompany"></div>
-        <div class="hint">
-          Desktop: click a stand or choose from the list.<br>
-          Phone: use the list (stand tapping is disabled).
-        </div>
+  <div class="side">
+    <div class="selBox">
+      <div class="panelTitle">Selected exhibitor</div>
+      <div id="selStand">None</div>
+      <div id="selCompany"></div>
+      <div class="hint">
+        Desktop: click a stand or choose from the list.<br>
+        Phone: use the list (stand tapping is disabled).
       </div>
+    </div>
 
-      <div class="panelCard">
-        <h3>Sold exhibitors</h3>
-        <input class="search" id="search" placeholder="Search company or stand…" />
-        <div class="list" id="list"></div>
+    <div class="listBox">
+      <div class="listHead">
+        <div class="panelTitle">Sold exhibitors</div>
+        <input id="search" placeholder="Search company or stand…" />
       </div>
+      <div id="list"></div>
+    </div>
 
-      <div class="panelCard">
-        <h3>Help</h3>
-        <div class="hint">All stands are in the main colour. Selecting an exhibitor makes their stand red with a label + line.</div>
-      </div>
+    <div class="selBox">
+      <div class="panelTitle">Help</div>
+      <div class="hint">All stands are in the main colour. Selecting an exhibitor makes their stand red with a label + line.</div>
     </div>
   </div>
 </div>
 
+<!-- jsPDF for Export PDF -->
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
 <script>
 (() => {
-  /* Safari compatibility: CSS.escape polyfill */
-  if (!window.CSS) window.CSS = {};
-  if (typeof window.CSS.escape !== 'function') {
-    window.CSS.escape = function (value) {
-      return String(value).replace(/[^a-zA-Z0-9_\-]/g, function (ch) {
-        const hex = ch.codePointAt(0).toString(16).toUpperCase();
-        return '\\' + hex + ' ';
-      });
-    };
-  }
+  // ===== CONFIG =====
+  const API_BASE = "https://floorplansaberdeen.floorplansaberdeen.workers.dev";
+  const SVG_URL  = "./event_plan.svg";
 
-  const API_BASE = 'https://floorplansaberdeen.floorplansaberdeen.workers.dev';
-  const SVG_URL  = './event_plan.svg';
-  const SYNC_MS  = 15000;
+  const STAND_FILL_RGB = "213,109,50";       // requested
+  const STAND_OPACITY  = 0.75;
+  const SELECTED_FILL  = "#e53935";
 
-  const MAIN_RGB = 'rgb(213, 109, 50)';
-  const MAIN_OP  = 0.75;
-  const SELECTED = '#e53935';
+  const STAND_ID_RE = /^([A-Z]{1,3})(\d{1,3})$/;
+  const isPhone = matchMedia("(max-width: 600px)").matches;
 
-  const isPhone = matchMedia('(max-width: 600px)').matches;
+  // ===== DOM =====
+  const elEvent  = document.getElementById("eventName");
+  const elUpdated= document.getElementById("updated");
+  const elStatus = document.getElementById("status");
 
-  const elEvent   = document.getElementById('eventTitle');
-  const elUpdated = document.getElementById('updated');
-  const btnClear  = document.getElementById('btnClear');
-  const btnPdf    = document.getElementById('btnPdf');
+  const svgHost  = document.getElementById("svgHost");
+  const listEl   = document.getElementById("list");
+  const searchEl = document.getElementById("search");
 
-  const svgHost   = document.getElementById('svgHost');
-  const overlay   = document.getElementById('overlay');
-  const pinDot    = document.getElementById('pinDot');
-  const pinLine   = document.getElementById('pinLine');
-  const labelBox  = document.getElementById('labelBox');
-  const labelStand= document.getElementById('labelStand');
-  const labelCompany = document.getElementById('labelCompany');
+  const selStand = document.getElementById("selStand");
+  const selCo    = document.getElementById("selCompany");
 
-  const selStand  = document.getElementById('selStand');
-  const selCompany= document.getElementById('selCompany');
+  const btnClear = document.getElementById("btnClear");
+  const btnPdf   = document.getElementById("btnPdf");
 
-  const searchEl  = document.getElementById('search');
-  const listEl    = document.getElementById('list');
-
+  // ===== STATE =====
   let svgRoot = null;
-  let standData = []; // array of {standId,status,company}
-  let byId = new Map();
-  let selectedId = '';
+  let stands = [];            // from API
+  let byId = new Map();       // standId -> {standId,status,company}
+  let selectedId = "";
+  let calloutG = null;
 
-  function normalizeStatus(v){
-    return String(v||'').toLowerCase().trim() === 'sold' ? 'sold' : 'available';
+  // ===== UTILS =====
+  function setStatus(txt, ok=true){
+    elStatus.textContent = txt;
+    elStatus.style.color = ok ? "#0a7a2a" : "#b00020";
   }
+  function normalizeStatus(v){
+    return String(v||"").toLowerCase().trim()==="sold" ? "sold" : "available";
+  }
+  function isStandId(id){ return STAND_ID_RE.test(String(id||"").trim()); }
 
   async function fetchJson(url){
-    const res = await fetch(url, { cache:'no-store' });
+    const res = await fetch(url, { cache:"no-store" });
     const text = await res.text();
-    let json = null;
-    try{ json = JSON.parse(text); }catch{}
-    if(!res.ok) throw new Error('HTTP ' + res.status);
-    return json;
+    try{
+      const json = JSON.parse(text);
+      if(!res.ok) throw new Error("HTTP "+res.status);
+      return json;
+    }catch(e){
+      throw new Error("Bad response from server.");
+    }
   }
 
   async function loadSvg(){
-    const res = await fetch(SVG_URL, { cache:'no-store' });
-    if(!res.ok) throw new Error('SVG not found: ' + SVG_URL);
-    svgHost.insertAdjacentHTML('afterbegin', await res.text());
-    svgRoot = svgHost.querySelector('svg');
-    if(!svgRoot) throw new Error('SVG root not found');
-    svgRoot.style.userSelect = 'none';
+    const res = await fetch(SVG_URL, { cache:"no-store" });
+    if(!res.ok) throw new Error("SVG not found: "+SVG_URL+" (HTTP "+res.status+")");
+    svgHost.innerHTML = await res.text();
+    svgRoot = svgHost.querySelector("svg");
+    if(!svgRoot) throw new Error("SVG missing <svg> root");
+
+    // Ensure pointer events are available on shapes, not text
+    svgRoot.querySelectorAll("text,tspan").forEach(t=>{
+      t.style.pointerEvents = "none";
+      t.style.userSelect = "none";
+    });
+
+    // Create a single overlay group for callout (always on top)
+    calloutG = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    calloutG.setAttribute("id","__callout");
+    svgRoot.appendChild(calloutG);
   }
 
   function getStandNodes(){
-    if(!svgRoot) return [];
-    // Prefer g[id], else shapes
-    const groups = Array.from(svgRoot.querySelectorAll('g[id]'));
-    const shapes = Array.from(svgRoot.querySelectorAll('path[id],rect[id],polygon[id],circle[id],ellipse[id],polyline[id],line[id]'));
+    // Prefer elements that themselves have the id (not big groups)
+    const shapes = Array.from(svgRoot.querySelectorAll("path[id],rect[id],polygon[id],circle[id],ellipse[id],polyline[id]"))
+      .filter(el => isStandId(el.id));
+    if (shapes.length) return shapes;
 
-    const exists = id => byId.has(String(id||'').trim());
-    const g = groups.filter(n => exists(n.id));
-    if(g.length) return g;
-    return shapes.filter(n => exists(n.id));
+    const groups = Array.from(svgRoot.querySelectorAll("g[id]")).filter(g=>isStandId(g.id));
+    return groups;
   }
 
-  function paintNode(node, fillRgb, opacity){
-    const targets = (node.tagName.toLowerCase()==='g')
-      ? node.querySelectorAll('path,rect,polygon,circle,ellipse,polyline,line')
+  function paintStandNode(node, isSelected){
+    const targets = (node.tagName.toLowerCase()==="g")
+      ? node.querySelectorAll("path,rect,polygon,circle,ellipse,polyline,line")
       : [node];
 
+    const fill = isSelected ? SELECTED_FILL : `rgb(${STAND_FILL_RGB})`;
+    const op   = isSelected ? "0.85" : String(STAND_OPACITY);
+
     targets.forEach(el=>{
-      el.style.fill = fillRgb;
-      el.style.fillOpacity = String(opacity);
-      el.style.stroke = 'rgba(0,0,0,0.45)';
-      el.style.strokeOpacity = '0.6';
+      el.style.fill = fill;
+      el.style.fillOpacity = op;
+      el.style.stroke = "rgba(0,0,0,0.45)";
+      el.style.strokeOpacity = "0.6";
+      el.style.cursor = isPhone ? "default" : "pointer";
     });
   }
 
-  function renderPlan(){
-    const nodes = getStandNodes();
-    nodes.forEach(node=>{
-      paintNode(node, MAIN_RGB, MAIN_OP);
+  function repaintAll(){
+    if(!svgRoot) return;
+    getStandNodes().forEach(node=>{
+      const id = String(node.id||"").trim();
+      paintStandNode(node, id === selectedId);
     });
+  }
 
-    // Then selected stand in red
-    if(selectedId && byId.has(selectedId)){
-      const selNode = svgRoot.querySelector('#' + CSS.escape(selectedId));
-      if(selNode){
-        paintNode(selNode, SELECTED, 0.80);
+  function standBBox(standId){
+    const node = svgRoot.querySelector("#"+CSS.escape(standId));
+    if(!node) return null;
+    try{ return node.getBBox(); }catch(_){ return null; }
+  }
+
+  // Smart placement: try several candidate positions around the stand bbox.
+  function chooseCalloutPosition(bb, vb){
+    const pad = 18;
+    const w = isPhone ? 260 : 300;
+    const h = isPhone ? 90  : 98;
+
+    const cx = bb.x + bb.width/2;
+    const cy = bb.y + bb.height/2;
+
+    const candidates = [
+      // below-left / below-right / above-left / above-right
+      {x: cx - w - 30, y: bb.y + bb.height + 40},
+      {x: cx + 30,     y: bb.y + bb.height + 40},
+      {x: cx - w - 30, y: bb.y - h - 40},
+      {x: cx + 30,     y: bb.y - h - 40},
+      // left / right
+      {x: bb.x - w - 40, y: cy - h/2},
+      {x: bb.x + bb.width + 40, y: cy - h/2},
+      // forced "down"
+      {x: cx - w/2, y: bb.y + bb.height + 60},
+    ];
+
+    function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
+
+    // Prefer candidates that stay inside viewBox and don't overlap the stand bbox.
+    for (const c of candidates){
+      const x = clamp(c.x, vb.x + pad, vb.x + vb.width - w - pad);
+      const y = clamp(c.y, vb.y + pad, vb.y + vb.height - h - pad);
+
+      const overlap =
+        !(x+w < bb.x-pad || x > bb.x+bb.width+pad || y+h < bb.y-pad || y > bb.y+bb.height+pad);
+
+      if(!overlap) return {x,y,w,h};
+    }
+
+    // fallback
+    const fx = clamp(cx - w/2, vb.x + pad, vb.x + vb.width - w - pad);
+    const fy = clamp(bb.y + bb.height + 60, vb.y + pad, vb.y + vb.height - h - pad);
+    return {x:fx,y:fy,w,h};
+  }
+
+  function clearCallout(){
+    if(calloutG) calloutG.innerHTML = "";
+  }
+
+  function drawCallout(standId){
+    clearCallout();
+    if(!standId) return;
+
+    const info = byId.get(standId) || { standId, company:"" };
+    const bb = standBBox(standId);
+    if(!bb) return;
+
+    // viewBox
+    let vb = svgRoot.viewBox && svgRoot.viewBox.baseVal ? svgRoot.viewBox.baseVal : null;
+    if(!vb || !vb.width){
+      // if missing viewBox, create from bbox of svg content
+      try{
+        const rootBB = svgRoot.getBBox();
+        svgRoot.setAttribute("viewBox", `${rootBB.x} ${rootBB.y} ${rootBB.width} ${rootBB.height}`);
+        vb = svgRoot.viewBox.baseVal;
+      }catch(_){
+        vb = {x:0,y:0,width:1000,height:700};
       }
     }
+
+    const box = chooseCalloutPosition(bb, vb);
+
+    const standCx = bb.x + bb.width/2;
+    const standCy = bb.y + bb.height/2;
+
+    // Anchor point on box (closest edge)
+    const boxCx = box.x + box.w/2;
+    const boxCy = box.y + box.h/2;
+    const ax = (standCx < box.x) ? box.x : (standCx > box.x+box.w ? box.x+box.w : boxCx);
+    const ay = (standCy < box.y) ? box.y : (standCy > box.y+box.h ? box.y+box.h : boxCy);
+
+    // Line + pin
+    const line = document.createElementNS("http://www.w3.org/2000/svg","line");
+    line.setAttribute("x1", ax);
+    line.setAttribute("y1", ay);
+    line.setAttribute("x2", standCx);
+    line.setAttribute("y2", standCy);
+    line.setAttribute("stroke", "rgba(0,0,0,.75)");
+    line.setAttribute("stroke-width", isPhone ? "6" : "4");
+    line.setAttribute("stroke-linecap","round");
+
+    const pin = document.createElementNS("http://www.w3.org/2000/svg","circle");
+    pin.setAttribute("cx", standCx);
+    pin.setAttribute("cy", standCy);
+    pin.setAttribute("r", isPhone ? "16" : "12");
+    pin.setAttribute("fill", "rgba(0,0,0,.75)");
+
+    // Callout box
+    const rect = document.createElementNS("http://www.w3.org/2000/svg","rect");
+    rect.setAttribute("x", box.x);
+    rect.setAttribute("y", box.y);
+    rect.setAttribute("width", box.w);
+    rect.setAttribute("height", box.h);
+    rect.setAttribute("rx", "16");
+    rect.setAttribute("ry", "16");
+    rect.setAttribute("fill", SELECTED_FILL);
+    rect.setAttribute("fill-opacity","0.95");
+
+    // subtle drop shadow
+    rect.style.filter = "drop-shadow(0px 10px 16px rgba(0,0,0,.22))";
+
+    // Text
+    const t1 = document.createElementNS("http://www.w3.org/2000/svg","text");
+    t1.setAttribute("x", box.x + box.w/2);
+    t1.setAttribute("y", box.y + (isPhone ? 38 : 42));
+    t1.setAttribute("text-anchor","middle");
+    t1.setAttribute("fill","#fff");
+    t1.style.fontFamily = "Arial, Helvetica, sans-serif";
+    t1.style.fontWeight = "900";
+    t1.style.fontSize = isPhone ? "28px" : "30px";
+    t1.setAttribute("class","calloutTitle");
+    t1.textContent = info.standId;
+
+    const t2 = document.createElementNS("http://www.w3.org/2000/svg","text");
+    t2.setAttribute("x", box.x + box.w/2);
+    t2.setAttribute("y", box.y + (isPhone ? 70 : 76));
+    t2.setAttribute("text-anchor","middle");
+    t2.setAttribute("fill","#fff");
+    t2.style.fontFamily = "Arial, Helvetica, sans-serif";
+    t2.style.fontWeight = "800";
+    t2.style.fontSize = isPhone ? "18px" : "18px";
+    t2.setAttribute("class","calloutSub");
+    t2.textContent = (info.company || "").trim();
+
+    // Order: line under box, pin above line, box above, text on top
+    calloutG.appendChild(line);
+    calloutG.appendChild(pin);
+    calloutG.appendChild(rect);
+    calloutG.appendChild(t1);
+    if(t2.textContent) calloutG.appendChild(t2);
+  }
+
+  function setSelected(standId){
+    selectedId = standId || "";
+    if(!selectedId){
+      selStand.textContent = "None";
+      selCo.textContent = "";
+      clearCallout();
+      repaintAll();
+      renderList();
+      return;
+    }
+    const info = byId.get(selectedId) || { standId:selectedId, company:"" };
+    selStand.textContent = info.standId;
+    selCo.textContent = (info.company || "").trim();
+    repaintAll();
+    renderList();
+    drawCallout(selectedId);
   }
 
   function renderList(){
-    const q = String(searchEl.value||'').toLowerCase().trim();
-    const sold = standData
-      .filter(s => normalizeStatus(s.status)==='sold')
-      .filter(s => (s.company||'').trim().length > 0)
-      .sort((a,b)=>(a.company||'').localeCompare(b.company||'', undefined, {numeric:true}));
+    const q = String(searchEl.value||"").toLowerCase().trim();
+    const sold = stands
+      .filter(s => normalizeStatus(s.status)==="sold")
+      .filter(s => String(s.company||"").trim() !== "")
+      .map(s => ({ standId:String(s.standId).trim(), company:String(s.company||"").trim() }))
+      .sort((a,b)=>a.company.localeCompare(b.company));
 
-    const filtered = sold.filter(s=>{
-      if(!q) return true;
-      return s.standId.toLowerCase().includes(q) || (s.company||'').toLowerCase().includes(q);
+    const filtered = !q ? sold : sold.filter(x =>
+      x.company.toLowerCase().includes(q) || x.standId.toLowerCase().includes(q)
+    );
+
+    listEl.innerHTML = "";
+    filtered.forEach(item=>{
+      const row = document.createElement("div");
+      row.className = "row" + (item.standId===selectedId ? " active":"");
+      row.innerHTML = `<strong>${escapeHtml(item.company)}</strong><small>Stand ${escapeHtml(item.standId)}</small>`;
+      row.addEventListener("click", ()=>setSelected(item.standId));
+      listEl.appendChild(row);
     });
 
-    listEl.innerHTML = '';
     if(!filtered.length){
-      const d = document.createElement('div');
-      d.className = 'item';
-      d.style.cursor = 'default';
-      d.textContent = 'No exhibitors found.';
-      listEl.appendChild(d);
-      return;
+      const empty = document.createElement("div");
+      empty.style.padding = "12px";
+      empty.style.color = "#777";
+      empty.textContent = "No sold exhibitors found.";
+      listEl.appendChild(empty);
     }
-
-    filtered.forEach(s=>{
-      const div = document.createElement('div');
-      div.className = 'item' + (s.standId===selectedId ? ' selected' : '');
-      div.innerHTML = `<div class="name">${escapeHtml(s.company)}</div><div class="sub">Stand ${escapeHtml(s.standId)}</div>`;
-      div.addEventListener('click', ()=> selectStand(s.standId));
-      listEl.appendChild(div);
-    });
   }
 
-  function escapeHtml(str){
-    return String(str||'').replace(/[&<>"']/g, (m)=>({
-      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'
+  function escapeHtml(s){
+    return String(s||"").replace(/[&<>"']/g, m => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
     }[m]));
   }
 
-  function clearSelection(){
-    selectedId = '';
-    btnClear.disabled = true;
-    selStand.textContent = 'None';
-    selCompany.textContent = '';
-    hideLabel();
-    renderPlan();
-    renderList();
-  }
-
-  function hideLabel(){
-    pinDot.style.display = 'none';
-    pinLine.style.display = 'none';
-    labelBox.style.display = 'none';
-    pinLine.innerHTML = '';
-  }
-
-  function selectStand(id){
-    id = String(id||'').trim();
-    if(!id || !byId.has(id)) return;
-
-    selectedId = id;
-    btnClear.disabled = false;
-
-    const info = byId.get(id);
-    selStand.textContent = info.standId;
-    selCompany.textContent = info.company || '';
-
-    renderPlan();
-    renderList();
-    drawLabelSmart(id, info.company || '');
-  }
-
-  function getNodeBBoxInClient(id){
-    const node = svgRoot.querySelector('#' + CSS.escape(id));
-    if(!node) return null;
-
-    let bb;
-    try{ bb = node.getBBox(); }catch{ return null; }
-
-    const ctm = node.getScreenCTM();
-    if(!ctm) return null;
-
-    // Convert SVG bb corners to screen coords
-    const p = svgRoot.createSVGPoint();
-    function xform(x,y){
-      p.x=x; p.y=y;
-      const sp = p.matrixTransform(ctm);
-      return {x: sp.x, y: sp.y};
-    }
-    const a = xform(bb.x, bb.y);
-    const b = xform(bb.x + bb.width, bb.y);
-    const c = xform(bb.x + bb.width, bb.y + bb.height);
-    const d = xform(bb.x, bb.y + bb.height);
-
-    const xs = [a.x,b.x,c.x,d.x], ys=[a.y,b.y,c.y,d.y];
-    const left = Math.min(...xs), right=Math.max(...xs);
-    const top = Math.min(...ys), bottom=Math.max(...ys);
-
-    return {
-      left, top, right, bottom,
-      cx: (left+right)/2,
-      cy: (top+bottom)/2
-    };
-  }
-
-  function drawLabelSmart(id, company){
-    const bb = getNodeBBoxInClient(id);
-    if(!bb){ hideLabel(); return; }
-
-    labelStand.textContent = id;
-    labelCompany.textContent = company;
-
-    // ensure box is measurable
-    labelBox.style.display = 'block';
-    labelBox.style.left = '0px';
-    labelBox.style.top  = '0px';
-
-    // Convert plan container bounds
-    const hostRect = svgHost.getBoundingClientRect();
-
-    // Candidate label positions (screen coords)
-    const pad = isPhone ? 22 : 28;
-    const candidates = [
-      { name:'bottom', x: bb.cx, y: bb.bottom + pad },
-      { name:'left',   x: bb.left - pad, y: bb.cy },
-      { name:'right',  x: bb.right + pad, y: bb.cy },
-      { name:'top',    x: bb.cx, y: bb.top - pad }
-    ];
-
-    const boxW = labelBox.offsetWidth;
-    const boxH = labelBox.offsetHeight;
-
-    function score(pos){
-      // compute label box rect at this pos (centered)
-      const L = pos.x - boxW/2, R = pos.x + boxW/2;
-      const T = pos.y - boxH/2, B = pos.y + boxH/2;
-
-      // heavy penalty if outside host
-      let penalty = 0;
-      if(L < hostRect.left) penalty += (hostRect.left - L) * 10;
-      if(R > hostRect.right) penalty += (R - hostRect.right) * 10;
-      if(T < hostRect.top) penalty += (hostRect.top - T) * 10;
-      if(B > hostRect.bottom) penalty += (B - hostRect.bottom) * 10;
-
-      // penalty if overlaps stand bbox
-      const overlap =
-        !(R < bb.left || L > bb.right || B < bb.top || T > bb.bottom);
-      if(overlap) penalty += 20000;
-
-      // slight preference for bottom
-      if(pos.name === 'bottom') penalty -= 300;
-
-      // prefer closer
-      const dx = pos.x - bb.cx, dy = pos.y - bb.cy;
-      penalty += (dx*dx + dy*dy) * 0.01;
-
-      return penalty;
+  async function sync(){
+    // settings
+    try{
+      const settings = await fetchJson(API_BASE + "/settings?ts=" + Date.now());
+      elEvent.textContent = (settings && settings.eventName) ? settings.eventName : "New Event";
+    }catch(_){
+      elEvent.textContent = "New Event";
     }
 
-    candidates.sort((a,b)=>score(a)-score(b));
-    const best = candidates[0];
+    // stands
+    stands = await fetchJson(API_BASE + "/stands?ts=" + Date.now());
+    if(!Array.isArray(stands)) stands = [];
 
-    // clamp best to host bounds (keep inside)
-    let x = best.x, y = best.y;
-    x = Math.max(hostRect.left + boxW/2 + 8, Math.min(hostRect.right - boxW/2 - 8, x));
-    y = Math.max(hostRect.top + boxH/2 + 8, Math.min(hostRect.bottom - boxH/2 - 8, y));
+    byId = new Map(stands.map(s => [String(s.standId).trim(), {
+      standId: String(s.standId).trim(),
+      status: normalizeStatus(s.status),
+      company: String(s.company||"").trim()
+    }]));
 
-    // Place label in overlay coordinates (relative to svgHost)
-    const relX = x - hostRect.left;
-    const relY = y - hostRect.top;
-    labelBox.style.left = relX + 'px';
-    labelBox.style.top  = relY + 'px';
+    elUpdated.textContent = "Updated: " + new Date().toLocaleTimeString();
+    renderList();
 
-    // Pin dot at stand center (relative)
-    const dotX = bb.cx - hostRect.left;
-    const dotY = bb.cy - hostRect.top;
-    pinDot.style.left = dotX + 'px';
-    pinDot.style.top  = dotY + 'px';
-    pinDot.style.display = 'block';
-
-    // Draw line (SVG in overlay)
-    pinLine.setAttribute('viewBox', `0 0 ${hostRect.width} ${hostRect.height}`);
-    pinLine.setAttribute('preserveAspectRatio','none');
-    pinLine.innerHTML = '';
-
-    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
-    line.setAttribute('x1', dotX);
-    line.setAttribute('y1', dotY);
-    line.setAttribute('x2', relX);
-    line.setAttribute('y2', relY);
-    line.setAttribute('stroke', '#111');
-    line.setAttribute('stroke-width', isPhone ? '6' : '4');
-    line.setAttribute('stroke-linecap','round');
-    line.setAttribute('opacity','0.8');
-
-    pinLine.appendChild(line);
-    pinLine.style.display = 'block';
+    // keep selection (if it still exists)
+    if(selectedId && !byId.has(selectedId)) selectedId = "";
+    repaintAll();
+    if(selectedId) drawCallout(selectedId);
   }
 
-  function bindStandClicks(){
-    // Phone: disable stand tapping
-    if(isPhone) return;
-
+  function bindStandClick(){
+    if(isPhone) return; // disabled on phone
     getStandNodes().forEach(node=>{
-      node.style.cursor = 'pointer';
-      node.addEventListener('click', (e)=>{
-        e.preventDefault(); e.stopPropagation();
-        const id = String(node.id||'').trim();
-        if(byId.has(id)) selectStand(id);
+      const id = String(node.id||"").trim();
+      node.addEventListener("click", (e)=>{
+        e.preventDefault();
+        e.stopPropagation();
+        setSelected(id);
       });
     });
   }
 
-  async function syncData(){
-    const data = await fetchJson(API_BASE + '/stands?ts=' + Date.now());
-    standData = Array.isArray(data) ? data : [];
-    byId = new Map(standData.map(s=>[String(s.standId||'').trim(), {
-      standId:String(s.standId||'').trim(),
-      status:normalizeStatus(s.status),
-      company:String(s.company||'').trim()
-    }]).filter(([k])=>k));
-
-    renderPlan();
-    renderList();
-
-    // keep selection alive
-    if(selectedId && byId.has(selectedId)){
-      const info = byId.get(selectedId);
-      selStand.textContent = info.standId;
-      selCompany.textContent = info.company || '';
-      drawLabelSmart(selectedId, info.company || '');
-    } else if(selectedId && !byId.has(selectedId)){
-      clearSelection();
-    }
-
-    elUpdated.textContent = 'Updated: ' + new Date().toLocaleTimeString();
-  }
-
-  async function loadSettings(){
+  async function exportPdf(){
     try{
-      const s = await fetchJson(API_BASE + '/settings?ts=' + Date.now());
-      const name = (s && typeof s.eventName === 'string') ? s.eventName : 'New Event';
-      elEvent.textContent = name;
-    }catch{
-      elEvent.textContent = 'New Event';
+      btnPdf.disabled = true;
+      setStatus("Preparing PDF…", true);
+
+      // serialize svg
+      const svg = svgRoot.cloneNode(true);
+      svg.removeAttribute("width");
+      svg.removeAttribute("height");
+
+      const svgText = new XMLSerializer().serializeToString(svg);
+      const blob = new Blob([svgText], { type:"image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+
+      // render to image
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      await new Promise((resolve,reject)=>{
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = url;
+      });
+
+      // draw to canvas
+      const canvas = document.createElement("canvas");
+      const w = img.width || 1600;
+      const h = img.height || 900;
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0,0,w,h);
+      ctx.drawImage(img,0,0);
+
+      URL.revokeObjectURL(url);
+
+      // build PDF
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({
+        orientation: w >= h ? "landscape" : "portrait",
+        unit: "pt",
+        format: [w, h]
+      });
+
+      const dataUrl = canvas.toDataURL("image/png");
+      pdf.addImage(dataUrl, "PNG", 0, 0, w, h);
+      pdf.save((elEvent.textContent || "floorplan") + ".pdf");
+
+      setStatus("Ready ✅", true);
+    }catch(e){
+      console.error(e);
+      setStatus("PDF export failed", false);
+    }finally{
+      btnPdf.disabled = false;
     }
   }
 
-  btnClear.addEventListener('click', clearSelection);
-
-  // Export PDF: use print-to-PDF (reliable)
-  btnPdf.addEventListener('click', ()=>{
-    window.print();
-  });
-
-  searchEl.addEventListener('input', renderList);
-
-  // Reposition label on resize/orientation
-  window.addEventListener('resize', ()=>{
-    if(selectedId && byId.has(selectedId)){
-      const info = byId.get(selectedId);
-      drawLabelSmart(selectedId, info.company || '');
-    }
-  });
-
+  // ===== INIT =====
   (async ()=>{
     try{
-      await loadSettings();
+      setStatus("Loading…", true);
       await loadSvg();
-      await syncData();
-      bindStandClicks();
-      setInterval(syncData, SYNC_MS);
+      await sync();
+      bindStandClick();
+      setSelected("");
+
+      // paint base state
+      repaintAll();
+
+      setStatus("Ready ✅", true);
+
+      // periodic refresh
+      setInterval(()=>sync().catch(()=>{}), 15000);
+
     }catch(e){
-      elEvent.textContent = 'Load error';
       console.error(e);
+      setStatus("Load error", false);
+      elEvent.textContent = "New Event";
     }
   })();
+
+  // ===== EVENTS =====
+  searchEl.addEventListener("input", renderList);
+  btnClear.addEventListener("click", ()=>setSelected(""));
+  btnPdf.addEventListener("click", exportPdf);
 
 })();
 </script>
