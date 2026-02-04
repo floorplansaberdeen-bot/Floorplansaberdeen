@@ -1,610 +1,638 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Exhibition Floorplan</title>
 <style>
-  :root{
-    --bg:#ffffff;
-    --ink:#111;
-    --muted:#6b6b6b;
-    --border:#e6e6e6;
-
-    /* Requested "green" replacement */
-    --stands: rgba(213,109,50,0.75);
-    --stands-solid: rgb(213,109,50);
-
-    --selected:#e53935;
-
-    --card:#fff;
-    --shadow: 0 10px 28px rgba(0,0,0,.12);
-    --shadow-soft: 0 6px 18px rgba(0,0,0,.10);
-
-    --radius: 14px;
+  :root {
+    --card-border: rgba(0,0,0,.12);
+    --muted: rgba(0,0,0,.62);
+    --main-fill: rgba(213, 109, 50, 0.75);
+    --sold-fill: #e53935;
+    --selected-fill: #e53935;
   }
-
-  *{box-sizing:border-box}
-  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);}
-
-  /* Header */
-  header{
-    position:sticky; top:0; z-index:50;
-    background:rgba(255,255,255,.92);
-    backdrop-filter:saturate(180%) blur(10px);
-    border-bottom:1px solid var(--border);
-    padding:12px 14px;
-    display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    background: #fff;
+    color: #111;
   }
-  .hLeft{display:flex; flex-direction:column; gap:4px;}
-  #eventName{font-weight:900;font-size:26px;line-height:1.05}
-  #updated{font-size:12px;color:var(--muted)}
-  #status{font-size:13px;color:#0f7a33;font-weight:700}
-  .hRight{display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:flex-end}
-  .btn{
-    appearance:none;border:1px solid var(--border);background:#fafafa;border-radius:10px;
-    padding:8px 12px;font-weight:800;font-size:13px;cursor:pointer;
+  header {
+    padding: 18px 16px 10px;
+    display:flex;
+    gap:14px;
+    align-items:flex-start;
+    justify-content:space-between;
+    flex-wrap:wrap;
   }
-  .btn:disabled{opacity:.55;cursor:not-allowed}
-
-  /* Layout */
-  .wrap{max-width:1400px;margin:0 auto;padding:12px;display:grid;gap:12px;grid-template-columns: 1fr 360px;}
-  @media (max-width: 980px){ .wrap{grid-template-columns:1fr;} }
-
-  /* On phone: keep plan pinned at top, list scrolls */
-  @media (max-width: 760px){
-    .wrap{padding:10px;gap:10px;}
-    .stickyPlan{
-      position:sticky; top:78px; z-index:30;
-      background:transparent;
+  .titleWrap h1 {
+    margin: 0;
+    font-size: 34px;
+    line-height: 1.02;
+  }
+  .sub {
+    margin-top: 6px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  .status {
+    margin-top: 6px;
+    font-weight: 700;
+    color: #1b5e20;
+    font-size: 16px;
+  }
+  .btnRow {
+    display:flex; gap:10px; align-items:center;
+  }
+  button {
+    border: 1px solid var(--card-border);
+    background: #fff;
+    border-radius: 14px;
+    padding: 12px 16px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  main {
+    display:grid;
+    grid-template-columns: 1.4fr 520px;
+    gap: 16px;
+    padding: 0 16px 16px;
+  }
+  @media (max-width: 1000px) {
+    main {
+      grid-template-columns: 1fr;
     }
   }
-
-  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
-  .cardPad{padding:12px}
-
-  /* Plan */
-  #planCard{min-height:440px}
-  #svgHost{position:relative; overflow:hidden;}
-  #svgHost svg{width:100%;height:auto;display:block}
-  svg text, svg tspan{pointer-events:none; user-select:none;}
-
-  /* Keep the lozenge visible (raise it) */
-  .legendPill{
-    position:absolute; left:50%; transform:translateX(-50%);
-    bottom:16px; /* higher so it won't clip */
-    display:inline-flex; align-items:center; gap:16px;
-    padding:10px 14px;border:1px solid var(--border);border-radius:999px;background:#fff;
-    box-shadow: var(--shadow-soft);
-    font-size:13px;font-weight:800;
+  .card {
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    background:#fff;
+    overflow:hidden;
+  }
+  .cardHead {
+    padding: 14px 14px 0;
+    font-weight: 800;
+  }
+  .planCard {
+    position: relative;
+  }
+  .planViewport {
+    position: relative;
+    height: min(560px, 62vh);
+    padding: 14px;
+  }
+  @media (max-width: 700px) {
+    .planViewport {
+      height: 320px;
+      padding: 12px;
+    }
+    header .titleWrap h1 { font-size: 40px; }
+  }
+  /* Make plan "sticky" on phone so list scrolls underneath */
+  @media (max-width: 1000px) {
+    .planCard {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background:#fff;
+    }
+  }
+  .svgHost {
+    position:absolute;
+    left: 14px; top: 14px; right: 14px; bottom: 14px;
+    border-radius: 14px;
+  }
+  .svgHost svg { width:100%; height:100%; display:block; }
+  /* overlay svg uses pixel coords via dynamic viewBox */
+  #overlaySvg {
+    position:absolute;
+    left: 14px; top: 14px; right: 14px; bottom: 14px;
     pointer-events:none;
   }
-    .legendPill{display:none !important;}
-
-  .dot{width:12px;height:12px;border-radius:50%;}
-  .dot.base{background:var(--stands-solid)}
-  .dot.sel{background:var(--selected)}
-
-  /* Right panel */
-  .side{display:grid;gap:12px}
-  .side h3{margin:0;font-size:13px;color:#222}
-  .big{font-size:26px;font-weight:950;line-height:1}
-  .subbig{font-size:20px;font-weight:850;margin-top:3px}
-  .help{font-size:12px;color:var(--muted);line-height:1.35}
-
-  /* List */
-  .search{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:12px;font-size:14px;outline:none}
-  #list{
-    max-height:520px; overflow:auto;
-    border:1px solid var(--border);
-    border-radius:12px;
-    background:#fff;
-    /* bottom padding so last row is selectable above browser bar */
-    padding-bottom: calc(14px + env(safe-area-inset-bottom));
-  }
-  .row{
-    padding:10px 12px;border-bottom:1px solid #f0f0f0;cursor:pointer;
-    display:flex;flex-direction:column;gap:2px;
-  }
-  .row:last-child{border-bottom:0}
-  .row:hover{background:#fafafa}
-  .row .name{font-weight:900;font-size:14px}
-  .row .meta{font-size:12px;color:var(--muted)}
-  .row.selected{outline:2px solid rgba(0,0,0,.06); background:#fff7f7}
-
-  /* Label overlay */
-  #overlay{
-    position:absolute; inset:0; pointer-events:none;
-  }
-  .tag{
+  .callout {
     position:absolute;
-    min-width:220px;
-    max-width: 360px;
-    background:var(--selected);
-    color:#fff;
-    border-radius:14px;
-    padding:14px 16px;
-    box-shadow: var(--shadow);
+    min-width: 180px;
+    max-width: 320px;
+    padding: 14px 18px;
+    border-radius: 18px;
+    background: var(--selected-fill);
+    color: #fff;
+    box-shadow: 0 12px 24px rgba(0,0,0,.18);
+    pointer-events:none;
     text-align:center;
   }
-  .tag .stand{font-weight:950;font-size:40px;letter-spacing:.5px;line-height:1}
-  .tag .company{font-weight:850;font-size:20px;margin-top:8px;line-height:1.15}
-  /* smaller on phone */
-  @media (max-width: 760px){
-    .tag{min-width:180px;max-width:320px;padding:12px 14px;border-radius:14px}
-    .tag .stand{font-size:34px}
-    .tag .company{font-size:18px}
+  .callout .stand {
+    font-weight: 900;
+    font-size: 34px;
+    letter-spacing: .5px;
+    line-height: 1;
   }
-
-  /* Connection line (SVG in overlay) */
-  #overlaySvg{position:absolute; inset:0; width:100%; height:100%;}
-  .line{stroke:rgba(0,0,0,.72); stroke-width:3; fill:none}
-  .pin{fill:rgba(0,0,0,.72)}
-  /* smaller + tasteful */
-  .pin{r:6}
-
-  /* Remove big blank space under plan on phone by letting SVG card shrink */
-  @media (max-width: 760px){
-    #planCard{min-height:auto}
+  .callout .company {
+    margin-top: 6px;
+    font-weight: 800;
+    font-size: 18px;
+    opacity: .98;
+    line-height: 1.15;
+  }
+  @media (max-width: 700px) {
+    .callout {
+      padding: 12px 14px;
+      min-width: 150px;
+      border-radius: 16px;
+    }
+    .callout .stand { font-size: 30px; }
+    .callout .company { font-size: 16px; }
+  }
+  /* right column */
+  .side {
+    display:flex;
+    flex-direction:column;
+    gap: 16px;
+  }
+  .pad {
+    padding: 14px;
+  }
+  .selectedBig {
+    font-size: 44px;
+    font-weight: 900;
+    line-height: 1;
+    margin: 6px 0 0;
+  }
+  .muted { color: var(--muted); }
+  .search {
+    width:100%;
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 12px 12px;
+    font-size: 16px;
+  }
+  .list {
+    max-height: 54vh;
+    overflow:auto;
+    padding-bottom: 90px; /* iOS browser bar */
+  }
+  @media (max-width: 1000px) {
+    .list { max-height: none; }
+  }
+  .row {
+    padding: 12px 14px;
+    border-top: 1px solid rgba(0,0,0,.08);
+    cursor:pointer;
+  }
+  .row:hover { background: rgba(0,0,0,.03); }
+  .row .nm { font-weight: 900; font-size: 20px; }
+  .row .st { color: var(--muted); margin-top: 2px; }
+  .row.active {
+    background: rgba(229,57,53,.08);
+  }
+  /* Ensure plan tapping is disabled on touch devices (prevents freezes) */
+  @media (hover: none) and (pointer: coarse) {
+    .svgHost { pointer-events:none; }
   }
 </style>
 </head>
 <body>
 <header>
-  <div class="hLeft">
-    <div id="eventName">Loading…</div>
-    <div id="updated"></div>
-    <div id="status"></div>
+  <div class="titleWrap">
+    <h1 id="eventTitle">Loading…</h1>
+    <div class="sub">Updated: <span id="updatedAt">—</span></div>
+    <div class="status" id="readyState">Loading…</div>
   </div>
-  <div class="hRight">
-    <button id="btnPdf" class="btn">Export PDF</button>
-    <button id="btnClear" class="btn">Clear selection</button>
+  <div class="btnRow">
+    <button id="btnPdf">Export PDF</button>
+    <button id="btnClear">Clear selection</button>
   </div>
 </header>
 
-<div class="wrap">
-  <div class="card stickyPlan" id="planCard">
-    <div id="svgHost">
-      <div id="overlay">
-        <svg id="overlaySvg" viewBox="0 0 100 100" preserveAspectRatio="none">
-          <path id="connLine" class="line" d="" />
-          <circle id="connDot" class="pin" cx="0" cy="0" r="0"></circle>
-        </svg>
-        <div id="tag" class="tag" style="display:none">
-          <div class="stand" id="tagStand"></div>
-          <div class="company" id="tagCompany"></div>
-        </div>
-      </div>
+<main>
+  <section class="card planCard">
+    <div class="planViewport" id="planViewport">
+      <div class="svgHost" id="svgHost"></div>
 
-      <div class="legendPill">
-        <span style="display:inline-flex;align-items:center;gap:8px"><span class="dot base"></span> Stands</span>
-        <span style="display:inline-flex;align-items:center;gap:8px"><span class="dot sel"></span> Selected</span>
+      <!-- overlay in pixel units -->
+      <svg id="overlaySvg" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <line id="olLine" x1="0" y1="0" x2="0" y2="0" stroke="rgba(0,0,0,.65)" stroke-width="4" stroke-linecap="round"/>
+        <circle id="olDot" cx="0" cy="0" r="7" fill="rgba(0,0,0,.78)"/>
+      </svg>
+
+      <div class="callout" id="callout" style="display:none">
+        <div class="stand" id="coStand"></div>
+        <div class="company" id="coCompany"></div>
       </div>
     </div>
-  </div>
+  </section>
 
-  <div class="side">
-    <div class="card">
-      <div class="cardPad">
-        <h3>Selected exhibitor</h3>
-        <div class="big" id="selStand">None</div>
-        <div class="subbig" id="selCompany"></div>
-        <div class="help" style="margin-top:10px">
+  <aside class="side">
+    <section class="card">
+      <div class="pad">
+        <div style="font-weight:900;">Selected exhibitor</div>
+        <div class="selectedBig" id="selStand">None</div>
+        <div style="font-size:22px; font-weight:900; margin-top:6px;" id="selCompany"></div>
+        <div class="muted" style="margin-top:10px;">
           Desktop: click a stand or choose from the list.<br/>
           Phone: use the list (stand tapping is disabled).
         </div>
       </div>
-    </div>
+    </section>
 
-    <div class="card">
-      <div class="cardPad" style="display:grid;gap:10px">
-        <h3>Sold exhibitors</h3>
-        <input id="q" class="search" placeholder="Search company or stand…" />
-        <div id="list"></div>
+    <section class="card">
+      <div class="pad">
+        <div style="font-weight:900; margin-bottom:10px;">Sold exhibitors</div>
+        <input class="search" id="search" placeholder="Search company or stand…"/>
       </div>
-    </div>
+      <div class="list" id="list"></div>
+    </section>
 
-    <div class="card">
-      <div class="cardPad">
-        <h3>Help</h3>
-        <div class="help">Selecting an exhibitor makes their stand red with a label + line.</div>
+    <section class="card">
+      <div class="pad">
+        <div style="font-weight:900;">Help</div>
+        <div class="muted" style="margin-top:6px;">
+          Selecting an exhibitor makes their stand red with a label + line.
+        </div>
       </div>
-    </div>
-  </div>
-</div>
+    </section>
+  </aside>
+</main>
 
 <script>
 (() => {
-  // Safari / old CSS.escape support
-  if (!window.CSS) window.CSS = {};
-  if (typeof window.CSS.escape !== 'function') {
-    window.CSS.escape = function (value) {
-      return String(value).replace(/[^a-zA-Z0-9_\\-]/g, function (ch) {
-        const hex = ch.codePointAt(0).toString(16).toUpperCase();
-        return '\\\\' + hex + ' ';
-      });
-    };
-  }
+  const API_BASE = "https://floorplansaberdeen.floorplansaberdeen.workers.dev";
+  const SVG_URL = "event_plan.svg";
 
-  const API_BASE = 'https://floorplansaberdeen.floorplansaberdeen.workers.dev';
-  const SVG_URL = './event_plan.svg';
+  const MAIN_FILL = getComputedStyle(document.documentElement).getPropertyValue('--main-fill').trim();
+  const SOLD_FILL = getComputedStyle(document.documentElement).getPropertyValue('--sold-fill').trim();
+  const SELECT_FILL = getComputedStyle(document.documentElement).getPropertyValue('--selected-fill').trim();
 
-  const STANDS_FILL = 'rgba(213, 109, 50, 0.75)';
-  const STANDS_STROKE = 'rgba(0,0,0,0.55)';
-  const SELECTED_FILL = '#e53935';
-
-  const isPhone = matchMedia('(max-width: 760px)').matches;
-
-  const elEvent = document.getElementById('eventName');
-  const elUpdated = document.getElementById('updated');
-  const elStatus = document.getElementById('status');
+  const elTitle = document.getElementById('eventTitle');
+  const elUpdated = document.getElementById('updatedAt');
+  const elReady = document.getElementById('readyState');
 
   const svgHost = document.getElementById('svgHost');
-  const overlay = document.getElementById('overlay');
-  const overlaySvg = document.getElementById('overlaySvg');
-  const connLine = document.getElementById('connLine');
-  const connDot = document.getElementById('connDot');
+  const planViewport = document.getElementById('planViewport');
 
-  const tag = document.getElementById('tag');
-  const tagStand = document.getElementById('tagStand');
-  const tagCompany = document.getElementById('tagCompany');
+  const overlaySvg = document.getElementById('overlaySvg');
+  const olLine = document.getElementById('olLine');
+  const olDot = document.getElementById('olDot');
+
+  const callout = document.getElementById('callout');
+  const coStand = document.getElementById('coStand');
+  const coCompany = document.getElementById('coCompany');
 
   const selStand = document.getElementById('selStand');
   const selCompany = document.getElementById('selCompany');
 
-  const q = document.getElementById('q');
-  const list = document.getElementById('list');
+  const listEl = document.getElementById('list');
+  const searchEl = document.getElementById('search');
 
   const btnPdf = document.getElementById('btnPdf');
   const btnClear = document.getElementById('btnClear');
 
   let svgRoot = null;
-  let stands = [];
-  let byId = new Map();
+  let byId = new Map(); // standId -> {standId,status,company}
   let selectedId = '';
-  let selectedCompany = '';
+  let lastDataTs = 0;
 
-  function setStatus(text, ok=true){
-    elStatus.textContent = text;
-    elStatus.style.color = ok ? '#0f7a33' : '#b00020';
+  function normalizeStatus(s) {
+    s = String(s||'').toLowerCase().trim();
+    if (s === 'sold' || s === 'booked') return 'sold';
+    return 'available';
   }
 
-  async function fetchJson(url){
-    const res = await fetch(url,{cache:'no-store'});
-    const text = await res.text();
-    let data;
-    try{ data = JSON.parse(text); }catch(e){ throw new Error('Bad JSON from API'); }
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    return data;
+  async function fetchJson(url) {
+    const r = await fetch(url, {cache:'no-store'});
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    return await r.json();
   }
 
-  async function loadSettings(){
-    try{
-      const s = await fetchJson(API_BASE + '/settings?ts=' + Date.now());
-      elEvent.textContent = (s && s.eventName) ? s.eventName : 'New Event';
-    }catch{
-      elEvent.textContent = 'New Event';
-    }
+  async function loadSvg() {
+    const r = await fetch(SVG_URL + '?v=' + Date.now(), {cache:'no-store'});
+    if (!r.ok) throw new Error('Failed to load SVG');
+    const txt = await r.text();
+    const doc = new DOMParser().parseFromString(txt, 'image/svg+xml');
+    const svg = doc.documentElement;
+
+    svg.removeAttribute('width'); svg.removeAttribute('height');
+    svg.style.width = '100%'; svg.style.height = '100%';
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+    // Make clickable only on desktop
+    svg.querySelectorAll('*').forEach(el=> {
+      el.style.cursor = 'pointer';
+    });
+
+    svgHost.innerHTML = '';
+    svgHost.appendChild(svg);
+    svgRoot = svg;
+
+    // Click handler (desktop only; on touch devices we disable pointer events via CSS)
+    svgRoot.addEventListener('click', (e) => {
+      const t = e.target.closest('[id]');
+      if (!t) return;
+      const id = t.id;
+      if (!byId.has(id)) return;
+      selectStand(id, true);
+    });
+
+    // Ensure overlay uses pixel units: set viewBox to match overlay size.
+    syncOverlayViewBox();
+    new ResizeObserver(syncOverlayViewBox).observe(planViewport);
   }
 
-  async function loadStands(){
-    const data = await fetchJson(API_BASE + '/stands?ts=' + Date.now());
-    stands = Array.isArray(data) ? data : [];
-    byId = new Map(stands.map(r => [String(r.standId||'').trim(), {
-      standId: String(r.standId||'').trim(),
-      status: String(r.status||'available').toLowerCase().trim() === 'sold' ? 'sold' : 'available',
-      company: String(r.company||'').trim()
-    }]));
+  function syncOverlayViewBox() {
+    const r = overlaySvg.getBoundingClientRect();
+    overlaySvg.setAttribute('viewBox', `0 0 ${Math.max(1, Math.round(r.width))} ${Math.max(1, Math.round(r.height))}`);
   }
 
-  async function loadSvg(){
-    const res = await fetch(SVG_URL,{cache:'no-store'});
-    if(!res.ok) throw new Error('SVG not found');
-    svgHost.insertAdjacentHTML('afterbegin', await res.text());
-    svgRoot = svgHost.querySelector('svg');
-    if(!svgRoot) throw new Error('SVG root not found');
-    // Put overlay on top
-    svgHost.appendChild(overlay);
-
-    // Disable SVG interaction on phone (prevents iOS freezes)
-    if (isPhone){
-      svgRoot.style.pointerEvents = 'none';
-    }
+  function getNodeCenterInOverlayPx(node) {
+    const vr = planViewport.getBoundingClientRect();
+    const nr = node.getBoundingClientRect();
+    const cx = (nr.left + nr.right)/2 - vr.left - 14; // subtract padding because overlaySvg is inset by 14px
+    const cy = (nr.top + nr.bottom)/2 - vr.top - 14;
+    return {x: cx, y: cy};
   }
 
-  function isStandId(id){
-    return /^[A-Z]{1,3}\d{1,3}$/i.test(String(id||'').trim());
-  }
-
-  
-  function getStandIds(){
-    if(!svgRoot) return [];
-    const ids = Array.from(svgRoot.querySelectorAll('[id]'))
-      .map(el=>el.id)
-      .filter(id=>isStandId(id));
-    return Array.from(new Set(ids)).sort((a,b)=>a.localeCompare(b, undefined, {numeric:true, sensitivity:'base'}));
-  }
-
-  function getPaintTargetsForId(standId){
-    if(!svgRoot) return [];
-    const els = Array.from(svgRoot.querySelectorAll('[id]')).filter(el=>el.id===standId);
-    const targets = [];
-    const pushShape = (el)=>{
-      const tag = el.tagName.toLowerCase();
-      if(tag==='text' || tag==='tspan') return;
-      if(tag==='g'){
-        el.querySelectorAll('path,rect,polygon,circle,ellipse,polyline,line').forEach(ch=>pushShape(ch));
-        return;
-      }
-      if(['path','rect','polygon','circle','ellipse','polyline','line'].includes(tag)){
-        targets.push(el);
-      }
-    };
-    els.forEach(pushShape);
-    return targets;
-  }
-
-  function resolveStandNode(standId){
-    // Pick the largest painted shape for bbox maths (avoids duplicate IDs on tiny text etc.)
-    const targets = getPaintTargetsForId(standId);
-    let best = null;
-    let bestArea = -1;
-    for(const el of targets){
-      try{
-        const bb = el.getBBox();
-        const area = Math.abs(bb.width * bb.height);
-        if(area > bestArea){
-          bestArea = area;
-          best = el;
-        }
-      }catch(_){}
-    }
-    return best || null;
-  }
-
-  function paintStandId(standId, isSelected){
-    const targets = getPaintTargetsForId(standId);
-    targets.forEach(el=>{
-      el.style.fill = isSelected ? SELECTED_FILL : STANDS_FILL;
-      el.style.fillOpacity = '1';
-      el.style.stroke = STANDS_STROKE;
-      el.style.strokeWidth = '1.2';
-      el.style.cursor = isPhone ? 'default' : 'pointer';
+  function colorAllStands() {
+    if (!svgRoot) return;
+    svgRoot.querySelectorAll('[id]').forEach(el => {
+      const id = el.id;
+      if (!byId.has(id)) return;
+      // all stands main color, only selected is red
+      const fill = (id === selectedId) ? SELECT_FILL : MAIN_FILL;
+      try {
+        el.style.fill = fill;
+        el.style.fillOpacity = '';
+      } catch {}
     });
   }
 
-  
-  function renderPlan(){
-    const ids = getStandIds();
-    ids.forEach(id=>paintStandId(id, id === selectedId));
+  function buildSoldListRows() {
+    const q = (searchEl.value || '').trim().toLowerCase();
+    const sold = Array.from(byId.values())
+      .filter(r => normalizeStatus(r.status) === 'sold')
+      .filter(r => {
+        const a = (r.company || '').toLowerCase();
+        const b = (r.standId || '').toLowerCase();
+        return !q || a.includes(q) || b.includes(q);
+      })
+      .sort((a,b)=> (a.company||'').localeCompare(b.company||'') || a.standId.localeCompare(b.standId));
+
+    listEl.innerHTML = '';
+    for (const r of sold) {
+      const row = document.createElement('div');
+      row.className = 'row' + (r.standId === selectedId ? ' active' : '');
+      row.dataset.id = r.standId;
+      row.innerHTML = `
+        <div class="nm">${escapeHtml(r.company || '(No company)')}</div>
+        <div class="st">Stand ${escapeHtml(r.standId)}</div>
+      `;
+      row.addEventListener('click', () => selectStand(r.standId, true));
+      listEl.appendChild(row);
+    }
   }
 
-  function soldItems(){
-    return Array.from(byId.values())
-      .filter(r=>r.status==='sold')
-      .map(r=>({standId:r.standId, company:r.company || '(No company)'}))
-      .sort((a,b)=>a.company.localeCompare(b.company));
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   }
 
-  function renderList(){
-    const query = String(q.value||'').toLowerCase().trim();
-    const items = soldItems().filter(it=>{
-      if(!query) return true;
-      return it.company.toLowerCase().includes(query) || it.standId.toLowerCase().includes(query);
+  function clearOverlay() {
+    callout.style.display = 'none';
+    olLine.style.display = 'none';
+    olDot.style.display = 'none';
+  }
+
+  function placeCallout(node, standId, company) {
+    if (!node) return clearOverlay();
+    syncOverlayViewBox();
+
+    const vp = planViewport.getBoundingClientRect();
+    const svgR = svgRoot.getBoundingClientRect();
+
+    // Where the stand is (overlay px)
+    const anchor = getNodeCenterInOverlayPx(node);
+
+    // Size estimate for callout (after setting text)
+    coStand.textContent = standId;
+    coCompany.textContent = company || '';
+    callout.style.display = 'block';
+
+    // Force layout to get size
+    const cw = callout.offsetWidth;
+    const ch = callout.offsetHeight;
+
+    // Candidate placements OUTSIDE the SVG drawing rect so it doesn't cover stands:
+    // below the SVG, above the SVG, left of SVG, right of SVG (clamped to viewport)
+    const inset = 12;
+    const overlayW = overlaySvg.getBoundingClientRect().width;
+    const overlayH = overlaySvg.getBoundingClientRect().height;
+
+    // svg box in overlay coords
+    const svgLeft = svgR.left - vp.left - 14;
+    const svgTop = svgR.top - vp.top - 14;
+    const svgRight = svgR.right - vp.left - 14;
+    const svgBottom = svgR.bottom - vp.top - 14;
+
+    const candidates = [];
+
+    // below
+    candidates.push({
+      x: clamp(anchor.x - cw/2, inset, overlayW - cw - inset),
+      y: clamp(svgBottom + 12, inset, overlayH - ch - inset),
+      score: 0
+    });
+    // above
+    candidates.push({
+      x: clamp(anchor.x - cw/2, inset, overlayW - cw - inset),
+      y: clamp(svgTop - ch - 12, inset, overlayH - ch - inset),
+      score: 0
+    });
+    // left
+    candidates.push({
+      x: clamp(svgLeft - cw - 12, inset, overlayW - cw - inset),
+      y: clamp(anchor.y - ch/2, inset, overlayH - ch - inset),
+      score: 0
+    });
+    // right
+    candidates.push({
+      x: clamp(svgRight + 12, inset, overlayW - cw - inset),
+      y: clamp(anchor.y - ch/2, inset, overlayH - ch - inset),
+      score: 0
     });
 
-    list.innerHTML = '';
-    items.forEach(it=>{
-      const div = document.createElement('div');
-      div.className = 'row' + (it.standId===selectedId ? ' selected' : '');
-      div.innerHTML = `<div class="name">${escapeHtml(it.company)}</div><div class="meta">Stand ${escapeHtml(it.standId)}</div>`;
-      div.addEventListener('click', ()=>select(it.standId));
-      list.appendChild(div);
-    });
+    // Score: prefer positions that are truly outside svg bounds.
+    for (const c of candidates) {
+      const insideX = (c.x + cw/2) >= svgLeft && (c.x + cw/2) <= svgRight;
+      const insideY = (c.y + ch/2) >= svgTop && (c.y + ch/2) <= svgBottom;
+      c.score = (insideX && insideY) ? 10 : 0; // penalize covering the svg
+      // prefer shorter line
+      const ax = c.x + cw/2, ay = c.y + ch/2;
+      const dx = ax - anchor.x, dy = ay - anchor.y;
+      c.score += Math.sqrt(dx*dx + dy*dy) / 80;
+    }
+    candidates.sort((a,b)=>a.score-b.score);
+    const best = candidates[0];
+
+    callout.style.left = `${Math.round(best.x)}px`;
+    callout.style.top = `${Math.round(best.y)}px`;
+
+    // Connect line to callout edge (closest point on callout box)
+    const cx = best.x + cw/2;
+    const cy = best.y + ch/2;
+    const p = closestPointOnRect(anchor.x, anchor.y, best.x, best.y, cw, ch);
+
+    olLine.style.display = '';
+    olDot.style.display = '';
+
+    olLine.setAttribute('x1', p.x);
+    olLine.setAttribute('y1', p.y);
+    olLine.setAttribute('x2', anchor.x);
+    olLine.setAttribute('y2', anchor.y);
+
+    olDot.setAttribute('cx', anchor.x);
+    olDot.setAttribute('cy', anchor.y);
+    olDot.setAttribute('r', '7');
   }
 
-  function escapeHtml(s){
-    return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  function closestPointOnRect(px, py, rx, ry, rw, rh) {
+    // clamp to rect then nudge to edge
+    const cx = clamp(px, rx, rx+rw);
+    const cy = clamp(py, ry, ry+rh);
+
+    // If inside, project to nearest edge
+    if (cx > rx && cx < rx+rw && cy > ry && cy < ry+rh) {
+      const dl = Math.abs(cx-rx);
+      const dr = Math.abs(rx+rw-cx);
+      const dt = Math.abs(cy-ry);
+      const db = Math.abs(ry+rh-cy);
+      const m = Math.min(dl,dr,dt,db);
+      if (m===dl) return {x: rx, y: cy};
+      if (m===dr) return {x: rx+rw, y: cy};
+      if (m===dt) return {x: cx, y: ry};
+      return {x: cx, y: ry+rh};
+    }
+    // outside: use clamped
+    return {x: cx, y: cy};
   }
 
-  
-  function getStandBBoxOnScreen(standId){
-    if(!svgRoot) return null;
-    const node = resolveStandNode(standId);
-    if(!node) return null;
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 
-    let bb;
-    try{ bb = node.getBBox(); }catch(_){ return null; }
-    const ctm = node.getScreenCTM();
-    if(!ctm) return null;
-
-    const p1 = svgRoot.createSVGPoint(); p1.x = bb.x; p1.y = bb.y;
-    const p2 = svgRoot.createSVGPoint(); p2.x = bb.x + bb.width; p2.y = bb.y;
-    const p3 = svgRoot.createSVGPoint(); p3.x = bb.x; p3.y = bb.y + bb.height;
-    const p4 = svgRoot.createSVGPoint(); p4.x = bb.x + bb.width; p4.y = bb.y + bb.height;
-
-    const s1 = p1.matrixTransform(ctm);
-    const s2 = p2.matrixTransform(ctm);
-    const s3 = p3.matrixTransform(ctm);
-    const s4 = p4.matrixTransform(ctm);
-
-    const xs = [s1.x,s2.x,s3.x,s4.x];
-    const ys = [s1.y,s2.y,s3.y,s4.y];
-    const minX = Math.min(...xs), maxX = Math.max(...xs);
-    const minY = Math.min(...ys), maxY = Math.max(...ys);
-
-    return { x:minX, y:minY, w:(maxX-minX), h:(maxY-minY) };
+  function setSelectedPanel(r) {
+    if (!r) {
+      selStand.textContent = 'None';
+      selCompany.textContent = '';
+      return;
+    }
+    selStand.textContent = r.standId;
+    selCompany.textContent = r.company || '';
   }
 
-  // Smart placement: choose a position for tag that stays within svgHost
-  // and tries to avoid covering the stand bbox by preferring outside areas.
-  function placeTag(standId){
-    if(!selectedId){
-      tag.style.display = 'none';
-      connLine.setAttribute('d','');
-      connDot.setAttribute('cx',0); connDot.setAttribute('cy',0);
+  function selectStand(id, scrollIntoView) {
+    selectedId = id || '';
+    colorAllStands();
+    buildSoldListRows();
+
+    const r = byId.get(selectedId);
+    setSelectedPanel(r);
+
+    if (!selectedId) {
+      clearOverlay();
       return;
     }
 
-    const hostRect = svgHost.getBoundingClientRect();
-    const stand = getStandBBoxOnScreen(standId);
-    if(!stand) return;
-
-    tag.style.display = 'block';
-
-    // Size tag after it becomes visible
-    const tagRect = tag.getBoundingClientRect();
-
-    const padding = 14;
-    const dotRadius = isPhone ? 5 : 6;
-
-    // Candidate anchors relative to host: try bottom-left, bottom-center, bottom-right, top-left, top-right
-    const candidates = [
-      {name:'bottom-center', x: stand.cx - tagRect.width/2, y: stand.bottom + 28},
-      {name:'bottom-left',   x: stand.left - tagRect.width - 28, y: stand.cy - tagRect.height/2},
-      {name:'bottom-right',  x: stand.right + 28, y: stand.cy - tagRect.height/2},
-      {name:'top-center',    x: stand.cx - tagRect.width/2, y: stand.top - tagRect.height - 28},
-      {name:'top-left',      x: stand.left - tagRect.width - 28, y: stand.top - tagRect.height - 18},
-      {name:'top-right',     x: stand.right + 28, y: stand.top - tagRect.height - 18},
-    ];
-
-    // Host bounds in screen coords
-    const H = {l:hostRect.left+padding, r:hostRect.right-padding, t:hostRect.top+padding, b:hostRect.bottom-padding};
-
-    function clamp(v,min,max){ return Math.max(min, Math.min(max,v)); }
-
-    function score(pos){
-      // clamp into host
-      const x = clamp(pos.x, H.l, H.r - tagRect.width);
-      const y = clamp(pos.y, H.t, H.b - tagRect.height);
-
-      // intersection with stand bbox (penalize)
-      const inter =
-        Math.max(0, Math.min(x+tagRect.width, stand.right) - Math.max(x, stand.left)) *
-        Math.max(0, Math.min(y+tagRect.height, stand.bottom) - Math.max(y, stand.top));
-
-      // prefer lower positions a bit (so label tends down)
-      const downBias = (y - H.t) / (H.b - H.t);
-
-      // distance (prefer farther so line longer)
-      const cx = x + tagRect.width/2;
-      const cy = y + tagRect.height/2;
-      const dist = Math.hypot(cx-stand.cx, cy-stand.cy);
-
-      return {
-        x,y,
-        val: (inter>0 ? 1e9 : 0) + (1 - downBias)*120 + (-dist) // larger dist -> lower score (better)
-      };
-    }
-
-    let best = null;
-    candidates.forEach(c=>{
-      const s = score(c);
-      if(!best || s.val < best.val) best = s;
-    });
-
-    // Apply position (convert to host-local coords)
-    const localX = best.x - hostRect.left;
-    const localY = best.y - hostRect.top;
-    tag.style.left = localX + 'px';
-    tag.style.top  = localY + 'px';
-
-    // Draw connector line in overlay SVG using host-local coords
-    const standLocal = {
-      x: stand.cx - hostRect.left,
-      y: stand.cy - hostRect.top
-    };
-    const tagLocal = {
-      x: localX + tagRect.width/2,
-      y: localY + tagRect.height/2
-    };
-
-    // Set overlaySvg viewBox to match pixels so line coords are easy
-    overlaySvg.setAttribute('viewBox', `0 0 ${hostRect.width} ${hostRect.height}`);
-
-    connLine.setAttribute('d', `M ${standLocal.x} ${standLocal.y} L ${tagLocal.x} ${tagLocal.y}`);
-    connDot.setAttribute('cx', standLocal.x);
-    connDot.setAttribute('cy', standLocal.y);
-    connDot.setAttribute('r', dotRadius);
-  }
-
-  function select(standId){
-    const info = byId.get(standId);
-    if(!info) return;
-
-    selectedId = standId;
-    selectedCompany = info.company || '(No company)';
-
-    // Update card
-    selStand.textContent = selectedId;
-    selCompany.textContent = info.company ? info.company : '';
-
-    // Tag
-    tagStand.textContent = selectedId;
-    tagCompany.textContent = info.company ? info.company : '';
-    renderPlan();
-    renderList();
-    placeTag(selectedId);
-  }
-
-  function clearSelection(){
-    selectedId = '';
-    selectedCompany = '';
-    selStand.textContent = 'None';
-    selCompany.textContent = '';
-    tag.style.display = 'none';
-    connLine.setAttribute('d','');
-    renderPlan();
-    renderList();
-  }
-
-  async function exportPdf(){
-    // Lightweight export: open print dialog of current view.
-    // If you previously used html2canvas/jsPDF, it can be re-added, but this is dependable.
-    window.print();
-  }
-
-  async function sync(){
-    try{
-      await loadSettings();
-      await loadStands();
-      renderPlan();
-      renderList();
-      elUpdated.textContent = 'Updated: ' + new Date().toLocaleTimeString();
-      setStatus('Ready ✅', true);
-
-      // keep selection in sync if still sold
-      if(selectedId){
-        const info = byId.get(selectedId);
-        if(info && info.status==='sold'){
-          select(selectedId);
-        }else{
-          clearSelection();
-        }
+    const node = svgRoot && svgRoot.querySelector('#' + CSS.escape(selectedId));
+    if (node) {
+      placeCallout(node, r.standId, r.company || '');
+      if (scrollIntoView) {
+        const row = listEl.querySelector(`[data-id="${CSS.escape(selectedId)}"]`);
+        if (row) row.scrollIntoView({block:'center'});
       }
-    }catch(err){
-      setStatus('Load error: ' + err.message, false);
-      console.error(err);
+    } else {
+      clearOverlay();
     }
   }
 
-  function onResize(){
-    if(selectedId) placeTag(selectedId);
+  async function syncData(forceTitle=false) {
+    const data = await fetchJson(API_BASE + '/stands?ts=' + Date.now());
+    byId = new Map((Array.isArray(data)?data:[]).map(x => {
+      const standId = String(x.standId||'').trim();
+      return [standId, {
+        standId,
+        status: normalizeStatus(x.status),
+        company: String(x.company||'').trim()
+      }];
+    }));
+    lastDataTs = Date.now();
+
+    // Title from server (optional)
+    if (forceTitle) {
+      try {
+        const meta = await fetchJson(API_BASE + '/meta?ts=' + Date.now());
+        if (meta && meta.eventName) elTitle.textContent = meta.eventName;
+      } catch {
+        elTitle.textContent = 'Getaway Show 2026';
+      }
+    }
+
+    elUpdated.textContent = new Date().toLocaleTimeString();
+    elReady.textContent = 'Ready ✅';
+
+    colorAllStands();
+    buildSoldListRows();
+
+    if (selectedId) {
+      const r = byId.get(selectedId);
+      if (r) {
+        const node = svgRoot.querySelector('#' + CSS.escape(selectedId));
+        if (node) placeCallout(node, r.standId, r.company||'');
+      }
+    }
   }
 
-  btnClear.addEventListener('click', clearSelection);
-  btnPdf.addEventListener('click', exportPdf);
-  q.addEventListener('input', renderList);
-  window.addEventListener('resize', onResize);
+  // PDF export (simple: opens print dialog with raster)
+  btnPdf.addEventListener('click', () => {
+    window.print();
+  });
 
-  (async ()=>{
-    try{
+  btnClear.addEventListener('click', () => {
+    selectedId = '';
+    setSelectedPanel(null);
+    buildSoldListRows();
+    colorAllStands();
+    clearOverlay();
+  });
+
+  searchEl.addEventListener('input', () => buildSoldListRows());
+
+  // keep overlay accurate on scroll/resize
+  window.addEventListener('resize', () => {
+    syncOverlayViewBox();
+    if (selectedId && svgRoot) {
+      const node = svgRoot.querySelector('#' + CSS.escape(selectedId));
+      const r = byId.get(selectedId);
+      if (node && r) placeCallout(node, r.standId, r.company||'');
+    }
+  });
+
+  window.addEventListener('scroll', () => {
+    if (!selectedId || !svgRoot) return;
+    const node = svgRoot.querySelector('#' + CSS.escape(selectedId));
+    const r = byId.get(selectedId);
+    if (node && r) placeCallout(node, r.standId, r.company||'');
+  }, {passive:true});
+
+  (async () => {
+    try {
+      elReady.textContent = 'Loading…';
       await loadSvg();
-      await sync();
-      setInterval(sync, 12000);
-    }catch(err){
-      setStatus('Load error: ' + err.message, false);
-      console.error(err);
+      await syncData(true);
+      // refresh periodically
+      setInterval(() => syncData(false).catch(()=>{}), 15000);
+    } catch (e) {
+      console.error(e);
+      elReady.textContent = 'Error loading';
+      elTitle.textContent = 'Exhibition Floorplan';
     }
   })();
 })();
