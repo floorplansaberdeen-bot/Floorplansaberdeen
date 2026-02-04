@@ -173,12 +173,7 @@
           <div class="company" id="tagCompany"></div>
         </div>
       </div>
-
-      <div class="legendPill">
-        <span style="display:inline-flex;align-items:center;gap:8px"><span class="dot base"></span> Stands</span>
-        <span style="display:inline-flex;align-items:center;gap:8px"><span class="dot sel"></span> Selected</span>
-      </div>
-    </div>
+</div>
   </div>
 
   <div class="side">
@@ -432,7 +427,7 @@
     const tagRect = tag.getBoundingClientRect();
 
     const padding = 14;
-    const dotRadius = isPhone ? 5 : 6;
+    const dotRadius = 5;
 
     // Candidate anchors relative to host: try bottom-left, bottom-center, bottom-right, top-left, top-right
     const candidates = [
