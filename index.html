@@ -1,538 +1,662 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Exhibition Floorplan</title>
-<style>
-  :root{
-    --bg:#ffffff;
-    --ink:#111;
-    --muted:#6b6b6b;
-    --border:#e6e6e6;
-
-    /* Requested "green" replacement */
-    --stands: rgba(213,109,50,0.75);
-    --stands-solid: rgb(213,109,50);
-
-    --selected:#e53935;
-
-    --card:#fff;
-    --shadow: 0 10px 28px rgba(0,0,0,.12);
-    --shadow-soft: 0 6px 18px rgba(0,0,0,.10);
-
-    --radius: 14px;
-  }
-
-  *{box-sizing:border-box}
-  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);}
-
-  /* Header */
-  header{
-    position:sticky; top:0; z-index:50;
-    background:rgba(255,255,255,.92);
-    backdrop-filter:saturate(180%) blur(10px);
-    border-bottom:1px solid var(--border);
-    padding:12px 14px;
-    display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
-  }
-  .hLeft{display:flex; flex-direction:column; gap:4px;}
-  #eventName{font-weight:900;font-size:26px;line-height:1.05}
-  #updated{font-size:12px;color:var(--muted)}
-  #status{font-size:13px;color:#0f7a33;font-weight:700}
-  .hRight{display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:flex-end}
-  .btn{
-    appearance:none;border:1px solid var(--border);background:#fafafa;border-radius:10px;
-    padding:8px 12px;font-weight:800;font-size:13px;cursor:pointer;
-  }
-  .btn:disabled{opacity:.55;cursor:not-allowed}
-
-  /* Layout */
-  .wrap{max-width:1400px;margin:0 auto;padding:12px;display:grid;gap:12px;grid-template-columns: 1fr 360px;}
-  @media (max-width: 980px){ .wrap{grid-template-columns:1fr;} }
-
-  /* On phone: keep plan pinned at top, list scrolls */
-  @media (max-width: 760px){
-    .wrap{padding:10px;gap:10px;}
-    .stickyPlan{
-      position:sticky; top:78px; z-index:30;
-      background:transparent;
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Exhibition Floorplan</title>
+  <style>
+    :root{
+      --bg:#ffffff;
+      --card:#ffffff;
+      --border: rgba(0,0,0,.10);
+      --text:#111;
+      --muted: rgba(0,0,0,.62);
+      --shadow: 0 10px 30px rgba(0,0,0,.10);
+      --stand: rgba(213,109,50,0.75);
+      --selected: #e53935;
+      --line: rgba(0,0,0,.65);
+      --dot: rgba(0,0,0,.75);
+      --radius: 14px;
+      --labelWDesktop: 260px;
+      --labelWPhone: 200px;
     }
-  }
-
-  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
-  .cardPad{padding:12px}
-
-  /* Plan */
-  #planCard{min-height:440px}
-  #svgHost{position:relative; overflow:hidden;}
-  #svgHost svg{width:100%;height:auto;display:block}
-  svg text, svg tspan{pointer-events:none; user-select:none;}
-
-  /* Keep the lozenge visible (raise it) */
-  .legendPill{
-    position:absolute; left:50%; transform:translateX(-50%);
-    bottom:16px; /* higher so it won't clip */
-    display:inline-flex; align-items:center; gap:16px;
-    padding:10px 14px;border:1px solid var(--border);border-radius:999px;background:#fff;
-    box-shadow: var(--shadow-soft);
-    font-size:13px;font-weight:800;
-    pointer-events:none;
-  }
-  .dot{width:12px;height:12px;border-radius:50%;}
-  .dot.base{background:var(--stands-solid)}
-  .dot.sel{background:var(--selected)}
-
-  /* Right panel */
-  .side{display:grid;gap:12px}
-  .side h3{margin:0;font-size:13px;color:#222}
-  .big{font-size:26px;font-weight:950;line-height:1}
-  .subbig{font-size:20px;font-weight:850;margin-top:3px}
-  .help{font-size:12px;color:var(--muted);line-height:1.35}
-
-  /* List */
-  .search{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:12px;font-size:14px;outline:none}
-  #list{
-    max-height:520px; overflow:auto;
-    border:1px solid var(--border);
-    border-radius:12px;
-    background:#fff;
-    /* bottom padding so last row is selectable above browser bar */
-    padding-bottom: calc(14px + env(safe-area-inset-bottom));
-  }
-  .row{
-    padding:10px 12px;border-bottom:1px solid #f0f0f0;cursor:pointer;
-    display:flex;flex-direction:column;gap:2px;
-  }
-  .row:last-child{border-bottom:0}
-  .row:hover{background:#fafafa}
-  .row .name{font-weight:900;font-size:14px}
-  .row .meta{font-size:12px;color:var(--muted)}
-  .row.selected{outline:2px solid rgba(0,0,0,.06); background:#fff7f7}
-
-  /* Label overlay */
-  #overlay{
-    position:absolute; inset:0; pointer-events:none;
-  }
-  .tag{
-    position:absolute;
-    min-width:220px;
-    max-width: 360px;
-    background:var(--selected);
-    color:#fff;
-    border-radius:14px;
-    padding:14px 16px;
-    box-shadow: var(--shadow);
-    text-align:center;
-  }
-  .tag .stand{font-weight:950;font-size:40px;letter-spacing:.5px;line-height:1}
-  .tag .company{font-weight:850;font-size:20px;margin-top:8px;line-height:1.15}
-  /* smaller on phone */
-  @media (max-width: 760px){
-    .tag{min-width:180px;max-width:320px;padding:12px 14px;border-radius:14px}
-    .tag .stand{font-size:34px}
-    .tag .company{font-size:18px}
-  }
-
-  /* Connection line (SVG in overlay) */
-  #overlaySvg{position:absolute; inset:0; width:100%; height:100%;}
-  .line{stroke:rgba(0,0,0,.72); stroke-width:3; fill:none}
-  .pin{fill:rgba(0,0,0,.72)}
-  /* smaller + tasteful */
-  .pin{r:6}
-
-  /* Remove big blank space under plan on phone by letting SVG card shrink */
-  @media (max-width: 760px){
-    #planCard{min-height:auto}
-  }
-
-/* ---- label sizing overrides ---- */
-.tag{box-shadow:0 10px 24px rgba(0,0,0,.18);} 
-.tag .stand{font-size:32px; line-height:1;}
-.tag .company{font-size:18px;}
-@media (max-width: 900px){
-  .tag .stand{font-size:26px;}
-  .tag .company{font-size:16px;}
-}
-</style>
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      color:var(--text);
+      background:var(--bg);
+    }
+    header{
+      padding:16px 16px 8px;
+      display:flex;
+      gap:12px;
+      align-items:flex-start;
+      justify-content:space-between;
+      flex-wrap:wrap;
+    }
+    .titleWrap{min-width:260px}
+    h1{margin:0; font-size:40px; line-height:1.05; letter-spacing:-.02em}
+    .meta{margin-top:6px; color:var(--muted); font-size:14px}
+    .status{margin-top:6px; font-weight:700; color:#1b5e20}
+    .actions{display:flex; gap:10px; align-items:center}
+    .btn{
+      border:1px solid var(--border);
+      background:#fff;
+      border-radius:12px;
+      padding:10px 14px;
+      font-weight:700;
+      cursor:pointer;
+      box-shadow: 0 1px 0 rgba(0,0,0,.03);
+    }
+    .btn:active{transform: translateY(1px)}
+    .layout{
+      padding: 0 16px 16px;
+      display:grid;
+      grid-template-columns: 1.4fr .6fr;
+      gap:16px;
+      align-items:start;
+    }
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      box-shadow: 0 1px 0 rgba(0,0,0,.03);
+    }
+    .planCard{
+      padding:12px;
+      position:relative;
+      overflow:hidden;
+      min-height: 520px;
+    }
+    .planHeader{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding: 6px 8px 10px;
+      border-bottom: 1px solid rgba(0,0,0,.06);
+      margin: -12px -12px 12px;
+    }
+    .planHeader .left{font-weight:800}
+    .svgHost{
+      position:relative;
+      width:100%;
+      height: 460px;
+      border-radius: 12px;
+      overflow:hidden;
+    }
+    .svgHost svg{width:100%; height:100%; display:block}
+    .overlay{
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+    }
+    .side{
+      padding:12px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      min-height: 520px;
+    }
+    .panel{
+      border:1px solid rgba(0,0,0,.08);
+      border-radius: 14px;
+      padding:12px;
+    }
+    .panel h3{margin:0 0 8px; font-size:16px}
+    .selectedBox .big{font-size:42px; font-weight:900; line-height:1}
+    .selectedBox .name{font-size:22px; font-weight:800; margin-top:6px}
+    .hint{color:var(--muted); font-size:14px; line-height:1.35; margin-top:10px}
+    .search input{
+      width:100%;
+      padding:10px 12px;
+      border-radius: 12px;
+      border:1px solid rgba(0,0,0,.14);
+      font-size:16px;
+    }
+    .list{
+      border:1px solid rgba(0,0,0,.10);
+      border-radius: 14px;
+      overflow:hidden;
+      max-height: 540px;
+      background:#fff;
+    }
+    .item{
+      padding:12px 14px;
+      border-top:1px solid rgba(0,0,0,.06);
+      cursor:pointer;
+    }
+    .item:first-child{border-top:none}
+    .item .company{font-size:18px; font-weight:800}
+    .item .stand{color:var(--muted); font-size:15px; margin-top:2px}
+    .item.active{background: rgba(229,57,53,.08)}
+    .footerPad{height: 24px}
+    /* Label styling (overlay) */
+    .labelBox{
+      filter: drop-shadow(0 8px 18px rgba(0,0,0,.18));
+    }
+    /* Responsive */
+    @media (max-width: 980px){
+      .layout{grid-template-columns: 1fr}
+      .planCard{min-height: unset}
+      .side{min-height: unset}
+      h1{font-size:44px}
+    }
+    @media (max-width: 640px){
+      header{padding:14px 14px 8px}
+      h1{font-size:44px}
+      .layout{padding: 0 14px 14px}
+      .svgHost{height: 280px;}
+      /* sticky plan on phone */
+      .planCard{
+        position: sticky;
+        top: env(safe-area-inset-top, 0px);
+        z-index: 5;
+      }
+      .side{gap:12px}
+      .list{max-height: calc(100vh - 530px);}
+      /* ensure bottom padding so last item isn't behind browser bar */
+      .list::after{
+        content:"";
+        display:block;
+        height: 96px;
+      }
+    }
+  </style>
 </head>
 <body>
-<header>
-  <div class="hLeft">
-    <div id="eventName">Loading…</div>
-    <div id="updated"></div>
-    <div id="status"></div>
-  </div>
-  <div class="hRight">
-    <button id="btnPdf" class="btn">Export PDF</button>
-    <button id="btnClear" class="btn">Clear selection</button>
-  </div>
-</header>
+  <header>
+    <div class="titleWrap">
+      <h1 id="eventTitle">Loading…</h1>
+      <div class="meta" id="updatedAt">Updated: —</div>
+      <div class="status" id="ready">Loading…</div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="exportPdfBtn">Export PDF</button>
+      <button class="btn" id="clearBtn">Clear selection</button>
+    </div>
+  </header>
 
-<div class="wrap">
-  <div class="card stickyPlan" id="planCard">
-    <div id="svgHost">
-      <div id="overlay">
-        <svg id="overlaySvg" viewBox="0 0 100 100" preserveAspectRatio="none">
-          <path id="connLine" class="line" d="" style="display:none" />
-          <circle id="connDot" class="pin" cx="0" cy="0" r="4" style="display:none"></circle>
-        </svg>
-        <div id="tag" class="tag" style="display:none">
-          <div class="stand" id="tagStand"></div>
-          <div class="company" id="tagCompany"></div>
+  <div class="layout">
+    <div class="card planCard">
+      <div class="planHeader">
+        <div class="left">Plan</div>
+        <div class="meta" id="planMeta"></div>
+      </div>
+      <div class="svgHost" id="svgHost">
+        <div class="overlay">
+          <svg id="overlaySvg" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"></svg>
         </div>
       </div>
-
-      <div class="legendPill">
-        <span style="display:inline-flex;align-items:center;gap:8px"><span class="dot base"></span> Stands</span>
-        <span style="display:inline-flex;align-items:center;gap:8px"><span class="dot sel"></span> Selected</span>
-      </div>
     </div>
-  </div>
 
-  <div class="side">
-    <div class="card">
-      <div class="cardPad">
+    <div class="card side">
+      <div class="panel selectedBox">
         <h3>Selected exhibitor</h3>
         <div class="big" id="selStand">None</div>
-        <div class="subbig" id="selCompany"></div>
-        <div class="help" style="margin-top:10px">
-          Desktop: click a stand or choose from the list.<br/>
-          Phone: use the list (stand tapping is disabled).
-        </div>
+        <div class="name" id="selCompany"></div>
+        <div class="hint">Desktop: click a stand or choose from the list.<br/>Phone: use the list (stand tapping is disabled).</div>
       </div>
-    </div>
 
-    <div class="card">
-      <div class="cardPad" style="display:grid;gap:10px">
+      <div class="panel">
         <h3>Sold exhibitors</h3>
-        <input id="q" class="search" placeholder="Search company or stand…" />
-        <div id="list"></div>
+        <div class="search" style="margin:10px 0 10px;">
+          <input id="search" placeholder="Search company or stand…" />
+        </div>
+        <div class="list" id="list"></div>
       </div>
-    </div>
 
-    <div class="card">
-      <div class="cardPad">
+      <div class="panel">
         <h3>Help</h3>
-        <div class="help">Selecting an exhibitor makes their stand red with a label + line.</div>
+        <div class="hint" style="margin-top:0">Selecting an exhibitor makes their stand red with a label + line.</div>
       </div>
     </div>
   </div>
-</div>
 
 <script>
 (() => {
-  // Safari / old CSS.escape support
-  if (!window.CSS) window.CSS = {};
-  if (typeof window.CSS.escape !== 'function') {
-    window.CSS.escape = function (value) {
-      return String(value).replace(/[^a-zA-Z0-9_\\-]/g, function (ch) {
-        const hex = ch.codePointAt(0).toString(16).toUpperCase();
-        return '\\\\' + hex + ' ';
-      });
-    };
-  }
+  // ===== CONFIG =====
+  const API_BASE = window.API_BASE || "https://floorplansaberdeen-bot.workers.dev"; // change if needed
+  const STANDS_ENDPOINT = `${API_BASE}/stands`;
+  const SETTINGS_ENDPOINT = `${API_BASE}/settings`;
+  const SVG_URL = "event_plan.svg"; // same repo file
 
-  const API_BASE = 'https://floorplansaberdeen.floorplansaberdeen.workers.dev';
-  const SVG_URL = './event_plan.svg';
+  const COLORS = {
+    stand: getComputedStyle(document.documentElement).getPropertyValue('--stand').trim() || "rgba(213,109,50,0.75)",
+    selected: getComputedStyle(document.documentElement).getPropertyValue('--selected').trim() || "#e53935",
+    line: getComputedStyle(document.documentElement).getPropertyValue('--line').trim() || "rgba(0,0,0,.65)",
+    dot: getComputedStyle(document.documentElement).getPropertyValue('--dot').trim() || "rgba(0,0,0,.75)",
+  };
 
-  const STANDS_FILL = 'rgba(213, 109, 50, 0.75)';
-  const STANDS_STROKE = 'rgba(0,0,0,0.55)';
-  const SELECTED_FILL = '#e53935';
+  const isPhone = () => window.matchMedia("(max-width: 640px)").matches;
 
-  const isPhone = matchMedia('(max-width: 760px)').matches;
+  // ===== DOM =====
+  const svgHost = document.getElementById("svgHost");
+  const overlaySvg = document.getElementById("overlaySvg");
+  const listEl = document.getElementById("list");
+  const searchEl = document.getElementById("search");
+  const selStandEl = document.getElementById("selStand");
+  const selCompanyEl = document.getElementById("selCompany");
+  const eventTitleEl = document.getElementById("eventTitle");
+  const updatedAtEl = document.getElementById("updatedAt");
+  const readyEl = document.getElementById("ready");
+  const clearBtn = document.getElementById("clearBtn");
+  const exportPdfBtn = document.getElementById("exportPdfBtn");
 
-  const elEvent = document.getElementById('eventName');
-  const elUpdated = document.getElementById('updated');
-  const elStatus = document.getElementById('status');
-
-  const svgHost = document.getElementById('svgHost');
-  const overlay = document.getElementById('overlay');
-  const overlaySvg = document.getElementById('overlaySvg');
-  const connLine = document.getElementById('connLine');
-  const connDot = document.getElementById('connDot');
-
-  const tag = document.getElementById('tag');
-  const tagStand = document.getElementById('tagStand');
-  const tagCompany = document.getElementById('tagCompany');
-
-  const selStand = document.getElementById('selStand');
-  const selCompany = document.getElementById('selCompany');
-
-  const q = document.getElementById('q');
-  const list = document.getElementById('list');
-
-  const btnPdf = document.getElementById('btnPdf');
-  const btnClear = document.getElementById('btnClear');
-
+  // ===== STATE =====
   let svgRoot = null;
-  let stands = [];
-  let byId = new Map();
-  let selectedId = '';
-  let selectedCompany = '';
+  let standsData = []; // {standId, status, company}
+  let standsById = new Map();
+  let standEls = new Map(); // standId -> element
+  let standScreenBoxes = new Map(); // standId -> {x,y,w,h,cx,cy} relative to container
+  let selectedStandId = null;
 
-  function setStatus(text, ok=true){
-    elStatus.textContent = text;
-    elStatus.style.color = ok ? '#0f7a33' : '#b00020';
+  // ===== HELPERS =====
+  function normId(s){ return (s||"").toString().trim(); }
+  function statusNorm(s){
+    const v = (s||"").toString().toLowerCase().trim();
+    if (v === "sold") return "sold";
+    return "available";
   }
 
   async function fetchJson(url){
-    const res = await fetch(url,{cache:'no-store'});
-    const text = await res.text();
-    let data;
-    try{ data = JSON.parse(text); }catch(e){ throw new Error('Bad JSON from API'); }
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    return data;
-  }
-
-  async function loadSettings(){
-    try{
-      const s = await fetchJson(API_BASE + '/settings?ts=' + Date.now());
-      elEvent.textContent = (s && s.eventName) ? s.eventName : 'New Event';
-    }catch{
-      elEvent.textContent = 'New Event';
-    }
-  }
-
-  async function loadStands(){
-    const data = await fetchJson(API_BASE + '/stands?ts=' + Date.now());
-    stands = Array.isArray(data) ? data : [];
-    byId = new Map(stands.map(r => [String(r.standId||'').trim(), {
-      standId: String(r.standId||'').trim(),
-      status: String(r.status||'available').toLowerCase().trim() === 'sold' ? 'sold' : 'available',
-      company: String(r.company||'').trim()
-    }]));
+    const r = await fetch(url, {cache:"no-store"});
+    if(!r.ok) throw new Error(`Fetch failed: ${url} (${r.status})`);
+    return await r.json();
   }
 
   async function loadSvg(){
-    const res = await fetch(SVG_URL,{cache:'no-store'});
-    if(!res.ok) throw new Error('SVG not found');
-    svgHost.insertAdjacentHTML('afterbegin', await res.text());
-    svgRoot = svgHost.querySelector('svg');
-    if(!svgRoot) throw new Error('SVG root not found');
-    // Put overlay on top
-    svgHost.appendChild(overlay);
-
-    // Disable SVG interaction on phone (prevents iOS freezes)
-    if (isPhone){
-      svgRoot.style.pointerEvents = 'none';
-    }
+    const r = await fetch(SVG_URL, {cache:"no-store"});
+    if(!r.ok) throw new Error(`SVG not found: ${SVG_URL}`);
+    const txt = await r.text();
+    const wrap = document.createElement("div");
+    wrap.innerHTML = txt;
+    const s = wrap.querySelector("svg");
+    if(!s) throw new Error("Invalid SVG");
+    // Clear host and insert
+    svgHost.querySelectorAll("svg").forEach(x => x.remove());
+    // Put SVG behind overlay
+    svgHost.insertBefore(s, svgHost.firstChild);
+    svgRoot = s;
+    svgRoot.removeAttribute("width");
+    svgRoot.removeAttribute("height");
+    svgRoot.style.width = "100%";
+    svgRoot.style.height = "100%";
+    svgRoot.style.display = "block";
+    // Clean any stray shapes that could show (fix top-left quarter circle from defs/markers)
+    // Ensure overlay starts empty
+    overlaySvg.innerHTML = "";
   }
 
-  function isStandId(id){
-    return /^[A-Z]{1,3}\d{1,3}$/i.test(String(id||'').trim());
-  }
-
-  function getStandNodes(){
-    if(!svgRoot) return [];
-    const groups = Array.from(svgRoot.querySelectorAll('g[id]')).filter(g=>isStandId(g.id));
-    const shapes = Array.from(svgRoot.querySelectorAll('path[id],rect[id],polygon[id],circle[id],ellipse[id],polyline[id],line[id]'))
-      .filter(el=>isStandId(el.id));
-    return groups.length ? groups : shapes;
-  }
-
-  function paintStand(node, isSelected){
-    const targets = (node.tagName.toLowerCase()==='g')
-      ? node.querySelectorAll('path,rect,polygon,circle,ellipse,polyline,line')
-      : [node];
-
-    targets.forEach(el=>{
-      el.style.fill = isSelected ? SELECTED_FILL : STANDS_FILL;
-      el.style.fillOpacity = '1';
-      el.style.stroke = STANDS_STROKE;
-      el.style.strokeWidth = '1.2';
-      el.style.cursor = isPhone ? 'default' : 'pointer';
-    });
-  }
-
-  function renderPlan(){
-    const nodes = getStandNodes();
-    nodes.forEach(node=>{
-      const id = String(node.id||'').trim();
-      paintStand(node, id === selectedId);
-      if(!isPhone){
-        node.style.pointerEvents = 'auto';
-        node.addEventListener('click', (e)=>{
-          e.preventDefault();
-          e.stopPropagation();
-          select(id);
-        }, {passive:false});
+  function findStandElements(){
+    standEls.clear();
+    // Strategy: any element with id matching stand ids, or data-stand attribute.
+    const all = svgRoot.querySelectorAll("[id], [data-stand]");
+    all.forEach(el => {
+      const id = normId(el.getAttribute("data-stand") || el.id);
+      if(!id) return;
+      // Only accept if it matches a stand in sheet OR looks like a stand id pattern.
+      if (standsById.has(id) || /^[A-Z]{1,3}\d{1,3}$/.test(id) || /^SB\d{1,3}$/.test(id)) {
+        // Prefer filled shapes: path/rect/polygon etc.
+        const tag = el.tagName.toLowerCase();
+        if(["path","rect","polygon","polyline","circle","ellipse"].includes(tag) || el.getBBox){
+          if(!standEls.has(id)) standEls.set(id, el);
+        }
       }
     });
   }
 
-  function soldItems(){
-    return Array.from(byId.values())
-      .filter(r=>r.status==='sold')
-      .map(r=>({standId:r.standId, company:r.company || '(No company)'}))
-      .sort((a,b)=>a.company.localeCompare(b.company));
-  }
-
-  function renderList(){
-    const query = String(q.value||'').toLowerCase().trim();
-    const items = soldItems().filter(it=>{
-      if(!query) return true;
-      return it.company.toLowerCase().includes(query) || it.standId.toLowerCase().includes(query);
-    });
-
-    list.innerHTML = '';
-    items.forEach(it=>{
-      const div = document.createElement('div');
-      div.className = 'row' + (it.standId===selectedId ? ' selected' : '');
-      div.innerHTML = `<div class="name">${escapeHtml(it.company)}</div><div class="meta">Stand ${escapeHtml(it.standId)}</div>`;
-      div.addEventListener('click', ()=>select(it.standId));
-      list.appendChild(div);
-    });
-  }
-
-  function escapeHtml(s){
-    return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-  }
-
-  function getStandBBoxOnScreen(standId){
-    const node = svgRoot.querySelector('#' + CSS.escape(standId));
-    if(!node) return null;
-    let target = node;
-    // If group, get bbox of group
-    try{
-      const bb = target.getBBox();
-      const pt = svgRoot.createSVGPoint();
-      const ctm = target.getCTM();
-      if(!ctm) return null;
-
-      // Corners -> screen
-      const corners = [
-        [bb.x, bb.y],
-        [bb.x+bb.width, bb.y],
-        [bb.x+bb.width, bb.y+bb.height],
-        [bb.x, bb.y+bb.height]
-      ].map(([x,y])=>{
-        pt.x=x; pt.y=y;
-        const sp = pt.matrixTransform(ctm).matrixTransform(svgRoot.getScreenCTM());
-        return {x:sp.x,y:sp.y};
-      });
-
-      const xs = corners.map(p=>p.x), ys=corners.map(p=>p.y);
-      const minX=Math.min(...xs), maxX=Math.max(...xs);
-      const minY=Math.min(...ys), maxY=Math.max(...ys);
-      return {left:minX, top:minY, right:maxX, bottom:maxY, width:maxX-minX, height:maxY-minY, cx:(minX+maxX)/2, cy:(minY+maxY)/2};
-    }catch{
-      return null;
+  function setBaseColors(){
+    // paint all known stand shapes to base color
+    for(const [id, el] of standEls.entries()){
+      const st = standsById.get(id);
+      // always show base colour regardless of sold/available, public wants all stands same colour until selected
+      el.style.fill = COLORS.stand;
+      el.style.stroke = "rgba(0,0,0,.55)";
+      el.style.strokeWidth = "1";
+      el.style.cursor = isPhone() ? "default" : "pointer";
+      el.style.transition = "fill 140ms ease";
+      // disable pointer on phone to avoid freezing
+      el.style.pointerEvents = isPhone() ? "none" : "auto";
     }
   }
 
-  // Smart placement: choose a position for tag that stays within svgHost
-  // and tries to avoid covering the stand bbox by preferring outside areas.
-  function getAnchorLocal(el){
-  const r = el.getBoundingClientRect();
-  return { x: r.left + r.width/2, y: r.top + r.height/2 };
-}
-
-let cachedPlanBounds = null; // in host-local coords
-function computePlanBounds(){
-  if(!svgRoot) return null;
-  const hostRect = svgHost.getBoundingClientRect();
-  let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
-  for(const id of standIds){
-    const el = getStandNode(id);
-    if(!el) continue;
-    const r = el.getBoundingClientRect();
-    if(r.width<1 || r.height<1) continue;
-    minX = Math.min(minX, r.left - hostRect.left);
-    minY = Math.min(minY, r.top - hostRect.top);
-    maxX = Math.max(maxX, r.right - hostRect.left);
-    maxY = Math.max(maxY, r.bottom - hostRect.top);
-  }
-  if(!isFinite(minX)) return null;
-  return {x:minX, y:minY, w:(maxX-minX), h:(maxY-minY)};
-}
-
-function rectsIntersect(a,b){
-  return !(a.x+a.w < b.x || b.x+b.w < a.x || a.y+a.h < b.y || b.y+b.h < a.y);
-}
-
-function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
-
-function placeTag(standId){
-  const el = getStandNode(standId);
-  if(!el) return;
-
-  const hostRect = svgHost.getBoundingClientRect();
-  const anchorScreen = getAnchorLocal(el);
-  const ax = anchorScreen.x - hostRect.left;
-  const ay = anchorScreen.y - hostRect.top;
-
-  tagStand.textContent = standId;
-  tagCompany.textContent = (standsById.get(standId)?.company || '').trim();
-  tag.style.display = 'block';
-
-  // measure tag size
-  tag.style.left = '0px'; tag.style.top = '0px';
-  tag.style.visibility = 'hidden';
-  const measured = tag.getBoundingClientRect();
-  const tw = measured.width;
-  const th = measured.height;
-  tag.style.visibility = 'visible';
-
-  if(!cachedPlanBounds) cachedPlanBounds = computePlanBounds();
-  const plan = cachedPlanBounds || {x:0, y:0, w:hostRect.width, h:hostRect.height};
-
-  const margin = 18;
-  const candidates = [
-    {cx: plan.x - margin - tw/2, cy: ay},
-    {cx: plan.x + plan.w + margin + tw/2, cy: ay},
-    {cx: ax, cy: plan.y - margin - th/2},
-    {cx: ax, cy: plan.y + plan.h + margin + th/2},
-    {cx: plan.x - margin - tw/2, cy: plan.y - margin - th/2},
-    {cx: plan.x + plan.w + margin + tw/2, cy: plan.y - margin - th/2},
-    {cx: plan.x - margin - tw/2, cy: plan.y + plan.h + margin + th/2},
-    {cx: plan.x + plan.w + margin + tw/2, cy: plan.y + plan.h + margin + th/2},
-  ];
-
-  const minCx = tw/2 + 8, maxCx = hostRect.width - tw/2 - 8;
-  const minCy = th/2 + 8, maxCy = hostRect.height - th/2 - 8;
-
-  let best=null, bestScore=Infinity;
-  for(const c0 of candidates){
-    const cx = clamp(c0.cx, minCx, maxCx);
-    const cy = clamp(c0.cy, minCy, maxCy);
-    const rect = {x: cx - tw/2, y: cy - th/2, w: tw, h: th};
-    const overlapsPlan = rectsIntersect(rect, plan);
-    const dist = Math.hypot(cx-ax, cy-ay);
-    const score = (overlapsPlan ? 1e6 : 0) + dist;
-    if(score < bestScore){ bestScore=score; best={cx,cy,rect}; }
+  function setSelectedColor(){
+    for(const [id, el] of standEls.entries()){
+      el.style.fill = (id === selectedStandId) ? COLORS.selected : COLORS.stand;
+    }
   }
 
-  const cx = best.cx, cy = best.cy;
-  tag.style.left = Math.round(cx - tw/2) + 'px';
-  tag.style.top  = Math.round(cy - th/2) + 'px';
+  function computeStandBoxes(){
+    standScreenBoxes.clear();
+    const hostRect = svgHost.getBoundingClientRect();
+    for(const [id, el] of standEls.entries()){
+      try{
+        const bb = el.getBBox();
+        const m = el.getScreenCTM();
+        if(!m) continue;
+        const pts = [
+          {x: bb.x, y: bb.y},
+          {x: bb.x+bb.width, y: bb.y},
+          {x: bb.x+bb.width, y: bb.y+bb.height},
+          {x: bb.x, y: bb.y+bb.height},
+        ].map(p => {
+          const pt = svgRoot.createSVGPoint();
+          pt.x = p.x; pt.y = p.y;
+          const sp = pt.matrixTransform(m);
+          return {x: sp.x - hostRect.left, y: sp.y - hostRect.top};
+        });
+        const xs = pts.map(p=>p.x), ys = pts.map(p=>p.y);
+        const minX = Math.min(...xs), maxX = Math.max(...xs);
+        const minY = Math.min(...ys), maxY = Math.max(...ys);
+        const box = {x:minX, y:minY, w:maxX-minX, h:maxY-minY};
+        box.cx = box.x + box.w/2;
+        box.cy = box.y + box.h/2;
+        standScreenBoxes.set(id, box);
+      }catch(e){ /* ignore */ }
+    }
+  }
 
-  connLine.style.display = '';
-  connDot.style.display = '';
-  connDot.setAttribute('cx', ax);
-  connDot.setAttribute('cy', ay);
-  connDot.setAttribute('r', '4');
+  function rectsIntersect(a,b){
+    return !(a.x+a.w < b.x || b.x+b.w < a.x || a.y+a.h < b.y || b.y+b.h < a.y);
+  }
 
-  const edgeX = clamp(ax, best.rect.x, best.rect.x + best.rect.w);
-  const edgeY = clamp(ay, best.rect.y, best.rect.y + best.rect.h);
-  connLine.setAttribute('d', `M ${ax} ${ay} L ${edgeX} ${edgeY}`);
-}
+  function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
 
-function clearSelection(){
-  selectedId = null;
-  tag.style.display = 'none';
-  connLine.setAttribute('d','');
-  connLine.style.display = 'none';
-  connDot.style.display = 'none';
-  standsById.forEach((row,id)=>{
-    const el = getStandNode(id);
-    if(!el) return;
-    setStandFill(el, baseFill);
+  function buildLabelLayout(id, company){
+    const w = isPhone() ? parseInt(getComputedStyle(document.documentElement).getPropertyValue('--labelWPhone')) : parseInt(getComputedStyle(document.documentElement).getPropertyValue('--labelWDesktop'));
+    const standText = id || "";
+    const compText = company || "";
+    const h = compText ? (isPhone()? 86 : 92) : (isPhone()? 68 : 72);
+    return {w, h, standText, compText};
+  }
+
+  function chooseLabelPosition(targetBox, label){
+    const hostRect = svgHost.getBoundingClientRect();
+    const W = hostRect.width, H = hostRect.height;
+    // Candidate anchor positions relative to target center
+    const d = isPhone() ? 64 : 90;
+    const candidates = [
+      {name:"bottom", x: targetBox.cx - label.w/2, y: targetBox.cy + d},
+      {name:"top", x: targetBox.cx - label.w/2, y: targetBox.cy - d - label.h},
+      {name:"right", x: targetBox.cx + d, y: targetBox.cy - label.h/2},
+      {name:"left", x: targetBox.cx - d - label.w, y: targetBox.cy - label.h/2},
+      {name:"bottom-right", x: targetBox.cx + d*.8, y: targetBox.cy + d*.8},
+      {name:"bottom-left", x: targetBox.cx - d*.8 - label.w, y: targetBox.cy + d*.8},
+      {name:"top-right", x: targetBox.cx + d*.8, y: targetBox.cy - d*.8 - label.h},
+      {name:"top-left", x: targetBox.cx - d*.8 - label.w, y: targetBox.cy - d*.8 - label.h},
+    ];
+
+    // Expand stand boxes for collision
+    const standRects = Array.from(standScreenBoxes.values()).map(b => ({x:b.x-6,y:b.y-6,w:b.w+12,h:b.h+12}));
+
+    function score(c){
+      const r = {x: clamp(c.x, 8, W - label.w - 8), y: clamp(c.y, 8, H - label.h - 8), w: label.w, h: label.h};
+      let collisions = 0;
+      for(const s of standRects){
+        if(rectsIntersect(r, s)) collisions++;
+      }
+      // prefer below and centered-ish
+      const dy = Math.abs((r.y + r.h/2) - (targetBox.cy + d));
+      const dx = Math.abs((r.x + r.w/2) - targetBox.cx);
+      const edgePenalty = (r.x<12||r.y<12||r.x+r.w>W-12||r.y+r.h>H-12) ? 2 : 0;
+      return {r, collisions, metric: collisions*10000 + edgePenalty*800 + dy*2 + dx};
+    }
+
+    let best = null;
+    for(const c of candidates){
+      const s = score(c);
+      if(!best || s.metric < best.metric) best = s;
+    }
+    return best.r;
+  }
+
+  function drawOverlay(){
+    overlaySvg.innerHTML = ""; // avoid stray shapes/quarter circles
+    if(!selectedStandId) return;
+
+    const data = standsById.get(selectedStandId) || {};
+    const box = standScreenBoxes.get(selectedStandId);
+    if(!box) return;
+
+    const label = buildLabelLayout(selectedStandId, data.company);
+    const pos = chooseLabelPosition(box, label);
+
+    // Compute connector: from label rect edge to stand center
+    const sx = box.cx, sy = box.cy;
+    const lx = pos.x, ly = pos.y, lw = pos.w, lh = pos.h;
+    const px = clamp(sx, lx, lx+lw);
+    const py = clamp(sy, ly, ly+lh);
+
+    // Pick the closest point on label rectangle perimeter
+    let ex = px, ey = py;
+    // Move point to edge (not inside)
+    const leftDist = Math.abs(px - lx);
+    const rightDist = Math.abs(px - (lx+lw));
+    const topDist = Math.abs(py - ly);
+    const bottomDist = Math.abs(py - (ly+lh));
+    const m = Math.min(leftDist, rightDist, topDist, bottomDist);
+    if(m === leftDist) ex = lx;
+    else if(m === rightDist) ex = lx+lw;
+    else if(m === topDist) ey = ly;
+    else ey = ly+lh;
+
+    const dotR = isPhone() ? 4.2 : 4.8;
+
+    // SVG elements
+    const NS = "http://www.w3.org/2000/svg";
+    const line = document.createElementNS(NS,"line");
+    line.setAttribute("x1", ex);
+    line.setAttribute("y1", ey);
+    line.setAttribute("x2", sx);
+    line.setAttribute("y2", sy);
+    line.setAttribute("stroke", COLORS.line);
+    line.setAttribute("stroke-width", isPhone()? "3" : "3.2");
+    line.setAttribute("stroke-linecap", "round");
+    line.setAttribute("opacity","0.9");
+
+    const dot = document.createElementNS(NS,"circle");
+    dot.setAttribute("cx", sx);
+    dot.setAttribute("cy", sy);
+    dot.setAttribute("r", dotR);
+    dot.setAttribute("fill", COLORS.dot);
+
+    const g = document.createElementNS(NS,"g");
+    g.setAttribute("class","labelBox");
+
+    const rect = document.createElementNS(NS,"rect");
+    rect.setAttribute("x", lx);
+    rect.setAttribute("y", ly);
+    rect.setAttribute("width", lw);
+    rect.setAttribute("height", lh);
+    rect.setAttribute("rx", isPhone()? "16" : "18");
+    rect.setAttribute("fill", COLORS.selected);
+    rect.setAttribute("opacity","0.96");
+
+    const t1 = document.createElementNS(NS,"text");
+    t1.setAttribute("x", lx + lw/2);
+    t1.setAttribute("y", ly + (label.compText ? (isPhone()? 42 : 44) : (isPhone()? 44 : 46)));
+    t1.setAttribute("text-anchor","middle");
+    t1.setAttribute("font-weight","900");
+    t1.setAttribute("font-size", isPhone()? "34" : "36");
+    t1.setAttribute("fill","#fff");
+    t1.textContent = label.standText;
+
+    g.appendChild(rect);
+    g.appendChild(t1);
+
+    if(label.compText){
+      const t2 = document.createElementNS(NS,"text");
+      t2.setAttribute("x", lx + lw/2);
+      t2.setAttribute("y", ly + (isPhone()? 70 : 74));
+      t2.setAttribute("text-anchor","middle");
+      t2.setAttribute("font-weight","800");
+      t2.setAttribute("font-size", isPhone()? "20" : "18");
+      t2.setAttribute("fill","#fff");
+      t2.textContent = label.compText;
+      g.appendChild(t2);
+    }
+
+    overlaySvg.appendChild(line);
+    overlaySvg.appendChild(dot);
+    overlaySvg.appendChild(g);
+  }
+
+  function renderList(){
+    const q = (searchEl.value || "").toLowerCase().trim();
+    const sold = standsData
+      .filter(s => statusNorm(s.status) === "sold")
+      .filter(s => {
+        const comp = (s.company || "(No company)").toLowerCase();
+        const sid = (s.standId || "").toLowerCase();
+        return !q || comp.includes(q) || sid.includes(q);
+      })
+      .sort((a,b) => (a.company||"").localeCompare(b.company||"") || (a.standId||"").localeCompare(b.standId||""));
+    listEl.innerHTML = "";
+    for(const s of sold){
+      const div = document.createElement("div");
+      div.className = "item" + (s.standId === selectedStandId ? " active" : "");
+      const comp = s.company ? s.company : "(No company)";
+      div.innerHTML = `<div class="company">${escapeHtml(comp)}</div><div class="stand">Stand ${escapeHtml(s.standId)}</div>`;
+      div.addEventListener("click", () => selectStand(s.standId));
+      listEl.appendChild(div);
+    }
+  }
+
+  function escapeHtml(str){
+    return (str||"").toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  function updateSelectedPanel(){
+    if(!selectedStandId){
+      selStandEl.textContent = "None";
+      selCompanyEl.textContent = "";
+      return;
+    }
+    const s = standsById.get(selectedStandId) || {};
+    selStandEl.textContent = selectedStandId;
+    selCompanyEl.textContent = s.company || "";
+  }
+
+  function selectStand(id){
+    id = normId(id);
+    if(!id) return;
+    selectedStandId = id;
+    setSelectedColor();
+    updateSelectedPanel();
+    drawOverlay();
+    renderList();
+  }
+
+  function clearSelection(){
+    selectedStandId = null;
+    setSelectedColor();
+    updateSelectedPanel();
+    overlaySvg.innerHTML = "";
+    renderList();
+  }
+
+  function bindStandClicks(){
+    // Desktop only
+    for(const [id, el] of standEls.entries()){
+      el.onpointerdown = null;
+      if(isPhone()) continue;
+      el.style.pointerEvents = "auto";
+      el.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        selectStand(id);
+      });
+    }
+  }
+
+  async function refreshData(){
+    const [settings, stands] = await Promise.all([
+      fetchJson(SETTINGS_ENDPOINT).catch(()=>({eventName:"Getaway Show 2026", updatedAt:null})),
+      fetchJson(STANDS_ENDPOINT)
+    ]);
+    standsData = Array.isArray(stands) ? stands : (stands.stands || []);
+    standsById = new Map(standsData.map(s => [normId(s.standId), s]));
+    eventTitleEl.textContent = settings.eventName || "Exhibition Floorplan";
+    const updated = settings.updatedAt || settings.lastUpdated || settings.updated || null;
+    updatedAtEl.textContent = "Updated: " + (updated ? updated : new Date().toLocaleTimeString());
+    readyEl.textContent = "Ready ✅";
+
+    if(svgRoot){
+      findStandElements();
+      setBaseColors();
+      computeStandBoxes();
+      bindStandClicks();
+      setSelectedColor();
+      drawOverlay();
+    }
+    renderList();
+  }
+
+  function onResize(){
+    if(!svgRoot) return;
+    // Update phone/desktop pointer behavior
+    setBaseColors();
+    bindStandClicks();
+    // Recompute geometry
+    computeStandBoxes();
+    drawOverlay();
+  }
+
+  // ===== PDF EXPORT (simple browser print) =====
+  function exportPdf(){
+    // Use a print-friendly window with current plan SVG (including selection)
+    const w = window.open("", "_blank");
+    if(!w) return;
+    const title = eventTitleEl.textContent || "Floorplan";
+    const svgHtml = svgRoot ? svgRoot.outerHTML : "";
+    const overlayHtml = overlaySvg ? overlaySvg.outerHTML : "";
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"/><title>${escapeHtml(title)}</title>
+      <style>
+        body{margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;}
+        .wrap{padding:20px;}
+        .box{position:relative; border:1px solid rgba(0,0,0,.12); border-radius:14px; overflow:hidden;}
+        .box svg{width:100%; height:auto; display:block;}
+        .overlay{position:absolute; inset:0; pointer-events:none;}
+      </style>
+      </head><body><div class="wrap">
+        <h2 style="margin:0 0 10px;">${escapeHtml(title)}</h2>
+        <div class="box">
+          ${svgHtml}
+          <div class="overlay">${overlayHtml}</div>
+        </div>
+      </div>
+      <script>setTimeout(()=>{window.print();}, 250);<\/script>
+    </body></html>`);
+    w.document.close();
+  }
+
+  // ===== INIT =====
+  clearBtn.addEventListener("click", clearSelection);
+  exportPdfBtn.addEventListener("click", exportPdf);
+  searchEl.addEventListener("input", renderList);
+
+  window.addEventListener("resize", () => {
+    clearTimeout(window.__rz);
+    window.__rz = setTimeout(onResize, 120);
   });
-  renderList();
-  updateSelectedCard();
-}
-)();
+
+  (async () => {
+    try{
+      readyEl.textContent = "Loading…";
+      await loadSvg();
+      await refreshData();
+      // periodic refresh
+      setInterval(refreshData, 15000);
+    }catch(e){
+      console.error(e);
+      readyEl.textContent = "Error loading ❌";
+      eventTitleEl.textContent = "Floorplan";
+      updatedAtEl.textContent = (e && e.message) ? e.message : "Failed to load";
+    }
+  })();
+})();
 </script>
 </body>
 </html>
