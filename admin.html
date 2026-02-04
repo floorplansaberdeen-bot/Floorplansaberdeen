@@ -232,9 +232,56 @@
 <script>
 (() => {
   // ===== CONFIG =====
-  const API_BASE = window.API_BASE || "https://floorplansaberdeen-bot.workers.dev"; // change if needed
+  const DEFAULT_API_BASE = "https://floorplansaberdeen-bot.workers.dev";
+const API_BASE = (() => {
+  const override = window.API_BASE;
+  const saved = localStorage.getItem("floorplan_api_base");
+  const base = (override && typeof override==="string") ? override : ((saved && saved.startsWith("http")) ? saved : DEFAULT_API_BASE);
+  return base.replace(/\/+$/,"");
+})(); // change if needed
   const STANDS_ENDPOINT = `${API_BASE}/stands`;
   const SETTINGS_ENDPOINT = `${API_BASE}/settings`;
+  // ---- Backend selection & resilient fetch ----
+  function setApiBase(newBase){
+    if(!newBase) return;
+    const clean = String(newBase).trim().replace(/\/+$/,"");
+    localStorage.setItem("floorplan_api_base", clean);
+    location.reload();
+  }
+
+  function backendUi(message){
+    let el = document.getElementById("backendBanner");
+    if(!el){
+      el = document.createElement("div");
+      el.id = "backendBanner";
+      el.style.cssText = "position:fixed;left:12px;right:12px;bottom:12px;z-index:99999;background:#111;color:#fff;padding:12px 14px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.35);display:flex;gap:12px;align-items:center;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;font-size:14px;";
+      el.innerHTML = `<div style="flex:1;line-height:1.3"></div>
+        <button id="backendSetBtn" style="background:#fff;color:#111;border:0;border-radius:10px;padding:10px 12px;font-weight:700;cursor:pointer">Set backend URL</button>
+        <button id="backendHideBtn" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:10px 12px;font-weight:700;cursor:pointer">Hide</button>`;
+      document.body.appendChild(el);
+      el.querySelector("#backendSetBtn").onclick = () => {
+        const current = localStorage.getItem("floorplan_api_base") || DEFAULT_API_BASE;
+        const v = prompt("Paste your backend URL (Cloudflare Worker or Google Apps Script Web App):", current);
+        if(v) setApiBase(v);
+      };
+      el.querySelector("#backendHideBtn").onclick = () => el.remove();
+    }
+    el.firstElementChild.textContent = message || "Backend not reachable.";
+  }
+
+  async function safeFetch(url, options){
+    try{
+      const res = await fetch(url, options);
+      if(!res.ok){
+        const txt = await res.text().catch(()=> "");
+        throw new Error(`HTTP ${res.status} ${res.statusText}${txt?": "+txt.slice(0,120):""}`);
+      }
+      return res;
+    }catch(err){
+      backendUi("Can't reach the backend right now (this is why the page won't load). If Cloudflare is down, paste your Google Apps Script Web App URL instead.");
+      throw err;
+    }
+  }
   const UPDATE_ENDPOINT = `${API_BASE}/update`;
   const RESET_ENDPOINT = `${API_BASE}/reset`;
   const EXPORT_CSV_ENDPOINT = `${API_BASE}/export`;
@@ -286,9 +333,14 @@
   function statusNorm(s){ return (s||"").toString().toLowerCase().trim() === "sold" ? "sold" : "available"; }
 
   async function fetchJson(url, opts={}){
-    const r = await fetch(url, Object.assign({cache:"no-store"}, opts));
-    if(!r.ok) throw new Error(`Fetch failed (${r.status}): ${url}`);
-    return await r.json();
+    const isBackend = (typeof url === "string") && (url.startsWith(API_BASE) || url.startsWith(DEFAULT_API_BASE));
+    const res = isBackend ? await safeFetch(url, {cache:"no-store", ...opts}) : await fetch(url, {cache:"no-store", ...opts});
+    if(!res.ok){
+      const txt = await res.text().catch(()=> "");
+      throw new Error(`Fetch failed: ${url} (${res.status}) ${txt.slice(0,120)}`);
+    }
+    const ct = (res.headers.get("content-type")||"").toLowerCase();
+    return ct.includes("application/json") ? await res.json() : await res.text();
   }
 
   async function loadSvg(){
