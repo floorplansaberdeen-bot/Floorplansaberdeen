@@ -79,6 +79,8 @@
     font-size:13px;font-weight:800;
     pointer-events:none;
   }
+    .legendPill{display:none !important;}
+
   .dot{width:12px;height:12px;border-radius:50%;}
   .dot.base{background:var(--stands-solid)}
   .dot.sel{background:var(--selected)}
@@ -166,14 +168,19 @@
       <div id="overlay">
         <svg id="overlaySvg" viewBox="0 0 100 100" preserveAspectRatio="none">
           <path id="connLine" class="line" d="" />
-          <circle id="connDot" class="pin" cx="0" cy="0" r="6"></circle>
+          <circle id="connDot" class="pin" cx="0" cy="0" r="0"></circle>
         </svg>
         <div id="tag" class="tag" style="display:none">
           <div class="stand" id="tagStand"></div>
           <div class="company" id="tagCompany"></div>
         </div>
       </div>
-</div>
+
+      <div class="legendPill">
+        <span style="display:inline-flex;align-items:center;gap:8px"><span class="dot base"></span> Stands</span>
+        <span style="display:inline-flex;align-items:center;gap:8px"><span class="dot sel"></span> Selected</span>
+      </div>
+    </div>
   </div>
 
   <div class="side">
@@ -309,19 +316,54 @@
     return /^[A-Z]{1,3}\d{1,3}$/i.test(String(id||'').trim());
   }
 
-  function getStandNodes(){
+  
+  function getStandIds(){
     if(!svgRoot) return [];
-    const groups = Array.from(svgRoot.querySelectorAll('g[id]')).filter(g=>isStandId(g.id));
-    const shapes = Array.from(svgRoot.querySelectorAll('path[id],rect[id],polygon[id],circle[id],ellipse[id],polyline[id],line[id]'))
-      .filter(el=>isStandId(el.id));
-    return groups.length ? groups : shapes;
+    const ids = Array.from(svgRoot.querySelectorAll('[id]'))
+      .map(el=>el.id)
+      .filter(id=>isStandId(id));
+    return Array.from(new Set(ids)).sort((a,b)=>a.localeCompare(b, undefined, {numeric:true, sensitivity:'base'}));
   }
 
-  function paintStand(node, isSelected){
-    const targets = (node.tagName.toLowerCase()==='g')
-      ? node.querySelectorAll('path,rect,polygon,circle,ellipse,polyline,line')
-      : [node];
+  function getPaintTargetsForId(standId){
+    if(!svgRoot) return [];
+    const els = Array.from(svgRoot.querySelectorAll('[id]')).filter(el=>el.id===standId);
+    const targets = [];
+    const pushShape = (el)=>{
+      const tag = el.tagName.toLowerCase();
+      if(tag==='text' || tag==='tspan') return;
+      if(tag==='g'){
+        el.querySelectorAll('path,rect,polygon,circle,ellipse,polyline,line').forEach(ch=>pushShape(ch));
+        return;
+      }
+      if(['path','rect','polygon','circle','ellipse','polyline','line'].includes(tag)){
+        targets.push(el);
+      }
+    };
+    els.forEach(pushShape);
+    return targets;
+  }
 
+  function resolveStandNode(standId){
+    // Pick the largest painted shape for bbox maths (avoids duplicate IDs on tiny text etc.)
+    const targets = getPaintTargetsForId(standId);
+    let best = null;
+    let bestArea = -1;
+    for(const el of targets){
+      try{
+        const bb = el.getBBox();
+        const area = Math.abs(bb.width * bb.height);
+        if(area > bestArea){
+          bestArea = area;
+          best = el;
+        }
+      }catch(_){}
+    }
+    return best || null;
+  }
+
+  function paintStandId(standId, isSelected){
+    const targets = getPaintTargetsForId(standId);
     targets.forEach(el=>{
       el.style.fill = isSelected ? SELECTED_FILL : STANDS_FILL;
       el.style.fillOpacity = '1';
@@ -331,20 +373,10 @@
     });
   }
 
+  
   function renderPlan(){
-    const nodes = getStandNodes();
-    nodes.forEach(node=>{
-      const id = String(node.id||'').trim();
-      paintStand(node, id === selectedId);
-      if(!isPhone){
-        node.style.pointerEvents = 'auto';
-        node.addEventListener('click', (e)=>{
-          e.preventDefault();
-          e.stopPropagation();
-          select(id);
-        }, {passive:false});
-      }
-    });
+    const ids = getStandIds();
+    ids.forEach(id=>paintStandId(id, id === selectedId));
   }
 
   function soldItems(){
@@ -375,36 +407,33 @@
     return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   }
 
+  
   function getStandBBoxOnScreen(standId){
-    const node = svgRoot.querySelector('#' + CSS.escape(standId));
+    if(!svgRoot) return null;
+    const node = resolveStandNode(standId);
     if(!node) return null;
-    let target = node;
-    // If group, get bbox of group
-    try{
-      const bb = target.getBBox();
-      const pt = svgRoot.createSVGPoint();
-      const ctm = target.getCTM();
-      if(!ctm) return null;
 
-      // Corners -> screen
-      const corners = [
-        [bb.x, bb.y],
-        [bb.x+bb.width, bb.y],
-        [bb.x+bb.width, bb.y+bb.height],
-        [bb.x, bb.y+bb.height]
-      ].map(([x,y])=>{
-        pt.x=x; pt.y=y;
-        const sp = pt.matrixTransform(ctm).matrixTransform(svgRoot.getScreenCTM());
-        return {x:sp.x,y:sp.y};
-      });
+    let bb;
+    try{ bb = node.getBBox(); }catch(_){ return null; }
+    const ctm = node.getScreenCTM();
+    if(!ctm) return null;
 
-      const xs = corners.map(p=>p.x), ys=corners.map(p=>p.y);
-      const minX=Math.min(...xs), maxX=Math.max(...xs);
-      const minY=Math.min(...ys), maxY=Math.max(...ys);
-      return {left:minX, top:minY, right:maxX, bottom:maxY, width:maxX-minX, height:maxY-minY, cx:(minX+maxX)/2, cy:(minY+maxY)/2};
-    }catch{
-      return null;
-    }
+    const p1 = svgRoot.createSVGPoint(); p1.x = bb.x; p1.y = bb.y;
+    const p2 = svgRoot.createSVGPoint(); p2.x = bb.x + bb.width; p2.y = bb.y;
+    const p3 = svgRoot.createSVGPoint(); p3.x = bb.x; p3.y = bb.y + bb.height;
+    const p4 = svgRoot.createSVGPoint(); p4.x = bb.x + bb.width; p4.y = bb.y + bb.height;
+
+    const s1 = p1.matrixTransform(ctm);
+    const s2 = p2.matrixTransform(ctm);
+    const s3 = p3.matrixTransform(ctm);
+    const s4 = p4.matrixTransform(ctm);
+
+    const xs = [s1.x,s2.x,s3.x,s4.x];
+    const ys = [s1.y,s2.y,s3.y,s4.y];
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+
+    return { x:minX, y:minY, w:(maxX-minX), h:(maxY-minY) };
   }
 
   // Smart placement: choose a position for tag that stays within svgHost
@@ -427,7 +456,7 @@
     const tagRect = tag.getBoundingClientRect();
 
     const padding = 14;
-    const dotRadius = 5;
+    const dotRadius = isPhone ? 5 : 6;
 
     // Candidate anchors relative to host: try bottom-left, bottom-center, bottom-right, top-left, top-right
     const candidates = [

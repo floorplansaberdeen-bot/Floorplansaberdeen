@@ -200,7 +200,7 @@
   const SVG_URL  = './event_plan.svg';
   const SYNC_INTERVAL_MS = 10000;
 
-  const SOLD  = 'rgba(229, 57, 53, 0.75)';
+  const SOLD  = '#e53935';
   const AVAIL = 'rgba(213, 109, 50, 0.75)';
 
   const ADMIN_PASSWORD = 'FLOORPASS1';
@@ -349,33 +349,46 @@
     countEl.textContent = filtered.length+' / '+items.length;
   }
 
-  function getStandBBoxOnScreen(standId){
-    const node = svgRoot.querySelector('#' + CSS.escape(standId));
-    if(!node) return null;
-    try{
-      const bb = node.getBBox();
-      const pt = svgRoot.createSVGPoint();
-      const ctm = node.getCTM();
-      if(!ctm) return null;
-
-      const corners = [
-        [bb.x, bb.y],
-        [bb.x+bb.width, bb.y],
-        [bb.x+bb.width, bb.y+bb.height],
-        [bb.x, bb.y+bb.height]
-      ].map(([x,y])=>{
-        pt.x=x; pt.y=y;
-        const sp = pt.matrixTransform(ctm).matrixTransform(svgRoot.getScreenCTM());
-        return {x:sp.x,y:sp.y};
-      });
-
-      const xs = corners.map(p=>p.x), ys=corners.map(p=>p.y);
-      const minX=Math.min(...xs), maxX=Math.max(...xs);
-      const minY=Math.min(...ys), maxY=Math.max(...ys);
-      return {left:minX, top:minY, right:maxX, bottom:maxY, cx:(minX+maxX)/2, cy:(minY+maxY)/2};
-    }catch{
-      return null;
+  
+  function resolveNodeInRoot(root, standId){
+    const els = Array.from(root.querySelectorAll('[id]')).filter(el=>el.id===standId);
+    // Prefer groups, otherwise pick largest shape (avoid duplicate IDs on text)
+    const groups = els.filter(el=>el.tagName.toLowerCase()==='g');
+    const candidates = (groups.length ? groups : els).filter(el=>{
+      const tag = el.tagName.toLowerCase();
+      return tag!=='text' && tag!=='tspan' && tag!=='defs';
+    });
+    let best=null, bestArea=-1;
+    for(const el of candidates){
+      try{
+        const bb = el.getBBox();
+        const area = Math.abs(bb.width*bb.height);
+        if(area>bestArea){ bestArea=area; best=el; }
+      }catch(_){}
     }
+    return best;
+  }
+
+  function getStandBBoxOnScreen(standId){
+    if(!svgRoot) return null;
+    const node = resolveNodeInRoot(svgRoot, standId);
+    if(!node) return null;
+    let bb;
+    try{ bb = node.getBBox(); }catch(_){ return null; }
+    const ctm = node.getScreenCTM();
+    if(!ctm) return null;
+
+    const p1 = svgRoot.createSVGPoint(); p1.x=bb.x; p1.y=bb.y;
+    const p2 = svgRoot.createSVGPoint(); p2.x=bb.x+bb.width; p2.y=bb.y;
+    const p3 = svgRoot.createSVGPoint(); p3.x=bb.x; p3.y=bb.y+bb.height;
+    const p4 = svgRoot.createSVGPoint(); p4.x=bb.x+bb.width; p4.y=bb.y+bb.height;
+
+    const s1=p1.matrixTransform(ctm), s2=p2.matrixTransform(ctm), s3=p3.matrixTransform(ctm), s4=p4.matrixTransform(ctm);
+    const xs=[s1.x,s2.x,s3.x,s4.x], ys=[s1.y,s2.y,s3.y,s4.y];
+    const minX=Math.min(...xs), maxX=Math.max(...xs);
+    const minY=Math.min(...ys), maxY=Math.max(...ys);
+
+    return {left:minX, top:minY, right:maxX, bottom:maxY, cx:(minX+maxX)/2, cy:(minY+maxY)/2};
   }
 
   function placeOverlay(standId){
@@ -482,14 +495,54 @@
     zoomHost.appendChild(zoomSvgRoot);
   }
 
+  
   function updateZoom(standId){
-    if(!zoomSvgRoot || !standId) return;
-    const node = svgRoot.querySelector('#' + CSS.escape(standId));
-    if(!node) return;
-    let bb; try{ bb = node.getBBox(); }catch{ return; }
-    const pad = Math.max(20, Math.max(bb.width, bb.height) * 0.7);
+    if(!zoomSvgRoot){
+      return;
+    }
+    const ringId = '__zoomRing';
+    const existing = zoomSvgRoot.querySelector('#' + ringId);
+    if(!standId){
+      if(existing) existing.remove();
+      return;
+    }
+
+    const node = resolveNodeInRoot(zoomSvgRoot, standId);
+    if(!node){
+      if(existing) existing.remove();
+      return;
+    }
+
+    let bb;
+    try{ bb = node.getBBox(); }catch(_){
+      if(existing) existing.remove();
+      return;
+    }
+
+    // Zoom viewBox (keep plenty of context)
+    const pad = Math.max(40, Math.max(bb.width, bb.height) * 0.9);
     const x = bb.x - pad, y = bb.y - pad, w = bb.width + pad*2, h = bb.height + pad*2;
     zoomSvgRoot.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
+
+    // Highlight ring around the selected stand inside the zoom view
+    const ringPad = Math.max(6, Math.min(22, Math.max(bb.width, bb.height) * 0.12));
+    let ring = existing;
+    if(!ring){
+      ring = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      ring.setAttribute('id', ringId);
+      ring.setAttribute('fill', 'none');
+      ring.setAttribute('stroke', '#111');
+      ring.setAttribute('stroke-width', '6');
+      ring.setAttribute('opacity', '0.9');
+      ring.style.pointerEvents = 'none';
+      zoomSvgRoot.appendChild(ring);
+    }
+    ring.setAttribute('x', bb.x - ringPad);
+    ring.setAttribute('y', bb.y - ringPad);
+    ring.setAttribute('width', bb.width + ringPad*2);
+    ring.setAttribute('height', bb.height + ringPad*2);
+    ring.setAttribute('rx', String(Math.max(18, ringPad*2)));
+    ring.setAttribute('ry', String(Math.max(18, ringPad*2)));
   }
 
   async function syncOnce(force=false){
