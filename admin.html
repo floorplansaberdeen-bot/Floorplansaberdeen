@@ -481,45 +481,84 @@ function getBackendUrl() {
     return { x, y };
   }
 
-  function updatePointer(standId) {
-    if (!standId) {
-      lineEl.style.display="none";
-      dotEl.style.display="none";
-      labelEl.style.display="none";
-      return;
-    }
-    const elem = elementForStand(standId);
-    if (!elem) return;
-
-    const standPt = getElementCenterInPage(elem);
-    const { x: labelCx, y: labelCy } = placeLabelSmart(standPt);
-    const wrapRect = planWrap.getBoundingClientRect();
-
-    const sx = standPt.x - wrapRect.left;
-    const sy = standPt.y - wrapRect.top;
-    const lx = labelCx - wrapRect.left;
-    const ly = labelCy - wrapRect.top;
-
-    const dx = sx - lx, dy = sy - ly;
-    const len = Math.sqrt(dx*dx + dy*dy);
-    const ang = Math.atan2(dy, dx);
-
-    lineEl.style.display="block";
-    lineEl.style.left = `${lx}px`;
-    lineEl.style.top = `${ly}px`;
-    lineEl.style.width = `${len}px`;
-    lineEl.style.transform = `rotate(${ang}rad)`;
-
-    dotEl.style.display="block";
-    dotEl.style.left = `${sx}px`;
-    dotEl.style.top = `${sy}px`;
-
-    labelEl.style.display="block";
-    labelEl.style.left = `${lx}px`;
-    labelEl.style.top = `${ly}px`;
-    labelStandEl.textContent = standId;
+  function clearCallout(){
+    while (calloutSvg.firstChild) calloutSvg.removeChild(calloutSvg.firstChild);
+    calloutSvg.style.display = "none";
+    lozenge.style.display = "none";
+    lozStand.textContent = "—";
+    lozCompany.style.display = "none";
+    lozCompany.textContent = "";
   }
 
+  function drawCallout(standId){
+    const row = rows.find(r => r.standId === normStandId(standId));
+    const elem = row ? elementForStand(row.standId) : elementForStand(standId);
+    if (!elem) { clearCallout(); return; }
+
+    // Update lozenge content
+    lozStand.textContent = row ? row.standId : standId;
+    const company = (row && row.status === "sold") ? (row.company || "") : "";
+    if (company){
+      lozCompany.style.display = "block";
+      lozCompany.textContent = company;
+    } else {
+      lozCompany.style.display = "none";
+      lozCompany.textContent = "";
+    }
+    lozenge.style.display = "inline-block";
+
+    // Force layout so getBoundingClientRect is accurate
+    void lozenge.offsetWidth;
+
+    requestAnimationFrame(() => {
+      const standRect = elem.getBoundingClientRect();
+      const standPt = { x: standRect.left + standRect.width/2, y: standRect.top + standRect.height/2 };
+
+      const lozRect = lozenge.getBoundingClientRect();
+      const lozTop = { x: lozRect.left + lozRect.width/2, y: lozRect.top };
+
+      const stackRect = planStack.getBoundingClientRect();
+      const x1 = lozTop.x - stackRect.left;
+      const y1 = lozTop.y - stackRect.top;
+      const x2 = standPt.x - stackRect.left;
+      const y2 = standPt.y - stackRect.top;
+
+      calloutSvg.setAttribute("viewBox", `0 0 ${stackRect.width} ${stackRect.height}`);
+      calloutSvg.setAttribute("preserveAspectRatio", "none");
+      calloutSvg.setAttribute("width", String(stackRect.width));
+      calloutSvg.setAttribute("height", String(stackRect.height));
+      calloutSvg.style.display = "block";
+
+      const dotPx = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--dot")) || 10;
+      const r = dotPx / 2;
+      const NS = "http://www.w3.org/2000/svg";
+      while (calloutSvg.firstChild) calloutSvg.removeChild(calloutSvg.firstChild);
+
+      const line = document.createElementNS(NS, "line");
+      line.setAttribute("x1", String(x1));
+      line.setAttribute("y1", String(y1));
+      line.setAttribute("x2", String(x2));
+      line.setAttribute("y2", String(y2));
+      line.setAttribute("stroke", getComputedStyle(document.documentElement).getPropertyValue("--line").trim() || "rgba(0,0,0,.70)");
+      line.setAttribute("stroke-width", "3");
+      line.setAttribute("stroke-linecap", "round");
+
+      const dot = document.createElementNS(NS, "circle");
+      dot.setAttribute("cx", String(x2));
+      dot.setAttribute("cy", String(y2));
+      dot.setAttribute("r", String(r));
+      dot.setAttribute("fill", "rgba(0,0,0,.72)");
+
+      calloutSvg.appendChild(line);
+      calloutSvg.appendChild(dot);
+    });
+  }
+
+  // Backwards-compatible alias (older code calls updatePointer)
+  function updatePointer(standId){
+    if (!standId) { clearCallout(); return; }
+    drawCallout(standId);
+  }\n
   function applyColours() {
     rows.forEach(r => {
       const elem = elementForStand(r.standId);
@@ -579,7 +618,7 @@ function getBackendUrl() {
     companyEl.value = row.company || "";
 
     applyColours();
-    updatePointer(row.standId);
+    drawCallout(row.standId);
     renderTable();
     updateZoom(row.standId);
   }
