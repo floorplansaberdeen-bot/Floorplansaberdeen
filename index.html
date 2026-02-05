@@ -1,183 +1,106 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Floorplan</title>
   <style>
     :root{
-      --bg:#ffffff;
+      --bg:#fafafa;
       --card:#ffffff;
-      --border:#e9e9e9;
+      --border:#e6e6e6;
       --text:#111;
       --muted:#666;
-      --accent: rgba(213,109,50,0.75); /* stands main colour */
-      --selected:#e63b3b;
-      --shadow: 0 12px 30px rgba(0,0,0,.12);
-      --dot: 10px; /* pointer dot size (match admin) */
-      --line: rgba(0,0,0,.70);
-      --safe: env(safe-area-inset-bottom, 0px);
+      --accent:rgba(213,109,50,0.75); /* stand fill */
+      --selected:#e53935;           /* selected fill */
+      --shadow:0 10px 24px rgba(0,0,0,.12);
+      --radius:16px;
+      --labelW:260px;
+      --labelH:74px;
+      --labelPad:14px;
+      --dotR:5; /* marker radius */
+      --lineW:3;
     }
-    *{ box-sizing:border-box; }
-    body{
-      margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
-      background:var(--bg); color:var(--text);
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:18px 18px 8px}
+    .title h1{margin:0;font-size:44px;letter-spacing:-.02em}
+    .title .meta{margin-top:4px;color:var(--muted);font-size:14px}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    button{appearance:none;border:1px solid var(--border);background:#fff;border-radius:12px;padding:10px 14px;font-weight:600;cursor:pointer}
+    button:active{transform:translateY(1px)}
+    main{display:grid;grid-template-columns: minmax(420px, 1fr) 420px;gap:16px;padding:0 18px 18px}
+    @media (max-width: 980px){
+      header{position:sticky;top:0;background:var(--bg);z-index:30;padding-bottom:12px}
+      main{grid-template-columns:1fr}
     }
-    header{
-      padding:20px 18px 8px;
-      display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
-      flex-wrap:wrap;
-    }
-    header h1{ margin:0; font-size:44px; line-height:1.05; letter-spacing:-.02em; }
-    header .meta{ margin-top:6px; color:var(--muted); font-size:16px; }
-    header .status{
-      margin-top:6px; font-weight:700;
-      color:#1a8f2a; display:flex; align-items:center; gap:8px;
-    }
-    header .actions{ display:flex; gap:10px; align-items:center; margin-left:auto; }
-    button{
-      border:1px solid var(--border);
-      background:#fff;
-      padding:10px 14px;
-      border-radius:12px;
-      font-weight:700;
-      cursor:pointer;
-    }
-    button:disabled{ opacity:.45; cursor:not-allowed; }
-    main{
-      padding:0 18px 18px;
-      display:grid;
-      grid-template-columns: 1fr 420px;
-      gap:18px;
-      align-items:start;
-    }
-    .card{
-      background:var(--card);
-      border:1px solid var(--border);
-      border-radius:16px;
-      box-shadow: 0 1px 0 rgba(0,0,0,.02);
-    }
-    .planCard{ padding:14px; }
-    .planWrap{--labelGutter:110px;
 
-      position:relative;
-      border-radius:14px;
-      overflow:hidden;
-      background:#fff;
-      min-height:420px;
-    
-  padding-bottom: var(--labelGutter);
-}
-    /* The SVG inserted is inside .svgHost */
-    .svgHost{position:absolute; left:0; right:0; top:0; bottom:var(--labelGutter);}
-
-    .overlay{
-      position:absolute; inset:0;
-      pointer-events:none;
-    }
-    /* pointer label */
-    .label{
-      position:absolute;
+    .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+    .cardHead{padding:12px 14px;border-bottom:1px solid #f0f0f0;font-weight:700}
+    .planWrap{position:relative;display:flex;flex-direction:column;min-height:520px}
+    .svgArea{position:relative;flex:1;min-height:320px}
+    .svgHost{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:12px}
+    .svgHost svg{width:100%;height:100%;max-height:100%;max-width:100%}
+    .labelArea{position:relative;height:140px;border-top:1px solid #f0f0f0;background:#fff}
+    .labelBox{
+      position:absolute;left:50%;top:50%;
+      width:var(--labelW);height:var(--labelH);
+      transform:translate(-50%,-50%);
       background:var(--selected);
+      border-radius:14px;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
       color:#fff;
-      border-radius:16px;
-      padding:14px 18px;
-      box-shadow: var(--shadow);
-      min-width: 220px;
-      max-width: 320px;
+      box-shadow:var(--shadow);
       text-align:center;
       pointer-events:none;
-      transform: translate(-50%, -50%);
     }
-    .label .stand{ font-size:38px; font-weight:900; letter-spacing:.02em; }
-    .label .company{ margin-top:6px; font-size:18px; font-weight:800; opacity:.95; }
-    .line{display:none;
+    .labelBox .id{font-size:26px;font-weight:900;line-height:1;margin-bottom:6px;letter-spacing:.02em}
+    .labelBox .name{font-size:16px;font-weight:700;line-height:1.1;opacity:.95}
+    .labelHidden{display:none !important;}
+    .overlay{position:absolute;inset:0;pointer-events:none}
+    .overlay line{stroke:#222;stroke-width:var(--lineW);stroke-linecap:round}
+    .overlay circle{fill:#222}
 
-      position:absolute;
-      background:var(--line);
-      transform-origin: 0 0;
-      height:3px;
-      border-radius:3px;
-      pointer-events:none;
-    }
-    .dot{display:none;
+    /* sidebar */
+    .side{padding:14px}
+    .box{border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px;background:#fff}
+    .box h3{margin:0 0 10px;font-size:16px}
+    .selectedBig{font-size:44px;font-weight:900;line-height:1;margin:2px 0 6px}
+    .selectedName{font-size:22px;font-weight:800;margin:0 0 10px}
+    .help{color:var(--muted);font-size:13px}
+    .search{display:flex;gap:10px;margin:10px 0 12px}
+    input[type="search"]{width:100%;padding:12px 12px;border:1px solid var(--border);border-radius:12px;font-size:14px}
+    .list{max-height:460px;overflow:auto;border:1px solid var(--border);border-radius:14px;background:#fff}
+    .row{padding:12px 12px;border-bottom:1px solid #f2f2f2;cursor:pointer}
+    .row:last-child{border-bottom:none}
+    .row strong{display:block;font-size:16px}
+    .row small{color:var(--muted)}
+    .row.active{background:#fff5f5}
+    /* iOS bottom bar padding so last row can be tapped */
+    .list{padding-bottom:calc(14px + env(safe-area-inset-bottom))}
+    .error{color:#b00020;font-weight:700;margin-top:6px}
 
-      position:absolute;
-      width:var(--dot); height:var(--dot);
-      border-radius:999px;
-      background:rgba(0,0,0,.72);
-      transform: translate(-50%, -50%);
-      pointer-events:none;
-    }
-    .rightCol{ padding:14px; display:flex; flex-direction:column; gap:14px; }
-    .panel{ padding:14px; }
-    .panel h3{ margin:0 0 10px; font-size:16px; }
-    .selectedBig{
-      font-size:46px; font-weight:900; line-height:1;
-      margin:2px 0 6px;
-    }
-    .selectedCompany{ font-size:22px; font-weight:800; margin-bottom:8px; }
-    .help{ color:var(--muted); font-size:13px; line-height:1.35; }
-    .search{
-      width:100%; padding:12px 14px; border-radius:12px;
-      border:1px solid var(--border); font-size:16px;
-    }
-    .list{
-      border:1px solid var(--border);
-      border-radius:14px;
-      overflow:hidden;
-      max-height: 520px;
-      overflow:auto;
-      background:#fff;
-      padding-bottom: calc(14px + var(--safe)); /* allow last item above browser bar */
-    }
-    .item{
-      padding:12px 14px;
-      border-top:1px solid #f0f0f0;
-      cursor:pointer;
-      background:#fff;
-    }
-    .item:first-child{ border-top:none; }
-    .item:hover{ background:#fafafa; }
-    .item.active{ background: #fff2f2; }
-    .item .name{ font-weight:900; }
-    .item .sub{ color:var(--muted); margin-top:2px; }
-    .errBar{
-      margin:0 18px 10px;
-      color:#b00020;
-      font-weight:800;
-    }
-
-    /* Make plan sticky on phones and reduce whitespace */
+    /* phone behaviour */
     @media (max-width: 980px){
-      main{ grid-template-columns: 1fr; }
-      header h1{ font-size:44px; }
+      main{padding-bottom:24px}
+      .planCard{position:sticky;top:92px;z-index:20}
+      .planWrap{min-height:420px}
+      .labelArea{height:120px}
+      :root{ --labelW:220px; --labelH:64px; --dotR:4; --lineW:3; }
+      .title h1{font-size:40px}
     }
-    @media (max-width: 640px){
-      header{ padding:18px 14px 8px; }
-      main{ padding:0 14px 14px; gap:12px; }
-      .planCard{ padding:10px; }
-      .planWrap{ min-height: 300px; }
-      .label{ min-width: 200px; max-width: 260px; padding:12px 14px; border-radius:14px; }
-      .label .stand{ font-size:34px; }
-      .label .company{ font-size:16px; }
-      :root{ --dot: 10px; }
-      /* sticky plan section */
-      .planCard{
-        position: sticky;
-        top: 0;
-        z-index: 20;
-        background: var(--bg);
-      }
+    /* Disable stand clicking on touch phones (list only) */
+    @media (hover: none) and (pointer: coarse){
+      .svgHost{pointer-events:none}
     }
   </style>
 </head>
 <body>
   <header>
-    <div>
+    <div class="title">
       <h1 id="eventTitle">Floorplan</h1>
-      <div class="meta">Updated: <span id="updatedAt">—</span></div>
-      <div class="status" id="readyRow" style="display:none;">Ready ✅</div>
+      <div class="meta">Updated: <span id="updatedAt">—</span> · <span id="statusText">Loading…</span></div>
+      <div id="errorText" class="error" style="display:none"></div>
     </div>
     <div class="actions">
       <button id="exportPdfBtn">Export PDF</button>
@@ -185,41 +108,40 @@
     </div>
   </header>
 
-  <div class="errBar" id="errBar" style="display:none;"></div>
-
   <main>
     <section class="card planCard">
+      <div class="cardHead">Plan</div>
       <div class="planWrap" id="planWrap">
-        <div id="svgHost" class="svgHost"></div>
-        <div class="overlay" id="overlay" aria-hidden="true">
-          <div class="line" id="line" style="display:none;"></div>
-          <div class="dot" id="dot" style="display:none;"></div>
-          <div class="label" id="label" style="display:none;">
-            <div class="stand" id="labelStand">—</div>
-            <div class="company" id="labelCompany" style="display:none;"></div>
+        <div class="svgArea">
+          <div class="svgHost" id="svgHost"></div>
+          <svg class="overlay" id="overlaySvg"></svg>
+        </div>
+        <div class="labelArea">
+          <div class="labelBox labelHidden" id="labelBox">
+            <div class="id" id="labelId"></div>
+            <div class="name" id="labelName"></div>
           </div>
         </div>
       </div>
     </section>
 
-    <aside class="card rightCol">
-      <div class="card panel">
+    <aside class="side">
+      <div class="box">
         <h3>Selected exhibitor</h3>
         <div class="selectedBig" id="selStand">None</div>
-        <div class="selectedCompany" id="selCompany" style="display:none;"></div>
-        <div class="help">
-          Desktop: click a stand or choose from the list.<br/>
-          Phone: use the list (stand tapping is disabled).
-        </div>
+        <div class="selectedName" id="selName"></div>
+        <div class="help">Desktop: click a stand or choose from the list.<br/>Phone: use the list (stand tapping is disabled).</div>
       </div>
 
-      <div class="card panel">
+      <div class="box">
         <h3>Sold exhibitors</h3>
-        <input class="search" id="search" placeholder="Search company or stand…" />
-        <div class="list" id="list"></div>
+        <div class="search">
+          <input id="searchInput" type="search" placeholder="Search company or stand…"/>
+        </div>
+        <div class="list" id="soldList"></div>
       </div>
 
-      <div class="card panel">
+      <div class="box">
         <h3>Help</h3>
         <div class="help">Selecting an exhibitor makes their stand red with a label + line.</div>
       </div>
@@ -229,206 +151,263 @@
 <script>
 (() => {
   const DEFAULT_BACKEND = "https://floorplansaberdeen.floorplansaberdeen.workers.dev";
-  const BACKEND_KEY = "floorplan_backend_url";
-  const SVG_URL = "./event_plan.svg"; // adjust if you use a different file
+  const STANDS_ENDPOINT = "/stands"; // expects JSON array [{standId,status,company}]
+  const SVG_URL = "event_plan.svg";
+
+  const COLORS = {
+    base: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || "rgba(213,109,50,0.75)",
+    selected: getComputedStyle(document.documentElement).getPropertyValue('--selected').trim() || "#e53935"
+  };
 
   const el = (id) => document.getElementById(id);
-  const planWrap = el("planWrap");
-  const svgHost = el("svgHost");
-  const overlay = el("overlay");
-  const lineEl = el("line");
-  const dotEl = el("dot");
-  const labelEl = el("label");
-  const labelStandEl = el("labelStand");
-  const labelCompanyEl = el("labelCompany");
-  const selStandEl = el("selStand");
-  const selCompanyEl = el("selCompany");
-  const listEl = el("list");
-  const searchEl = el("search");
-  const errBar = el("errBar");
-  const updatedAtEl = el("updatedAt");
-  const readyRow = el("readyRow");
-  const eventTitle = el("eventTitle");
 
-  const exportBtn = el("exportPdfBtn");
-  const clearBtn = el("clearBtn");
+  const state = {
+    backend: getBackendBase(),
+    svgEl: null,
+    standElById: new Map(),
+    stands: [],
+    selectedId: null,
+    updatedAt: null
+  };
 
-  function normalizeBackendUrl(input) {
-  if (!input) return "";
-  let s = String(input).trim();
-  // If someone pastes a full endpoint (e.g. .../stands), strip it back to the base.
-  try {
-    const u = new URL(s);
-    let p = u.pathname.replace(/\/+$/,"");
-    p = p.replace(/\/(api\/stands|stands)$/i, "");
-    p = p.replace(/\/+$/,"");
-    u.pathname = p ? p : "/";
-    u.search = "";
-    u.hash = "";
-    const base = u.origin + (u.pathname === "/" ? "" : u.pathname);
-    return base.replace(/\/+$/,"");
-  } catch (e) {
-    s = s.replace(/\/+$/,"");
-    s = s.replace(/\/(api\/stands|stands)$/i, "");
-    return s.replace(/\/+$/,"");
-  }
-}
-
-function getBackendUrl() {
-    const saved = localStorage.getItem(BACKEND_KEY);
-    const base = (saved && saved.startsWith("http")) ? saved : DEFAULT_BACKEND;
-    return normalizeBackendUrl(base);
+  function getBackendBase(){
+    const saved = localStorage.getItem("floorplan_backend_base");
+    if (saved && /^https?:\/\//i.test(saved)) return saved.replace(/\/+$/,'');
+    return DEFAULT_BACKEND;
   }
 
-  async function fetchJson(url, opts = {}) {
-    const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), 12000);
-    try {
-      const res = await fetch(url, { ...opts, signal: controller.signal });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } finally {
-      clearTimeout(t);
+  function setStatus(text, ok=true){
+    el("statusText").textContent = text;
+    el("statusText").style.color = ok ? "#0a7a2b" : "#b00020";
+  }
+  function showError(msg){
+    const e = el("errorText");
+    e.style.display = "block";
+    e.textContent = msg;
+  }
+  function clearError(){
+    const e = el("errorText");
+    e.style.display = "none";
+    e.textContent = "";
+  }
+
+  async function fetchText(url){
+    const res = await fetch(url, {cache:"no-store"});
+    if(!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+    return await res.text();
+  }
+
+  async function loadSvg(){
+    const host = el("svgHost");
+    host.innerHTML = "";
+    const svgText = await fetchText(SVG_URL);
+    const doc = new DOMParser().parseFromString(svgText, "image/svg+xml");
+    const svg = doc.documentElement;
+    // Ensure responsive
+    svg.removeAttribute("width"); svg.removeAttribute("height");
+    svg.setAttribute("preserveAspectRatio","xMidYMid meet");
+    svg.style.width="100%"; svg.style.height="100%";
+    host.appendChild(svg);
+    state.svgEl = svg;
+
+    // Build stand element map on demand (by id)
+    state.standElById.clear();
+  }
+
+  function findStandEl(standId){
+    if(state.standElById.has(standId)) return state.standElById.get(standId);
+    if(!state.svgEl) return null;
+    // Common patterns: element id == standId
+    let node = state.svgEl.querySelector(`#${CSS.escape(standId)}`);
+    if(!node){
+      node = state.svgEl.querySelector(`[data-stand="${standId}"]`);
+    }
+    state.standElById.set(standId, node || null);
+    return node || null;
+  }
+
+  function applyStandColors(){
+    if(!state.svgEl) return;
+    // reset all known stand ids
+    for(const s of state.stands){
+      const node = findStandEl(s.standId);
+      if(!node) continue;
+      // base is always base on public
+      node.style.fill = COLORS.base;
+      node.style.cursor = "pointer";
+      node.style.transition = "fill 120ms ease";
+    }
+    if(state.selectedId){
+      const node = findStandEl(state.selectedId);
+      if(node) node.style.fill = COLORS.selected;
     }
   }
 
-  function showError(msg) {
-    errBar.style.display = "block";
-    errBar.textContent = msg;
-  }
-  function clearError() {
-    errBar.style.display = "none";
-    errBar.textContent = "";
-  }
-
-  function normStandId(s) {
-    return String(s || "").trim().toUpperCase();
-  }
-  function normRow(row) {
-    const standId = normStandId(row.standId ?? row.stand ?? row.id);
-    const status = String(row.status || "available").toLowerCase();
-    const company = String(row.company || "").trim();
-    return { standId, status, company };
-  }
-
-  // ===== SVG stand mapping =====
-  let svgRoot = null;
-  let standMap = new Map(); // standId -> element
-
-  function normalizeDomId(id) {
-    return String(id || "")
-      .trim()
-      .toUpperCase()
-      .replace(/^STAND[_-]?/,"")
-      .replace(/^ZONE[_-]?/,"")
-      .replace(/^ID[_-]?/,"")
-      .replace(/[^A-Z0-9]/g,"");
-  }
-
-  function hideLargeArtifacts(svg) {
-    if (!svg) return;
-    // Hide any huge filled shapes that sit at the top-left (common export artifact: quarter circle)
-    const nodes = svg.querySelectorAll("path,circle,ellipse,rect,polygon,polyline");
-    nodes.forEach(n => {
-      try {
-        const fill = (n.getAttribute("fill") || "").toLowerCase();
-        const stroke = (n.getAttribute("stroke") || "").toLowerCase();
-        if (!fill || fill === "none") return;
-        if (stroke && stroke !== "none") return;
-        const b = n.getBBox();
-        if (b.x <= 1 && b.y <= 1 && (b.width > 60 || b.height > 60)) {
-          n.style.display = "none";
-        }
-      } catch {}
-    });
-  }
-
-  function svgFromText(txt) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(txt, "image/svg+xml");
-    const svg = doc.querySelector("svg");
-    if (!svg) throw new Error("SVG parse failed");
-    return document.importNode(svg, true);
-  }
-
-
-  function buildStandMap() {
-    standMap.clear();
-    if (!svgRoot) return;
-
-    const consider = (node, rawKey) => {
-      const key = normalizeDomId(rawKey);
-      if (!key) return;
-      let area = 0;
-      try {
-        const b = node.getBBox();
-        area = Math.max(0, b.width) * Math.max(0, b.height);
-      } catch {}
-      const existing = standMap.get(key);
-      if (!existing) {
-        standMap.set(key, node);
-        return;
-      }
-      // Prefer the element with the larger bounding box (usually the real stand shape/group)
-      try {
-        const eb = existing.getBBox();
-        const eArea = Math.max(0, eb.width) * Math.max(0, eb.height);
-        if (area > eArea) standMap.set(key, node);
-      } catch {
-        // If existing has no bbox, replace it
-        standMap.set(key, node);
-      }
+  function standCenterInPlan(standId){
+    const node = findStandEl(standId);
+    if(!node) return null;
+    const planRect = el("planWrap").getBoundingClientRect();
+    const r = node.getBoundingClientRect();
+    return {
+      x: (r.left + r.right)/2 - planRect.left,
+      y: (r.top + r.bottom)/2 - planRect.top
     };
-
-    svgRoot.querySelectorAll("[id]").forEach(node => consider(node, node.id));
-    svgRoot.querySelectorAll("[data-stand]").forEach(node => consider(node, node.getAttribute("data-stand")));
   }
 
-  function elementForStand(standId) {
-    const key = normalizeDomId(standId);
-    return standMap.get(key) || null;
+  function updateLabelAndPointer(){
+    const labelBox = el("labelBox");
+    const overlay = el("overlaySvg");
+    overlay.innerHTML = "";
+    overlay.setAttribute("width","100%");
+    overlay.setAttribute("height","100%");
+    overlay.setAttribute("viewBox", `0 0 ${el("planWrap").clientWidth} ${el("planWrap").clientHeight}`);
+
+    if(!state.selectedId){
+      labelBox.classList.add("labelHidden");
+      return;
+    }
+
+    const sel = state.stands.find(s => s.standId === state.selectedId);
+    el("labelId").textContent = state.selectedId;
+    el("labelName").textContent = (sel && sel.company) ? sel.company : "";
+    labelBox.classList.remove("labelHidden");
+
+    const planWrap = el("planWrap");
+    const planRect = planWrap.getBoundingClientRect();
+    const labelRect = labelBox.getBoundingClientRect();
+    const p = standCenterInPlan(state.selectedId);
+    if(!p) return;
+
+    // label top-middle
+    const lx = (labelRect.left + labelRect.right)/2 - planRect.left;
+    const ly = (labelRect.top) - planRect.top;
+
+    const line = document.createElementNS("http://www.w3.org/2000/svg","line");
+    line.setAttribute("x1", lx);
+    line.setAttribute("y1", ly);
+    line.setAttribute("x2", p.x);
+    line.setAttribute("y2", p.y);
+    overlay.appendChild(line);
+
+    const dot = document.createElementNS("http://www.w3.org/2000/svg","circle");
+    const r = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dotR')) || 5;
+    dot.setAttribute("cx", p.x);
+    dot.setAttribute("cy", p.y);
+    dot.setAttribute("r", r);
+    overlay.appendChild(dot);
   }
 
-  function setFillForElement(elem, rgba) {
-    if (!elem) return;
-    // If group, apply to child shapes; else apply directly.
-    const shapes = elem.matches("path,rect,polygon,polyline,ellipse,circle")
-      ? [elem]
-      : Array.from(elem.querySelectorAll("path,rect,polygon,polyline,ellipse,circle"));
-
-    shapes.forEach(s => {
-      // Only fill areas that look like stands: skip tiny dots and outlines
-      const bbox = s.getBBox ? s.getBBox() : null;
-      if (bbox && (bbox.width < 8 || bbox.height < 8)) return;
-      s.style.fill = rgba;
-      s.style.fillOpacity = "1";
-    });
+  function setSelected(standId){
+    state.selectedId = standId;
+    const s = state.stands.find(x => x.standId === standId) || null;
+    el("selStand").textContent = standId || "None";
+    el("selName").textContent = s && s.company ? s.company : "";
+    applyStandColors();
+    updateLabelAndPointer();
+    renderSoldList(); // to highlight active row
   }
 
-  function getElementCenterInPage(elem) {
-    // Use bounding box in screen coords
-    const r = elem.getBoundingClientRect();
-    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  function clearSelection(){
+    state.selectedId = null;
+    el("selStand").textContent = "None";
+    el("selName").textContent = "";
+    applyStandColors();
+    updateLabelAndPointer();
+    renderSoldList();
   }
 
-  function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+  function wireStandClicksDesktopOnly(){
+    if(!state.svgEl) return;
+    // On touch phones we disabled pointer events via CSS.
+    for(const s of state.stands){
+      const node = findStandEl(s.standId);
+      if(!node) continue;
+      node.addEventListener("click", (e) => {
+        setSelected(s.standId);
+      });
+    }
+  }
 
-  function placeLabelUnder(standCenter, labelW, labelH) {
-    // Coordinates are in planWrap space (0..width, 0..height)
-    const wrapW = planWrap.clientWidth;
-    const wrapH = planWrap.clientHeight;
+  async function fetchStands(){
+    const url = state.backend + STANDS_ENDPOINT;
+    const res = await fetch(url, {cache:"no-store"});
+    if(!res.ok) throw new Error(`Backend error ${res.status}`);
+    const data = await res.json();
+    if(!Array.isArray(data)) throw new Error("Unexpected backend response");
+    state.stands = data.map(x => ({
+      standId: String(x.standId || "").trim(),
+      status: String(x.status || "").toLowerCase(),
+      company: String(x.company || "").trim()
+    })).filter(x => x.standId);
+    state.updatedAt = new Date();
+    el("updatedAt").textContent = state.updatedAt.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  }
 
-    const gutterCss = getComputedStyle(planWrap).getPropertyValue("--labelGutter").trim();
-    const gutter = gutterCss ? parseFloat(gutterCss) : 110;
+  function soldStandsFiltered(){
+    const q = (el("searchInput").value || "").trim().toLowerCase();
+    return state.stands
+      .filter(s => s.status === "sold")
+      .filter(s => !q || s.standId.toLowerCase().includes(q) || (s.company||"").toLowerCase().includes(q))
+      .sort((a,b) => a.standId.localeCompare(b.standId, undefined, {numeric:true}));
+  }
 
-    const margin = 12;
-    let x = standCenter.x;
-    x = Math.max(margin + labelW / 2, Math.min(wrapW - margin - labelW / 2, x));
+  function renderSoldList(){
+    const list = el("soldList");
+    list.innerHTML = "";
+    const items = soldStandsFiltered();
+    for(const s of items){
+      const row = document.createElement("div");
+      row.className = "row" + (state.selectedId === s.standId ? " active" : "");
+      row.innerHTML = `<strong>${escapeHtml(s.company || "(No company)")}</strong><small>Stand ${escapeHtml(s.standId)}</small>`;
+      row.addEventListener("click", () => setSelected(s.standId));
+      list.appendChild(row);
+    }
+    if(items.length === 0){
+      const empty = document.createElement("div");
+      empty.className = "row";
+      empty.style.cursor = "default";
+      empty.innerHTML = `<strong>No sold stands</strong><small>Nothing matches your search.</small>`;
+      list.appendChild(empty);
+    }
+  }
 
-    // Lock label into the reserved bottom gutter area (keeps it off the plan)
-    const y = wrapH - gutter / 2;
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
 
-    return { x, y };
+  async function init(){
+    clearError();
+    try{
+      setStatus("Loading…", true);
+      await loadSvg();
+      await fetchStands();
+      applyStandColors();
+      wireStandClicksDesktopOnly();
+      renderSoldList();
+      setStatus("Ready ✅", true);
+    }catch(err){
+      console.error(err);
+      setStatus("Error loading ✗", false);
+      showError(`Failed to load. Backend: ${state.backend}. (${err.message || err})`);
+      // still try to load SVG at least
+      try{
+        if(!state.svgEl) await loadSvg();
+      }catch(_e){}
+    }
+    updateLabelAndPointer();
+  }
+
+  // UI events
+  el("searchInput").addEventListener("input", renderSoldList);
+  el("clearBtn").addEventListener("click", clearSelection);
+
+  el("exportPdfBtn").addEventListener("click", () => window.print());
+
+  // Keep pointer correct on resize/scroll
+  window.addEventListener("resize", () => { updateLabelAndPointer(); });
+  window.addEventListener("scroll", () => { updateLabelAndPointer(); }, {passive:true});
+
+  init();
 })();
 </script>
 </body>
