@@ -2,778 +2,758 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Floorplan Admin</title>
   <style>
     :root{
       --bg:#ffffff;
       --card:#ffffff;
-      --border: rgba(0,0,0,.10);
+      --border:#e9e9e9;
       --text:#111;
-      --muted: rgba(0,0,0,.62);
-      --shadow: 0 10px 30px rgba(0,0,0,.10);
-      --available: rgba(213,109,50,0.75);
-      --sold: #e53935;
-      --line: rgba(0,0,0,.65);
-      --dot: rgba(0,0,0,.75);
-      --radius: 14px;
-      --labelWDesktop: 220px;
-      --labelWPhone: 190px;
+      --muted:#666;
+      --avail: rgba(213,109,50,0.75);
+      --sold:#e63b3b;
+      --shadow: 0 12px 30px rgba(0,0,0,.12);
+      --dot: 10px; /* dot size for pointer (match public) */
+      --line: rgba(0,0,0,.70);
+      --safe: env(safe-area-inset-bottom, 0px);
     }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:var(--bg); color:var(--text);}
+    *{ box-sizing:border-box; }
+    body{
+      margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      background:var(--bg); color:var(--text);
+    }
     header{
       padding:14px 16px;
-      border-bottom:1px solid rgba(0,0,0,.08);
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      gap:12px;
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      border-bottom:1px solid var(--border);
       flex-wrap:wrap;
     }
-    header .left{font-weight:900; font-size:18px}
-    header .right{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
-    .meta{color:var(--muted); font-size:13px}
-    .btn{
+    header .title{ font-weight:900; font-size:18px; }
+    header .tools{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    header input{
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid var(--border);
+      min-width: 260px;
+      font-weight:700;
+    }
+    button{
       border:1px solid var(--border);
       background:#fff;
-      border-radius:10px;
-      padding:8px 12px;
+      padding:10px 14px;
+      border-radius:12px;
       font-weight:800;
       cursor:pointer;
     }
-    .btn.danger{border-color: rgba(229,57,53,.35); background: rgba(229,57,53,.06)}
-    .btn:active{transform: translateY(1px)}
-    .layout{
-      padding: 16px;
+    button.danger{ border-color:#ffd0d0; background:#fff5f5; }
+    button:disabled{ opacity:.45; cursor:not-allowed; }
+    main{
+      padding:16px;
       display:grid;
-      grid-template-columns: 1.35fr .65fr;
+      grid-template-columns: 1.2fr 0.8fr;
       gap:16px;
       align-items:start;
     }
     .card{
       background:var(--card);
       border:1px solid var(--border);
-      border-radius:var(--radius);
-      box-shadow: 0 1px 0 rgba(0,0,0,.03);
+      border-radius:16px;
+      box-shadow: 0 1px 0 rgba(0,0,0,.02);
     }
-    .cardHeader{
+    .cardHead{
       padding:10px 12px;
-      border-bottom:1px solid rgba(0,0,0,.06);
       font-weight:900;
+      border-bottom:1px solid var(--border);
     }
-    .planWrap{padding:12px; position:relative; overflow:hidden;}
-    .svgHost{
+    .planCard{ overflow:hidden; }
+    .planBody{ padding:12px; }
+    .planWrap{
       position:relative;
-      width:100%;
-      height: 460px;
-      border-radius: 12px;
-      overflow:hidden;
-    }
-    .svgHost svg{width:100%; height:100%; display:block}
-    .overlay{position:absolute; inset:0; pointer-events:none;}
-    .legend{
-      display:flex; gap:10px; align-items:center;
-      padding:10px 12px 0;
-    }
-    .pill{
-      display:inline-flex; gap:8px; align-items:center;
-      border:1px solid rgba(0,0,0,.10);
-      border-radius:999px;
-      padding:6px 10px;
-      font-weight:800;
-      font-size:13px;
-      background:#fff;
-    }
-    .dot{width:10px;height:10px;border-radius:50%}
-    .zoomWrap{padding:0 12px 12px}
-    .zoomHost{
-      width:100%;
-      height: 250px;
-      border-radius: 12px;
-      border:1px solid rgba(0,0,0,.10);
-      overflow:hidden;
-      background:#fff;
-      position:relative;
-    }
-    .zoomHost svg{width:100%; height:100%; display:block}
-    .zoomHint{padding:8px 2px 0; color:var(--muted); font-size:13px}
-    .side{padding:12px; display:flex; flex-direction:column; gap:12px;}
-    .panel{border:1px solid rgba(0,0,0,.08); border-radius:14px; padding:12px;}
-    .panel h3{margin:0 0 10px; font-size:16px}
-    label{display:block; font-size:12px; color:var(--muted); margin-bottom:6px; font-weight:800}
-    input, select{
-      width:100%;
-      padding:10px 12px;
-      border-radius:12px;
-      border:1px solid rgba(0,0,0,.14);
-      font-size:15px;
-      background:#fff;
-    }
-    .row{display:grid; grid-template-columns: 1fr 1fr; gap:10px}
-    .actionsRow{display:flex; gap:10px; margin-top:10px}
-    .actionsRow .btn{flex:1}
-    .tableWrap{
-      border:1px solid rgba(0,0,0,.10);
       border-radius:14px;
       overflow:hidden;
       background:#fff;
+      min-height:420px;
     }
-    table{width:100%; border-collapse:collapse; font-size:13px}
-    thead th{background: rgba(0,0,0,.04); padding:10px; text-align:left}
-    tbody td{border-top:1px solid rgba(0,0,0,.06); padding:9px 10px; vertical-align:middle}
-    tbody tr:hover{background: rgba(0,0,0,.03)}
-    tbody tr.active{outline:2px solid rgba(74,144,226,.35); background: rgba(74,144,226,.06)}
-    .badge{
-      display:inline-flex; align-items:center; padding:3px 8px; border-radius:999px; font-weight:900;
-      border:1px solid rgba(0,0,0,.12);
+    .svgHost{ width:100%; height:auto; display:block; }
+    .overlay{ position:absolute; inset:0; pointer-events:none; }
+    .label{
+      position:absolute;
+      background:var(--sold);
+      color:#fff;
+      border-radius:16px;
+      padding:12px 16px;
+      box-shadow: var(--shadow);
+      min-width: 200px;
+      max-width: 300px;
+      text-align:left;
+      pointer-events:none;
+      transform: translate(-50%, -50%);
+    }
+    .label .stand{ font-size:28px; font-weight:900; }
+    .line{
+      position:absolute; background:var(--line);
+      transform-origin:0 0; height:3px; border-radius:3px;
+    }
+    .dot{
+      position:absolute; width:var(--dot); height:var(--dot);
+      border-radius:999px; background:rgba(0,0,0,.72);
+      transform: translate(-50%, -50%);
+    }
+    .legend{ padding:10px 12px; display:flex; gap:10px; align-items:center; border-top:1px solid var(--border); }
+    .pill{ display:flex; align-items:center; gap:8px; border:1px solid var(--border); padding:6px 10px; border-radius:999px; font-weight:800; font-size:13px; }
+    .sw{ width:10px; height:10px; border-radius:999px; display:inline-block; }
+    .zoomCard .cardHead{ display:flex; justify-content:space-between; }
+    .zoomBody{ padding:12px; }
+    .zoomWrap{
+      position:relative;
+      border:1px solid var(--border);
+      border-radius:14px;
+      overflow:hidden;
+      min-height:260px;
       background:#fff;
     }
-    .badge.sold{border-color: rgba(229,57,53,.35); background: rgba(229,57,53,.06); color:#b71c1c}
-    .badge.avail{border-color: rgba(213,109,50,.35); background: rgba(213,109,50,.10); color:#6d3b1f}
-    /* Overlay label */
-    .labelBox{filter: drop-shadow(0 8px 18px rgba(0,0,0,.18));}
+    .zoomSvgHost{ width:100%; height:auto; display:block; }
+    .zoomRing{
+      position:absolute;
+      border:4px solid rgba(0,0,0,.75);
+      border-radius:999px;
+      pointer-events:none;
+      box-shadow: 0 6px 18px rgba(0,0,0,.12);
+      display:none;
+    }
+    .hint{ color:var(--muted); font-size:13px; padding:10px 12px 12px; }
+    .side{ padding:12px; display:flex; flex-direction:column; gap:12px; }
+    .formRow{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+    .side label{ display:block; font-weight:800; font-size:12px; color:var(--muted); margin-bottom:6px; }
+    .side input, .side select{
+      width:100%; padding:10px 12px; border-radius:12px; border:1px solid var(--border);
+      font-weight:700;
+    }
+    .btnRow{ display:flex; gap:10px; }
+    .btnRow button{ flex:1; }
+    .tableWrap{ border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+    .tableTools{ padding:10px; display:flex; gap:10px; align-items:center; }
+    .tableTools input{
+      flex:1; padding:10px 12px; border-radius:12px; border:1px solid var(--border);
+    }
+    table{ width:100%; border-collapse:collapse; font-size:13px; }
+    th, td{ padding:10px 10px; border-top:1px solid #f0f0f0; text-align:left; }
+    th{ background:#fafafa; border-top:none; font-size:12px; color:var(--muted); }
+    tr.active{ background:#f5f8ff; outline:2px solid #c9d5ff; outline-offset:-2px; }
+    .badge{ display:inline-flex; align-items:center; padding:3px 8px; border-radius:999px; font-weight:900; font-size:12px; border:1px solid var(--border); }
+    .bSold{ color:#b40000; border-color:#ffd0d0; background:#fff5f5; }
+    .bAvail{ color:#6b3a0f; border-color:#f2dfcf; background:#fff7f0; }
+    .toast{
+      position:fixed;
+      left:16px; right:16px; bottom:16px;
+      background:#111; color:#fff;
+      padding:12px 14px;
+      border-radius:14px;
+      display:none;
+      z-index:999;
+      box-shadow: var(--shadow);
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+    }
+    .toast .msg{ font-weight:800; font-size:13px; line-height:1.3; }
+    .toast .actions{ display:flex; gap:10px; }
+    .toast button{ background:#fff; }
+
     @media (max-width: 980px){
-      .layout{grid-template-columns:1fr}
-      .svgHost{height: 380px}
+      main{ grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px){
+      main{ padding:12px; gap:12px; }
+      header input{ min-width: 200px; width: 100%; }
+      .planWrap{ min-height: 300px; }
+      /* Sticky plan + zoom on phone, scroll stands list */
+      .planCard{ position: sticky; top: 0; z-index: 20; background: var(--bg); }
+      .zoomCard{ position: sticky; top: 320px; z-index: 19; background: var(--bg); }
+      .tableWrap{ padding-bottom: calc(14px + var(--safe)); }
     }
   </style>
 </head>
 <body>
-<header>
-  <div class="left">Floorplan Admin</div>
-  <div class="right">
-    <div class="meta" id="syncMeta">Synced: —</div>
-    <div class="panel" style="padding:8px 10px; border-radius:12px;">
+  <header>
+    <div class="title">Floorplan Admin</div>
+    <div class="tools">
+      <div style="color:var(--muted); font-weight:800;">Synced: <span id="syncedAt">—</span></div>
       <div style="display:flex; gap:10px; align-items:center;">
         <div style="font-weight:900;">Event name</div>
-        <input id="eventName" style="width:220px; padding:8px 10px; border-radius:10px;" />
+        <input id="eventName" placeholder="New Event" />
       </div>
+      <button id="pauseBtn">Pause sync</button>
+      <button id="exportBtn">Export CSV</button>
+      <button id="importBtn">Import CSV</button>
+      <button class="danger" id="resetBtn">Reset all</button>
     </div>
-    <button class="btn" id="pauseBtn">Pause sync</button>
-    <button class="btn" id="exportCsvBtn">Export CSV</button>
-    <button class="btn" id="importCsvBtn">Import CSV</button>
-    <button class="btn danger" id="resetBtn">Reset all</button>
-  </div>
-</header>
+  </header>
 
-<div class="layout">
-  <div class="card">
-    <div class="cardHeader">Plan</div>
-    <div class="planWrap">
-      <div class="svgHost" id="svgHost">
-        <div class="overlay">
-          <svg id="overlaySvg" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"></svg>
+  <main>
+    <section class="card planCard">
+      <div class="cardHead">Plan</div>
+      <div class="planBody">
+        <div class="planWrap" id="planWrap">
+          <div id="svgHost" class="svgHost"></div>
+          <div class="overlay" id="overlay" aria-hidden="true">
+            <div class="line" id="line" style="display:none;"></div>
+            <div class="dot" id="dot" style="display:none;"></div>
+            <div class="label" id="label" style="display:none;">
+              <div class="stand" id="labelStand">—</div>
+            </div>
+          </div>
         </div>
       </div>
       <div class="legend">
-        <span class="pill"><span class="dot" style="background: var(--sold)"></span>Sold</span>
-        <span class="pill"><span class="dot" style="background: var(--available)"></span>Available</span>
+        <div class="pill"><span class="sw" style="background:var(--sold)"></span>Sold</div>
+        <div class="pill"><span class="sw" style="background:var(--avail)"></span>Available</div>
       </div>
-    </div>
-    <div class="cardHeader">Zoom</div>
-    <div class="zoomWrap">
-      <div class="zoomHost" id="zoomHost"></div>
-      <div class="zoomHint">Select a stand to zoom in.</div>
-    </div>
-  </div>
 
-  <div class="card side">
-    <div class="panel">
-      <h3>Selected Stand</h3>
-      <div style="margin-bottom:10px">
-        <label>Stand ID</label>
-        <input id="standId" placeholder="" disabled />
+      <section class="card zoomCard" style="margin:12px;">
+        <div class="cardHead">Zoom</div>
+        <div class="zoomBody">
+          <div class="zoomWrap" id="zoomWrap">
+            <div id="zoomSvgHost" class="zoomSvgHost"></div>
+            <div class="zoomRing" id="zoomRing"></div>
+          </div>
+          <div class="hint">Select a stand to zoom in.</div>
+        </div>
+      </section>
+    </section>
+
+    <aside class="card side">
+      <div class="card" style="border:1px solid var(--border); border-radius:14px; padding:12px;">
+        <div style="font-weight:900; margin-bottom:10px;">Selected Stand</div>
+
+        <div style="margin-bottom:10px;">
+          <label>Stand ID</label>
+          <input id="standId" disabled />
+        </div>
+
+        <div class="formRow" style="margin-bottom:10px;">
+          <div>
+            <label>Status</label>
+            <select id="status">
+              <option value="available">Available</option>
+              <option value="sold">Sold</option>
+            </select>
+          </div>
+          <div>
+            <label>Company (sold only)</label>
+            <input id="company" placeholder="Company name…" />
+          </div>
+        </div>
+
+        <div class="btnRow">
+          <button id="saveBtn">Save</button>
+          <button id="markAvailBtn" class="danger">Mark Available</button>
+        </div>
+
+        <div class="hint" style="padding:10px 0 0;">Click a stand on the plan or in the list to edit.</div>
       </div>
-      <div class="row">
-        <div>
-          <label>Status</label>
-          <select id="status">
-            <option value="available">Available</option>
+
+      <div class="card" style="border:1px solid var(--border); border-radius:14px;">
+        <div class="cardHead">Stands</div>
+        <div class="tableTools">
+          <input id="search" placeholder="Search stand or company…" />
+          <select id="filter" style="width:120px; padding:10px 12px; border-radius:12px; border:1px solid var(--border); font-weight:800;">
+            <option value="all">All</option>
             <option value="sold">Sold</option>
+            <option value="available">Available</option>
           </select>
         </div>
-        <div>
-          <label>Company (sold only)</label>
-          <input id="company" placeholder="Company name…" />
+        <div style="padding:0 12px 10px; color:var(--muted); font-weight:800;"><span id="count">0</span> / <span id="total">0</span></div>
+        <div class="tableWrap">
+          <table>
+            <thead>
+              <tr><th style="width:90px;">Stand</th><th style="width:120px;">Status</th><th>Company</th></tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
         </div>
       </div>
-      <div class="actionsRow">
-        <button class="btn" id="saveBtn" style="border-color: rgba(27,94,32,.25); background: rgba(27,94,32,.06)">Save</button>
-        <button class="btn" id="markAvailBtn" style="border-color: rgba(229,57,53,.20); background: rgba(229,57,53,.05)">Mark Available</button>
-      </div>
-      <div class="meta" style="margin-top:10px">Click a stand on the plan or in the list to edit.</div>
-    </div>
+    </aside>
+  </main>
 
-    <div class="panel">
-      <h3>Stands</h3>
-      <div style="display:flex; gap:10px; margin:10px 0;">
-        <input id="search" placeholder="Search stand or company…" />
-        <select id="filter" style="width:160px">
-          <option value="all">All</option>
-          <option value="sold">Sold</option>
-          <option value="available">Available</option>
-        </select>
-      </div>
-      <div class="meta" id="countMeta">0 / 0</div>
-      <div class="tableWrap" style="margin-top:8px">
-        <table>
-          <thead>
-            <tr><th style="width:90px">Stand</th><th style="width:110px">Status</th><th>Company</th></tr>
-          </thead>
-          <tbody id="tbody"></tbody>
-        </table>
-      </div>
+  <div class="toast" id="toast">
+    <div class="msg" id="toastMsg">Can't reach the backend right now (this is why the page won't load). If Cloudflare is down, paste your Google Apps Script Web App URL instead.</div>
+    <div class="actions">
+      <button id="setBackendBtn">Set backend URL</button>
+      <button id="hideToastBtn">Hide</button>
     </div>
   </div>
-</div>
 
 <script>
 (() => {
-  // ===== CONFIG =====
-  const DEFAULT_API_BASE = "https://floorplansaberdeen-bot.workers.dev";
-const API_BASE = (() => {
-  const override = window.API_BASE;
-  const saved = localStorage.getItem("floorplan_api_base");
-  const base = (override && typeof override==="string") ? override : ((saved && saved.startsWith("http")) ? saved : DEFAULT_API_BASE);
-  return base.replace(/\/+$/,"");
-})(); // change if needed
-  const STANDS_ENDPOINT = `${API_BASE}/stands`;
-  const SETTINGS_ENDPOINT = `${API_BASE}/settings`;
-  // ---- Backend selection & resilient fetch ----
-  function setApiBase(newBase){
-    if(!newBase) return;
-    const clean = String(newBase).trim().replace(/\/+$/,"");
-    localStorage.setItem("floorplan_api_base", clean);
-    location.reload();
-  }
+  const DEFAULT_BACKEND = "https://floorplansaberdeen.floorplansaberdeen.workers.dev";
+  const BACKEND_KEY = "floorplan_backend_url";
+  const SVG_URL = "./event_plan.svg";
 
-  function backendUi(message){
-    let el = document.getElementById("backendBanner");
-    if(!el){
-      el = document.createElement("div");
-      el.id = "backendBanner";
-      el.style.cssText = "position:fixed;left:12px;right:12px;bottom:12px;z-index:99999;background:#111;color:#fff;padding:12px 14px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.35);display:flex;gap:12px;align-items:center;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;font-size:14px;";
-      el.innerHTML = `<div style="flex:1;line-height:1.3"></div>
-        <button id="backendSetBtn" style="background:#fff;color:#111;border:0;border-radius:10px;padding:10px 12px;font-weight:700;cursor:pointer">Set backend URL</button>
-        <button id="backendHideBtn" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:10px 12px;font-weight:700;cursor:pointer">Hide</button>`;
-      document.body.appendChild(el);
-      el.querySelector("#backendSetBtn").onclick = () => {
-        const current = localStorage.getItem("floorplan_api_base") || DEFAULT_API_BASE;
-        const v = prompt("Paste your backend URL (Cloudflare Worker or Google Apps Script Web App):", current);
-        if(v) setApiBase(v);
-      };
-      el.querySelector("#backendHideBtn").onclick = () => el.remove();
-    }
-    el.firstElementChild.textContent = message || "Backend not reachable.";
-  }
+  const el = (id) => document.getElementById(id);
 
-  async function safeFetch(url, options){
-    try{
-      const res = await fetch(url, options);
-      if(!res.ok){
-        const txt = await res.text().catch(()=> "");
-        throw new Error(`HTTP ${res.status} ${res.statusText}${txt?": "+txt.slice(0,120):""}`);
-      }
-      return res;
-    }catch(err){
-      backendUi("Can't reach the backend right now (this is why the page won't load). If Cloudflare is down, paste your Google Apps Script Web App URL instead.");
-      throw err;
-    }
-  }
-  const UPDATE_ENDPOINT = `${API_BASE}/update`;
-  const RESET_ENDPOINT = `${API_BASE}/reset`;
-  const EXPORT_CSV_ENDPOINT = `${API_BASE}/export`;
-  const IMPORT_CSV_ENDPOINT = `${API_BASE}/import`;
-  const SVG_URL = "event_plan.svg";
+  const planWrap = el("planWrap");
+  const svgHost = el("svgHost");
+  const zoomWrap = el("zoomWrap");
+  const zoomSvgHost = el("zoomSvgHost");
+  const zoomRing = el("zoomRing");
 
-  const COLORS = {
-    available: getComputedStyle(document.documentElement).getPropertyValue('--available').trim() || "rgba(213,109,50,0.75)",
-    sold: getComputedStyle(document.documentElement).getPropertyValue('--sold').trim() || "#e53935",
-    line: getComputedStyle(document.documentElement).getPropertyValue('--line').trim() || "rgba(0,0,0,.65)",
-    dot: getComputedStyle(document.documentElement).getPropertyValue('--dot').trim() || "rgba(0,0,0,.75)",
-  };
+  const overlay = el("overlay");
+  const lineEl = el("line");
+  const dotEl = el("dot");
+  const labelEl = el("label");
+  const labelStandEl = el("labelStand");
 
-  const svgHost = document.getElementById("svgHost");
-  const overlaySvg = document.getElementById("overlaySvg");
-  const zoomHost = document.getElementById("zoomHost");
+  const tbody = el("tbody");
+  const searchEl = el("search");
+  const filterEl = el("filter");
+  const countEl = el("count");
+  const totalEl = el("total");
 
-  const syncMeta = document.getElementById("syncMeta");
-  const eventNameEl = document.getElementById("eventName");
-  const pauseBtn = document.getElementById("pauseBtn");
-  const exportCsvBtn = document.getElementById("exportCsvBtn");
-  const importCsvBtn = document.getElementById("importCsvBtn");
-  const resetBtn = document.getElementById("resetBtn");
+  const standIdEl = el("standId");
+  const statusEl = el("status");
+  const companyEl = el("company");
+  const saveBtn = el("saveBtn");
+  const markAvailBtn = el("markAvailBtn");
 
-  const standIdEl = document.getElementById("standId");
-  const statusEl = document.getElementById("status");
-  const companyEl = document.getElementById("company");
-  const saveBtn = document.getElementById("saveBtn");
-  const markAvailBtn = document.getElementById("markAvailBtn");
-
-  const searchEl = document.getElementById("search");
-  const filterEl = document.getElementById("filter");
-  const tbody = document.getElementById("tbody");
-  const countMeta = document.getElementById("countMeta");
-
-  const isPhone = () => window.matchMedia("(max-width: 640px)").matches;
+  const toast = el("toast");
+  const setBackendBtn = el("setBackendBtn");
+  const hideToastBtn = el("hideToastBtn");
+  const syncedAt = el("syncedAt");
 
   let svgRoot = null;
-  let standsData = [];
-  let standsById = new Map();
-  let standEls = new Map(); // id -> svg element
-  let standScreenBoxes = new Map(); // id -> {x,y,w,h,cx,cy}
+  let zoomSvgRoot = null;
+  let standMap = new Map();
+
+  let rows = [];
   let selectedStandId = null;
+  let autoSync = true;
+  let syncTimer = null;
 
-  let paused = false;
-  let pollTimer = null;
+  function getBackendUrl() {
+    const saved = localStorage.getItem(BACKEND_KEY);
+    return (saved && saved.startsWith("http")) ? saved.replace(/\/+$/,"") : DEFAULT_BACKEND;
+  }
 
-  function normId(s){ return (s||"").toString().trim(); }
-  function statusNorm(s){ return (s||"").toString().toLowerCase().trim() === "sold" ? "sold" : "available"; }
+  function showToast(show) {
+    toast.style.display = show ? "flex" : "none";
+  }
 
-  async function fetchJson(url, opts={}){
-    const isBackend = (typeof url === "string") && (url.startsWith(API_BASE) || url.startsWith(DEFAULT_API_BASE));
-    const res = isBackend ? await safeFetch(url, {cache:"no-store", ...opts}) : await fetch(url, {cache:"no-store", ...opts});
-    if(!res.ok){
-      const txt = await res.text().catch(()=> "");
-      throw new Error(`Fetch failed: ${url} (${res.status}) ${txt.slice(0,120)}`);
+  setBackendBtn.addEventListener("click", () => {
+    const current = getBackendUrl();
+    const v = prompt("Paste your backend URL (Cloudflare Worker or Google Apps Script Web App):", current);
+    if (v && v.trim().startsWith("http")) {
+      localStorage.setItem(BACKEND_KEY, v.trim().replace(/\/+$/,""));
+      location.reload();
     }
-    const ct = (res.headers.get("content-type")||"").toLowerCase();
-    return ct.includes("application/json") ? await res.json() : await res.text();
+  });
+  hideToastBtn.addEventListener("click", () => showToast(false));
+
+  async function fetchJson(url, opts = {}) {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 12000);
+    try {
+      const res = await fetch(url, { ...opts, signal: controller.signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } finally {
+      clearTimeout(t);
+    }
   }
 
-  async function loadSvg(){
-    const r = await fetch(SVG_URL, {cache:"no-store"});
-    if(!r.ok) throw new Error(`SVG not found: ${SVG_URL}`);
-    const txt = await r.text();
-    const wrap = document.createElement("div");
-    wrap.innerHTML = txt;
-    const s = wrap.querySelector("svg");
-    if(!s) throw new Error("Invalid SVG");
-    svgHost.querySelectorAll("svg").forEach(x => x.remove());
-    svgHost.insertBefore(s, svgHost.firstChild);
-    svgRoot = s;
-    svgRoot.removeAttribute("width");
-    svgRoot.removeAttribute("height");
-    svgRoot.style.width = "100%";
-    svgRoot.style.height = "100%";
-    overlaySvg.innerHTML = ""; // remove any stray shapes (fix quarter circle)
+  function normStandId(s){ return String(s||"").trim().toUpperCase(); }
+  function normRow(row) {
+    return {
+      standId: normStandId(row.standId ?? row.stand ?? row.id),
+      status: String(row.status || "available").toLowerCase(),
+      company: String(row.company || "").trim()
+    };
   }
 
-  function findStandElements(){
-    standEls.clear();
-    const all = svgRoot.querySelectorAll("[id],[data-stand]");
-    all.forEach(el => {
-      const id = normId(el.getAttribute("data-stand") || el.id);
-      if(!id) return;
-      if (standsById.has(id) || /^[A-Z]{1,3}\d{1,3}$/.test(id) || /^SB\d{1,3}$/.test(id)) {
-        const tag = el.tagName.toLowerCase();
-        if(["path","rect","polygon","polyline","circle","ellipse"].includes(tag) || el.getBBox){
-          if(!standEls.has(id)) standEls.set(id, el);
-        }
-      }
+  function normalizeDomId(id) {
+    return String(id || "")
+      .trim()
+      .toUpperCase()
+      .replace(/^STAND[_-]?/,"")
+      .replace(/^ZONE[_-]?/,"")
+      .replace(/^ID[_-]?/,"")
+      .replace(/[^A-Z0-9]/g,"");
+  }
+
+  function buildStandMap() {
+    standMap.clear();
+    if (!svgRoot) return;
+    svgRoot.querySelectorAll("[id]").forEach(node => {
+      const key = normalizeDomId(node.id);
+      if (key && !standMap.has(key)) standMap.set(key, node);
+    });
+    svgRoot.querySelectorAll("[data-stand]").forEach(node => {
+      const key = normalizeDomId(node.getAttribute("data-stand"));
+      if (key && !standMap.has(key)) standMap.set(key, node);
     });
   }
 
-  function applyColors(){
-    for(const [id, el] of standEls.entries()){
-      const s = standsById.get(id);
-      const st = statusNorm(s ? s.status : "available");
-      el.style.fill = (st === "sold") ? COLORS.sold : COLORS.available;
-      el.style.stroke = "rgba(0,0,0,.55)";
-      el.style.strokeWidth = "1";
-      el.style.cursor = "pointer";
-      el.style.transition = "fill 140ms ease";
-    }
+  function elementForStand(standId){
+    return standMap.get(normalizeDomId(standId)) || null;
   }
 
-  function computeStandBoxes(){
-    standScreenBoxes.clear();
-    const hostRect = svgHost.getBoundingClientRect();
-    for(const [id, el] of standEls.entries()){
-      try{
-        const bb = el.getBBox();
-        const m = el.getScreenCTM();
-        if(!m) continue;
-        const pts = [
-          {x: bb.x, y: bb.y},
-          {x: bb.x+bb.width, y: bb.y},
-          {x: bb.x+bb.width, y: bb.y+bb.height},
-          {x: bb.x, y: bb.y+bb.height},
-        ].map(p => {
-          const pt = svgRoot.createSVGPoint();
-          pt.x = p.x; pt.y = p.y;
-          const sp = pt.matrixTransform(m);
-          return {x: sp.x - hostRect.left, y: sp.y - hostRect.top};
-        });
-        const xs = pts.map(p=>p.x), ys = pts.map(p=>p.y);
-        const minX = Math.min(...xs), maxX = Math.max(...xs);
-        const minY = Math.min(...ys), maxY = Math.max(...ys);
-        const box = {x:minX, y:minY, w:maxX-minX, h:maxY-minY};
-        box.cx = box.x + box.w/2;
-        box.cy = box.y + box.h/2;
-        standScreenBoxes.set(id, box);
-      }catch(e){}
-    }
-  }
+  function setFillForElement(elem, rgba) {
+    if (!elem) return;
+    const shapes = elem.matches("path,rect,polygon,polyline,ellipse,circle")
+      ? [elem]
+      : Array.from(elem.querySelectorAll("path,rect,polygon,polyline,ellipse,circle"));
 
-  function rectsIntersect(a,b){
-    return !(a.x+a.w < b.x || b.x+b.w < a.x || a.y+a.h < b.y || b.y+b.h < a.y);
-  }
-  function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
-
-  function buildLabelLayout(id){
-    const w = isPhone() ? parseInt(getComputedStyle(document.documentElement).getPropertyValue('--labelWPhone')) : parseInt(getComputedStyle(document.documentElement).getPropertyValue('--labelWDesktop'));
-    const h = isPhone() ? 70 : 74;
-    return {w,h,standText:id};
-  }
-
-  function chooseLabelPosition(targetBox, label){
-    const hostRect = svgHost.getBoundingClientRect();
-    const W = hostRect.width, H = hostRect.height;
-    const d = isPhone() ? 62 : 92;
-    const candidates = [
-      {x: targetBox.cx - label.w/2, y: targetBox.cy + d},
-      {x: targetBox.cx - label.w/2, y: targetBox.cy - d - label.h},
-      {x: targetBox.cx + d, y: targetBox.cy - label.h/2},
-      {x: targetBox.cx - d - label.w, y: targetBox.cy - label.h/2},
-      {x: targetBox.cx + d*.8, y: targetBox.cy + d*.8},
-      {x: targetBox.cx - d*.8 - label.w, y: targetBox.cy + d*.8},
-      {x: targetBox.cx + d*.8, y: targetBox.cy - d*.8 - label.h},
-      {x: targetBox.cx - d*.8 - label.w, y: targetBox.cy - d*.8 - label.h},
-    ];
-    const standRects = Array.from(standScreenBoxes.values()).map(b => ({x:b.x-6,y:b.y-6,w:b.w+12,h:b.h+12}));
-    function score(c){
-      const r = {x: clamp(c.x, 8, W - label.w - 8), y: clamp(c.y, 8, H - label.h - 8), w: label.w, h: label.h};
-      let collisions = 0;
-      for(const s of standRects){
-        if(rectsIntersect(r, s)) collisions++;
-      }
-      const dy = Math.abs((r.y + r.h/2) - (targetBox.cy + d));
-      const dx = Math.abs((r.x + r.w/2) - targetBox.cx);
-      const edgePenalty = (r.x<12||r.y<12||r.x+r.w>W-12||r.y+r.h>H-12) ? 2 : 0;
-      return {r, metric: collisions*10000 + edgePenalty*800 + dy*2 + dx};
-    }
-    let best=null;
-    for(const c of candidates){
-      const s = score(c);
-      if(!best || s.metric < best.metric) best=s;
-    }
-    return best.r;
-  }
-
-  function drawOverlay(){
-    overlaySvg.innerHTML = ""; // remove any stray shapes (fix quarter circle)
-    if(!selectedStandId) return;
-    const box = standScreenBoxes.get(selectedStandId);
-    if(!box) return;
-
-    const label = buildLabelLayout(selectedStandId);
-    const pos = chooseLabelPosition(box, label);
-
-    const sx = box.cx, sy = box.cy;
-    const lx = pos.x, ly = pos.y, lw = pos.w, lh = pos.h;
-    const px = clamp(sx, lx, lx+lw);
-    const py = clamp(sy, ly, ly+lh);
-
-    let ex = px, ey = py;
-    const leftDist = Math.abs(px - lx);
-    const rightDist = Math.abs(px - (lx+lw));
-    const topDist = Math.abs(py - ly);
-    const bottomDist = Math.abs(py - (ly+lh));
-    const m = Math.min(leftDist, rightDist, topDist, bottomDist);
-    if(m === leftDist) ex = lx;
-    else if(m === rightDist) ex = lx+lw;
-    else if(m === topDist) ey = ly;
-    else ey = ly+lh;
-
-    const dotR = isPhone() ? 4.0 : 4.6;
-
-    const NS="http://www.w3.org/2000/svg";
-    const line = document.createElementNS(NS,"line");
-    line.setAttribute("x1", ex); line.setAttribute("y1", ey);
-    line.setAttribute("x2", sx); line.setAttribute("y2", sy);
-    line.setAttribute("stroke", COLORS.line);
-    line.setAttribute("stroke-width", isPhone()? "3" : "3.2");
-    line.setAttribute("stroke-linecap","round");
-    line.setAttribute("opacity","0.9");
-
-    const dot = document.createElementNS(NS,"circle");
-    dot.setAttribute("cx", sx); dot.setAttribute("cy", sy);
-    dot.setAttribute("r", dotR);
-    dot.setAttribute("fill", COLORS.dot);
-
-    const g = document.createElementNS(NS,"g");
-    g.setAttribute("class","labelBox");
-
-    const rect = document.createElementNS(NS,"rect");
-    rect.setAttribute("x", lx); rect.setAttribute("y", ly);
-    rect.setAttribute("width", lw); rect.setAttribute("height", lh);
-    rect.setAttribute("rx", isPhone()? "16" : "18");
-    rect.setAttribute("fill", COLORS.sold);
-    rect.setAttribute("opacity","0.96");
-
-    const t1 = document.createElementNS(NS,"text");
-    t1.setAttribute("x", lx + lw/2);
-    t1.setAttribute("y", ly + (isPhone()? 46 : 48));
-    t1.setAttribute("text-anchor","middle");
-    t1.setAttribute("font-weight","900");
-    t1.setAttribute("font-size", isPhone()? "30" : "30");
-    t1.setAttribute("fill","#fff");
-    t1.textContent = selectedStandId;
-
-    g.appendChild(rect);
-    g.appendChild(t1);
-
-    overlaySvg.appendChild(line);
-    overlaySvg.appendChild(dot);
-    overlaySvg.appendChild(g);
-  }
-
-  function renderZoom(){
-    zoomHost.innerHTML = "";
-    if(!selectedStandId || !svgRoot) return;
-
-    // Clone SVG for zoom
-    const clone = svgRoot.cloneNode(true);
-    clone.removeAttribute("width"); clone.removeAttribute("height");
-    clone.style.width="100%"; clone.style.height="100%";
-    // Make it monochrome (outlines)
-    clone.querySelectorAll("[style]").forEach(n => { /* keep */ });
-    clone.querySelectorAll("path,rect,polygon,polyline,circle,ellipse").forEach(n => {
-      n.style.fill = "transparent";
-      n.style.stroke = "rgba(0,0,0,.65)";
-      n.style.strokeWidth = "1.2";
-    });
-
-    // Focus viewBox around selected stand bbox in SVG coords
-    const el = standEls.get(selectedStandId);
-    if(!el) { zoomHost.appendChild(clone); return; }
-    const bb = el.getBBox();
-    const pad = Math.max(bb.width, bb.height) * 0.8 + 20;
-    const x = bb.x - pad;
-    const y = bb.y - pad;
-    const w = bb.width + pad*2;
-    const h = bb.height + pad*2;
-    clone.setAttribute("viewBox", `${x} ${y} ${w} ${h}`);
-
-    // Add a highlight ring (circle) centered on stand bbox
-    const NS="http://www.w3.org/2000/svg";
-    const ring = document.createElementNS(NS,"circle");
-    ring.setAttribute("cx", bb.x + bb.width/2);
-    ring.setAttribute("cy", bb.y + bb.height/2);
-    const r = Math.max(bb.width, bb.height) * 0.65 + 10;
-    ring.setAttribute("r", r);
-    ring.setAttribute("fill","none");
-    ring.setAttribute("stroke","rgba(0,0,0,.75)");
-    ring.setAttribute("stroke-width","6");
-    ring.setAttribute("stroke-linecap","round");
-    ring.setAttribute("opacity","0.9");
-    clone.appendChild(ring);
-
-    zoomHost.appendChild(clone);
-  }
-
-  function setSelected(id){
-    selectedStandId = id;
-    // form
-    const s = standsById.get(id) || {standId:id, status:"available", company:""};
-    standIdEl.value = id;
-    statusEl.value = statusNorm(s.status);
-    companyEl.value = s.company || "";
-    // visuals
-    computeStandBoxes();
-    drawOverlay();
-    renderZoom();
-    // table highlight
-    Array.from(tbody.querySelectorAll("tr")).forEach(tr => {
-      tr.classList.toggle("active", tr.dataset.id === id);
+    shapes.forEach(s => {
+      const bbox = s.getBBox ? s.getBBox() : null;
+      if (bbox && (bbox.width < 8 || bbox.height < 8)) return;
+      s.style.fill = rgba;
+      s.style.fillOpacity = "1";
     });
   }
 
-  function renderTable(){
-    const q = (searchEl.value||"").toLowerCase().trim();
+  function getElementCenterInPage(elem){
+    const r = elem.getBoundingClientRect();
+    return { x: r.left + r.width/2, y: r.top + r.height/2, w:r.width, h:r.height };
+  }
+
+  function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
+
+  function placeLabelSmart(standPt) {
+    const wrapRect = planWrap.getBoundingClientRect();
+    const margin = 26;
+    const labelW = 240;
+    const labelH = 78;
+
+    const standXRel = (standPt.x - wrapRect.left) / wrapRect.width;
+    const onLeft = standXRel > 0.55;
+    const x = onLeft ? (wrapRect.left + margin + labelW/2) : (wrapRect.right - margin - labelW/2);
+    const y = clamp(standPt.y, wrapRect.top + margin + labelH/2, wrapRect.bottom - margin - labelH/2);
+    return { x, y };
+  }
+
+  function updatePointer(standId) {
+    if (!standId) {
+      lineEl.style.display="none";
+      dotEl.style.display="none";
+      labelEl.style.display="none";
+      return;
+    }
+    const elem = elementForStand(standId);
+    if (!elem) return;
+
+    const standPt = getElementCenterInPage(elem);
+    const { x: labelCx, y: labelCy } = placeLabelSmart(standPt);
+    const wrapRect = planWrap.getBoundingClientRect();
+
+    const sx = standPt.x - wrapRect.left;
+    const sy = standPt.y - wrapRect.top;
+    const lx = labelCx - wrapRect.left;
+    const ly = labelCy - wrapRect.top;
+
+    const dx = sx - lx, dy = sy - ly;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    const ang = Math.atan2(dy, dx);
+
+    lineEl.style.display="block";
+    lineEl.style.left = `${lx}px`;
+    lineEl.style.top = `${ly}px`;
+    lineEl.style.width = `${len}px`;
+    lineEl.style.transform = `rotate(${ang}rad)`;
+
+    dotEl.style.display="block";
+    dotEl.style.left = `${sx}px`;
+    dotEl.style.top = `${sy}px`;
+
+    labelEl.style.display="block";
+    labelEl.style.left = `${lx}px`;
+    labelEl.style.top = `${ly}px`;
+    labelStandEl.textContent = standId;
+  }
+
+  function applyColours() {
+    rows.forEach(r => {
+      const elem = elementForStand(r.standId);
+      if (!elem) return;
+      setFillForElement(elem, r.status === "sold"
+        ? getComputedStyle(document.documentElement).getPropertyValue("--sold").trim()
+        : getComputedStyle(document.documentElement).getPropertyValue("--avail").trim()
+      );
+    });
+  }
+
+  function renderTable() {
+    const q = (searchEl.value || "").trim().toLowerCase();
     const f = filterEl.value;
-    const rows = standsData
-      .filter(s => {
-        const st = statusNorm(s.status);
-        if(f !== "all" && st !== f) return false;
-        const comp = (s.company||"").toLowerCase();
-        const id = (s.standId||"").toLowerCase();
-        return !q || comp.includes(q) || id.includes(q);
-      })
-      .sort((a,b) => (a.standId||"").localeCompare(b.standId||""));
-    countMeta.textContent = `${rows.length} / ${standsData.length}`;
+
+    const filtered = rows.filter(r => {
+      if (f !== "all" && r.status !== f) return false;
+      if (!q) return true;
+      return r.standId.toLowerCase().includes(q) || (r.company||"").toLowerCase().includes(q);
+    });
+
     tbody.innerHTML = "";
-    for(const s of rows){
+    filtered.forEach(r => {
       const tr = document.createElement("tr");
-      tr.dataset.id = s.standId;
-      if(s.standId === selectedStandId) tr.classList.add("active");
-      const st = statusNorm(s.status);
-      tr.innerHTML = `
-        <td><strong>${escapeHtml(s.standId)}</strong></td>
-        <td><span class="badge ${st==='sold'?'sold':'avail'}">${st==='sold'?'Sold':'Available'}</span></td>
-        <td>${escapeHtml(s.company||"")}</td>
-      `;
-      tr.addEventListener("click", () => setSelected(s.standId));
+      if (r.standId === selectedStandId) tr.classList.add("active");
+
+      const td1 = document.createElement("td");
+      td1.textContent = r.standId;
+
+      const td2 = document.createElement("td");
+      const badge = document.createElement("span");
+      badge.className = "badge " + (r.status === "sold" ? "bSold" : "bAvail");
+      badge.textContent = r.status === "sold" ? "Sold" : "Available";
+      td2.appendChild(badge);
+
+      const td3 = document.createElement("td");
+      td3.textContent = r.company || "";
+
+      tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
+      tr.addEventListener("click", () => selectStand(r.standId));
       tbody.appendChild(tr);
-    }
+    });
+
+    countEl.textContent = String(filtered.length);
+    totalEl.textContent = String(rows.length);
   }
 
-  function bindStandClicks(){
-    for(const [id, el] of standEls.entries()){
-      el.onpointerdown = null;
-      el.addEventListener("pointerdown", (e) => {
-        e.preventDefault();
-        setSelected(id);
-      });
-    }
-  }
+  function selectStand(standId) {
+    selectedStandId = normStandId(standId);
+    const row = rows.find(r => r.standId === selectedStandId);
+    if (!row) return;
 
-  function escapeHtml(str){
-    return (str||"").toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-  }
+    standIdEl.value = row.standId;
+    statusEl.value = row.status;
+    companyEl.value = row.company || "";
 
-  async function refresh(){
-    const [settings, stands] = await Promise.all([
-      fetchJson(SETTINGS_ENDPOINT).catch(()=>({eventName:"", updatedAt:null})),
-      fetchJson(STANDS_ENDPOINT)
-    ]);
-    standsData = Array.isArray(stands) ? stands : (stands.stands || []);
-    standsById = new Map(standsData.map(s => [normId(s.standId), s]));
-    if(settings && typeof settings.eventName === "string") eventNameEl.value = settings.eventName;
-    const updated = settings.updatedAt || settings.lastUpdated || settings.updated || new Date().toLocaleTimeString();
-    syncMeta.textContent = `Synced: ${updated}`;
-
-    if(svgRoot){
-      findStandElements();
-      applyColors();
-      computeStandBoxes();
-      bindStandClicks();
-      drawOverlay();
-      renderZoom();
-    }
+    applyColours();
+    updatePointer(row.standId);
     renderTable();
+    updateZoom(row.standId);
   }
 
-  async function saveCurrent(){
-    if(!selectedStandId) return;
+  function updateZoom(standId) {
+    zoomSvgHost.innerHTML = "";
+    zoomRing.style.display = "none";
+    if (!standId || !svgRoot) return;
+
+    // clone the SVG into zoom area
+    const clone = svgRoot.cloneNode(true);
+    zoomSvgHost.appendChild(clone);
+    zoomSvgRoot = clone;
+
+    // find element inside clone
+    const key = normalizeDomId(standId);
+    const target = zoomSvgRoot.querySelector("#"+CSS.escape(standId)) ||
+                   zoomSvgRoot.querySelector("#"+CSS.escape("stand-"+standId)) ||
+                   Array.from(zoomSvgRoot.querySelectorAll("[id]")).find(n => normalizeDomId(n.id) === key);
+
+    if (!target || !target.getBBox) return;
+
+    const bbox = target.getBBox();
+    const pad = Math.max(40, Math.max(bbox.width, bbox.height) * 0.9);
+    const vx = bbox.x - pad;
+    const vy = bbox.y - pad;
+    const vw = bbox.width + pad*2;
+    const vh = bbox.height + pad*2;
+
+    zoomSvgRoot.setAttribute("viewBox", `${vx} ${vy} ${vw} ${vh}`);
+    zoomSvgRoot.setAttribute("preserveAspectRatio","xMidYMid meet");
+    zoomSvgRoot.style.width = "100%";
+    zoomSvgRoot.style.height = "auto";
+    zoomSvgRoot.style.display = "block";
+
+    // Draw ring around selected stand (in screen coords within zoomWrap)
+    // We map the target bbox center from SVG coords into zoomWrap client coords by using getBoundingClientRect on a small marker
+    // Easiest: use target.getBoundingClientRect() after layout
+    requestAnimationFrame(() => {
+      const r = target.getBoundingClientRect();
+      const zw = zoomWrap.getBoundingClientRect();
+      const cx = (r.left + r.right)/2 - zw.left;
+      const cy = (r.top + r.bottom)/2 - zw.top;
+      const radius = Math.max(18, Math.min(60, Math.max(r.width, r.height) * 0.9));
+
+      zoomRing.style.display = "block";
+      zoomRing.style.width = `${radius*2}px`;
+      zoomRing.style.height = `${radius*2}px`;
+      zoomRing.style.left = `${cx - radius}px`;
+      zoomRing.style.top = `${cy - radius}px`;
+    });
+  }
+
+  async function loadSvg() {
+    const res = await fetch(SVG_URL);
+    if (!res.ok) throw new Error("Could not load SVG");
+    const txt = await res.text();
+    svgHost.innerHTML = txt;
+    svgRoot = svgHost.querySelector("svg");
+    if (!svgRoot) throw new Error("SVG invalid");
+
+    // Hide any stray huge circle at 0,0 (the “quarter circle” artifact)
+    svgRoot.querySelectorAll("circle").forEach(c => {
+      const cx = c.getAttribute("cx"), cy = c.getAttribute("cy"), r = parseFloat(c.getAttribute("r") || "0");
+      if ((cx === "0" || cx === "0.0") && (cy === "0" || cy === "0.0") && r >= 20) {
+        c.style.display = "none";
+      }
+    });
+
+    svgRoot.setAttribute("preserveAspectRatio","xMidYMid meet");
+    svgRoot.style.width = "100%";
+    svgRoot.style.height = "auto";
+    svgRoot.style.display = "block";
+
+    buildStandMap();
+
+    // click-to-select (desktop & mobile is OK for admin)
+    svgRoot.addEventListener("click", (ev) => {
+      let node = ev.target;
+      for (let i=0;i<6 && node;i++){
+        if (node.id) break;
+        node = node.parentElement;
+      }
+      if (!node || !node.id) return;
+      const key = normalizeDomId(node.id);
+      const found = rows.find(r => normalizeDomId(r.standId) === key);
+      if (found) selectStand(found.standId);
+    }, { passive:true });
+  }
+
+  async function loadData() {
+    const backend = getBackendUrl();
+    const data = await fetchJson(`${backend}/stands`);
+    rows = (Array.isArray(data) ? data : []).map(normRow).filter(r => r.standId);
+    applyColours();
+    renderTable();
+    syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+    showToast(false);
+  }
+
+  async function saveCurrent() {
+    if (!selectedStandId) return;
+    const backend = getBackendUrl();
     const payload = {
       standId: selectedStandId,
       status: statusEl.value,
-      company: (statusEl.value === "sold") ? (companyEl.value||"").trim() : ""
+      company: (statusEl.value === "sold") ? companyEl.value.trim() : ""
     };
-    // optimistic update
-    const local = standsById.get(selectedStandId) || {};
-    local.status = payload.status;
-    local.company = payload.company;
-    standsById.set(selectedStandId, local);
-    standsData = standsData.map(s => s.standId === selectedStandId ? Object.assign({}, s, payload) : s);
-    applyColors();
-    renderTable();
 
-    await fetchJson(UPDATE_ENDPOINT, {
-      method:"POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify(payload)
-    }).catch(err => {
-      alert("Save failed. Please try again.\n\n" + err.message);
-    });
-    await refresh().catch(()=>{});
+    // Try common Worker patterns
+    let ok = false;
+    try {
+      await fetchJson(`${backend}/stands/${encodeURIComponent(selectedStandId)}`, {
+        method:"PUT",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify(payload)
+      });
+      ok = true;
+    } catch (e1) {
+      try {
+        await fetchJson(`${backend}/stands`, {
+          method:"POST",
+          headers:{ "Content-Type":"application/json" },
+          body: JSON.stringify(payload)
+        });
+        ok = true;
+      } catch (e2) {
+        ok = false;
+      }
+    }
+    if (!ok) {
+      showToast(true);
+      return;
+    }
+
+    // Update local copy immediately (so plan updates)
+    const idx = rows.findIndex(r => r.standId === selectedStandId);
+    if (idx >= 0) rows[idx] = payload;
+    applyColours();
+    renderTable();
+    updatePointer(selectedStandId);
+    syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
   }
 
-  async function markAvailable(){
-    if(!selectedStandId) return;
+  saveBtn.addEventListener("click", saveCurrent);
+  markAvailBtn.addEventListener("click", () => {
     statusEl.value = "available";
     companyEl.value = "";
-    await saveCurrent();
-  }
-
-  async function saveEventName(){
-    const name = (eventNameEl.value||"").trim();
-    if(!name) return;
-    await fetchJson(`${SETTINGS_ENDPOINT}`, {
-      method:"POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({eventName: name})
-    }).catch(()=>{});
-    await refresh().catch(()=>{});
-  }
-
-  async function exportCsv(){
-    const r = await fetch(EXPORT_CSV_ENDPOINT, {cache:"no-store"});
-    const blob = await r.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "stands.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  async function importCsv(){
-    const inp = document.createElement("input");
-    inp.type = "file";
-    inp.accept = ".csv,text/csv";
-    inp.onchange = async () => {
-      const file = inp.files && inp.files[0];
-      if(!file) return;
-      const fd = new FormData();
-      fd.append("file", file);
-      await fetch(IMPORT_CSV_ENDPOINT, {method:"POST", body: fd}).catch(err => alert("Import failed: " + err.message));
-      await refresh().catch(()=>{});
-    };
-    inp.click();
-  }
-
-  async function resetAll(){
-    if(!confirm("Reset all stands to Available and clear companies?")) return;
-    await fetchJson(RESET_ENDPOINT, {method:"POST"}).catch(err => alert("Reset failed: " + err.message));
-    await refresh().catch(()=>{});
-  }
-
-  function onResize(){
-    if(!svgRoot) return;
-    computeStandBoxes();
-    drawOverlay();
-  }
-
-  function setPaused(v){
-    paused = v;
-    pauseBtn.textContent = paused ? "Resume sync" : "Pause sync";
-    pauseBtn.style.background = paused ? "rgba(0,0,0,.06)" : "#fff";
-  }
-
-  // ===== INIT =====
-  saveBtn.addEventListener("click", saveCurrent);
-  markAvailBtn.addEventListener("click", markAvailable);
-  eventNameEl.addEventListener("change", saveEventName);
+    saveCurrent();
+  });
 
   searchEl.addEventListener("input", renderTable);
   filterEl.addEventListener("change", renderTable);
 
-  pauseBtn.addEventListener("click", () => setPaused(!paused));
-  exportCsvBtn.addEventListener("click", exportCsv);
-  importCsvBtn.addEventListener("click", importCsv);
-  resetBtn.addEventListener("click", resetAll);
-
-  window.addEventListener("resize", () => {
-    clearTimeout(window.__rz);
-    window.__rz = setTimeout(onResize, 120);
+  // Simple CSV export/import local to browser (does not need backend)
+  el("exportBtn").addEventListener("click", () => {
+    const lines = ["standId,status,company"].concat(rows.map(r => {
+      const c = (r.company||"").replaceAll('"','""');
+      return `${r.standId},${r.status},"${c}"`;
+    }));
+    const blob = new Blob([lines.join("\n")], { type:"text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "stands.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
   });
 
+  el("importBtn").addEventListener("click", async () => {
+    const inp = document.createElement("input");
+    inp.type="file";
+    inp.accept=".csv,text/csv";
+    inp.onchange = async () => {
+      const f = inp.files && inp.files[0];
+      if (!f) return;
+      const txt = await f.text();
+      const lines = txt.split(/\r?\n/).filter(Boolean);
+      const out = [];
+      for (let i=1;i<lines.length;i++){
+        const line = lines[i];
+        const m = line.match(/^([^,]+),([^,]+),"(.*)"$/);
+        if (!m) continue;
+        out.push({ standId: normStandId(m[1]), status: m[2].trim().toLowerCase(), company: m[3].replaceAll('""','"') });
+      }
+      rows = out;
+      applyColours();
+      renderTable();
+    };
+    inp.click();
+  });
+
+  // Pause sync (polling) - optional
+  el("pauseBtn").addEventListener("click", () => {
+    autoSync = !autoSync;
+    el("pauseBtn").textContent = autoSync ? "Pause sync" : "Resume sync";
+    if (autoSync) startPolling(); else stopPolling();
+  });
+
+  function startPolling(){
+    stopPolling();
+    syncTimer = setInterval(async () => {
+      if (!autoSync) return;
+      try { await loadData(); } catch(e){ showToast(true); }
+    }, 8000);
+  }
+  function stopPolling(){
+    if (syncTimer) clearInterval(syncTimer);
+    syncTimer = null;
+  }
+
+  // init
   (async () => {
-    try{
+    try {
       await loadSvg();
-      await refresh();
-      pollTimer = setInterval(async () => {
-        if(paused) return;
-        await refresh().catch(()=>{});
-      }, 12000);
-    }catch(e){
+    } catch(e) {
+      showToast(true);
       console.error(e);
-      alert("Failed to load admin:\n\n" + (e.message || e));
+      return;
+    }
+    try {
+      await loadData();
+      startPolling();
+    } catch(e) {
+      showToast(true);
+      console.error(e);
     }
   })();
 })();
