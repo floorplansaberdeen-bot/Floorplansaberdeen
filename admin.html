@@ -81,7 +81,7 @@
       background:#fff;
       min-height:420px;
     }
-    .svgHost{ width:100%; height:auto; display:block; }
+    .svgHost{ width:100%; height:auto; display:block; pointer-events:auto; }
 
     /* Overlay spans BOTH plan + label bay */
     .calloutSvg{
@@ -175,14 +175,27 @@
     .toast button{ background:#fff; }
 
     
+    
     @media (min-width: 981px){
-      /* Keep plan visible while scrolling the right-side panel */
+      /* Keep the whole right panel visible; only the stands list area scrolls */
       .side{
         position: sticky;
         top: 12px;
         max-height: calc(100vh - 24px);
-        overflow: auto;
+        overflow: hidden;          /* IMPORTANT: prevent whole panel scrolling */
       }
+      .standsCard{
+        display:flex;
+        flex-direction:column;
+        min-height: 0;             /* allow inner scrolling */
+        flex: 1;
+      }
+      .standsCard .tableWrap{
+        flex: 1;
+        overflow: auto;            /* ONLY the list scrolls */
+      }
+    }
+
     }
 
     @media (max-width: 980px){
@@ -284,7 +297,7 @@
         <div class="hint" style="padding:10px 0 0;">Click a stand on the plan or in the list to edit.</div>
       </div>
 
-      <div class="card" style="border:1px solid var(--border); border-radius:14px;">
+      <div class="card standsCard" style="border:1px solid var(--border); border-radius:14px;">
         <div class="cardHead">Stands</div>
         <div class="tableTools">
           <input id="search" placeholder="Search stand or company…" />
@@ -761,13 +774,22 @@
 
     // click-to-select
     svgRoot.style.pointerEvents = "auto";
+    svgRoot.style.pointerEvents = "auto";
+    // Ensure shapes receive pointer events (some SVGs disable this)
+    svgRoot.querySelectorAll("path,rect,polygon,polyline,ellipse,circle,g").forEach(n => {
+      try{ n.style.pointerEvents = "all"; }catch(e){}
+    });
+
     svgRoot.addEventListener("click", (ev) => {
       // On phones, use the list only (no plan tapping)
       if (window.matchMedia && window.matchMedia('(max-width: 640px)').matches) return;
 
-      let node = ev.target;
-      while (node && node !== svgRoot && !node.id) node = node.parentElement;
-      if (!node || node === svgRoot || !node.id) return;
+      const t = ev.target;
+      let node = null;
+      if (t && t.closest) node = t.closest("[id]");
+      // Ensure the node is inside this svg
+      if (!node || !svgRoot.contains(node) || !node.id) return;
+
       const key = normalizeDomId(node.id);
       const found = rows.find(r => normalizeDomId(r.standId) === key);
       if (found) selectStand(found.standId);
