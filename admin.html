@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Floorplan Admin (v3-debug)</title>
+  <title>Floorplan Admin</title>
   <style>
     :root{
       --bg:#ffffff;
@@ -14,13 +14,14 @@
       --avail: rgba(213,109,50,0.75);
       --sold:#e63b3b;
       --shadow: 0 12px 30px rgba(0,0,0,.12);
-      --dot: 10px; /* dot size for pointer (match public) */
+      --dot: 10px; /* dot DIAMETER (match public) */
       --line: rgba(0,0,0,.70);
       --safe: env(safe-area-inset-bottom, 0px);
     }
     *{ box-sizing:border-box; }
     body{
-      margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
       background:var(--bg); color:var(--text);
     }
     header{
@@ -28,6 +29,7 @@
       display:flex; align-items:center; justify-content:space-between; gap:12px;
       border-bottom:1px solid var(--border);
       flex-wrap:wrap;
+      background:#fff;
     }
     header .title{ font-weight:900; font-size:18px; }
     header .tools{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
@@ -48,6 +50,7 @@
     }
     button.danger{ border-color:#ffd0d0; background:#fff5f5; }
     button:disabled{ opacity:.45; cursor:not-allowed; }
+
     main{
       padding:16px;
       display:grid;
@@ -68,6 +71,9 @@
     }
     .planCard{ overflow:hidden; }
     .planBody{ padding:12px; }
+
+    /* ===== Plan + Label bay + Callout overlay ===== */
+    .planStack{ position:relative; border-radius:14px; overflow:hidden; background:#fff; }
     .planWrap{
       position:relative;
       border-radius:14px;
@@ -76,32 +82,36 @@
       min-height:420px;
     }
     .svgHost{ width:100%; height:auto; display:block; }
-    .label{
-      position:absolute;
-      background:var(--sold);
-      color:#fff;
-      border-radius:16px;
+
+    /* Overlay spans BOTH plan + label bay */
+    .calloutSvg{
+      position:absolute; left:0; top:0;
+      width:100%; height:100%;
+      pointer-events:none;
+    }
+
+    .labelBay{
+      background:#fff;
+      border-top:1px solid var(--border);
+      padding:12px;
+      min-height:72px;
+    }
+    .lozenge{
+      display:inline-block;
+      background:#fff;
+      border-radius:999px;
       padding:12px 16px;
       box-shadow: var(--shadow);
-      min-width: 200px;
-      max-width: 300px;
-      text-align:left;
-      pointer-events:none;
-      transform: translate(-50%, -50%);
+      border:1px solid rgba(0,0,0,.08);
+      max-width: 340px;
     }
-    .label .stand{ font-size:28px; font-weight:900; }
-    .line{
-      position:absolute; background:var(--line);
-      transform-origin:0 0; height:3px; border-radius:3px;
-    }
-    .dot{
-      position:absolute; width:var(--dot); height:var(--dot);
-      border-radius:999px; background:rgba(0,0,0,.72);
-      transform: translate(-50%, -50%);
-    }
+    .lozStand{ font-size:28px; font-weight:900; line-height:1.1; }
+    .lozCompany{ margin-top:4px; font-size:16px; font-weight:800; opacity:.9; }
+
     .legend{ padding:10px 12px; display:flex; gap:10px; align-items:center; border-top:1px solid var(--border); }
     .pill{ display:flex; align-items:center; gap:8px; border:1px solid var(--border); padding:6px 10px; border-radius:999px; font-weight:800; font-size:13px; }
     .sw{ width:10px; height:10px; border-radius:999px; display:inline-block; }
+
     .zoomCard .cardHead{ display:flex; justify-content:space-between; }
     .zoomBody{ padding:12px; }
     .zoomWrap{
@@ -122,6 +132,7 @@
       display:none;
     }
     .hint{ color:var(--muted); font-size:13px; padding:10px 12px 12px; }
+
     .side{ padding:12px; display:flex; flex-direction:column; gap:12px; }
     .formRow{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
     .side label{ display:block; font-weight:800; font-size:12px; color:var(--muted); margin-bottom:6px; }
@@ -131,10 +142,12 @@
     }
     .btnRow{ display:flex; gap:10px; }
     .btnRow button{ flex:1; }
+
     .tableWrap{ border:1px solid var(--border); border-radius:14px; overflow:hidden; }
     .tableTools{ padding:10px; display:flex; gap:10px; align-items:center; }
     .tableTools input{
       flex:1; padding:10px 12px; border-radius:12px; border:1px solid var(--border);
+      font-weight:800;
     }
     table{ width:100%; border-collapse:collapse; font-size:13px; }
     th, td{ padding:10px 10px; border-top:1px solid #f0f0f0; text-align:left; }
@@ -143,6 +156,7 @@
     .badge{ display:inline-flex; align-items:center; padding:3px 8px; border-radius:999px; font-weight:900; font-size:12px; border:1px solid var(--border); }
     .bSold{ color:#b40000; border-color:#ffd0d0; background:#fff5f5; }
     .bAvail{ color:#6b3a0f; border-color:#f2dfcf; background:#fff7f0; }
+
     .toast{
       position:fixed;
       left:16px; right:16px; bottom:16px;
@@ -150,7 +164,7 @@
       padding:12px 14px;
       border-radius:14px;
       display:none;
-      z-index:999;
+      z-index:9999;
       box-shadow: var(--shadow);
       align-items:center;
       justify-content:space-between;
@@ -190,22 +204,10 @@
     </div>
   </header>
 
-  <div id="statusPanel" style="margin:0; padding:10px 16px; border-bottom:1px solid #eee; background:#fff;">
-    <div style="font-weight:900;">Status</div>
-    <div id="statusLines" style="font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size:12px; white-space:pre-wrap; color:#111; margin-top:6px;">Starting…</div>
-  </div>
-
-
-  <div id="debugBar" style="position:sticky;top:0;z-index:9999;background:#111;color:#fff;padding:8px 12px;font-weight:800;font-size:12px;display:none;">
-    Debug: <span id="dbgText">—</span>
-  </div>
-
-
   <main>
     <section class="card planCard">
       <div class="cardHead">Plan</div>
       <div class="planBody">
-
         <div class="planStack" id="planStack">
           <div class="planWrap" id="planWrap">
             <div id="svgHost" class="svgHost"></div>
@@ -222,6 +224,7 @@
           <svg class="calloutSvg" id="calloutSvg" aria-hidden="true"></svg>
         </div>
       </div>
+
       <div class="legend">
         <div class="pill"><span class="sw" style="background:var(--sold)"></span>Sold</div>
         <div class="pill"><span class="sw" style="background:var(--avail)"></span>Available</div>
@@ -294,7 +297,7 @@
   </main>
 
   <div class="toast" id="toast">
-    <div class="msg" id="toastMsg">Can't reach the backend right now (this is why the page won't load). If Cloudflare is down, paste your Google Apps Script Web App URL instead.</div>
+    <div class="msg" id="toastMsg">Can't reach the backend right now. If Cloudflare is down, you can paste your Google Apps Script Web App URL instead.</div>
     <div class="actions">
       <button id="setBackendBtn">Set backend URL</button>
       <button id="hideToastBtn">Hide</button>
@@ -306,13 +309,8 @@
   const DEFAULT_BACKEND = "https://floorplansaberdeen.floorplansaberdeen.workers.dev";
   const BACKEND_KEY = "floorplan_backend_url";
   const SVG_URL = new URL("./event_plan.svg", window.location.href).href;
-const el = (id) => document.getElementById(id);
-  const statusLines = el("statusLines");
-  const statusLog = [];
-  function status(msg){
-    statusLog.push(msg);
-    if (statusLines) statusLines.textContent = statusLog.join("\n");
-  }
+
+  const el = (id) => document.getElementById(id);
 
   const planWrap = el("planWrap");
   const svgHost = el("svgHost");
@@ -320,11 +318,11 @@ const el = (id) => document.getElementById(id);
   const zoomSvgHost = el("zoomSvgHost");
   const zoomRing = el("zoomRing");
 
-  const overlay = el("overlay");
-  const lineEl = el("line");
-  const dotEl = el("dot");
-  const labelEl = el("label");
-  const labelStandEl = el("labelStand");
+  const planStack = el("planStack");
+  const calloutSvg = el("calloutSvg");
+  const lozenge = el("lozenge");
+  const lozStand = el("lozStand");
+  const lozCompany = el("lozCompany");
 
   const tbody = el("tbody");
   const searchEl = el("search");
@@ -343,65 +341,46 @@ const el = (id) => document.getElementById(id);
   const hideToastBtn = el("hideToastBtn");
   const syncedAt = el("syncedAt");
 
-  const debugBar = el("debugBar");
-  const dbgText = el("dbgText");
-  const DEBUG = true; // set false to hide
-  function setDebug(msg){
-    if (!DEBUG) return;
-    debugBar.style.display = "block";
-    dbgText.textContent = msg;
-  }
-
-
-  // basic DOM sanity checks
-  if (!planStack || !calloutSvg || !lozenge || !lozStand || !lozCompany || !svgHost || !planWrap) {
-    setDebug(`Missing DOM nodes: planStack=${!!planStack} calloutSvg=${!!calloutSvg} lozenge=${!!lozenge} svgHost=${!!svgHost}`);
-  } else {
-    setDebug('DOM ok. Waiting for SVG/data...');
-  }
+  const eventNameEl = el("eventName");
+  const pauseBtn = el("pauseBtn");
+  const exportBtn = el("exportBtn");
+  const importBtn = el("importBtn");
+  const resetBtn = el("resetBtn");
 
   let svgRoot = null;
-  let zoomSvgRoot = null;
   let standMap = new Map();
 
   let rows = [];
   let selectedStandId = null;
+
   let autoSync = true;
   let syncTimer = null;
 
   function normalizeBackendUrl(input) {
-  if (!input) return "";
-  let s = String(input).trim();
-  // If someone pastes a full endpoint (e.g. .../stands), strip it back to the base.
-  try {
-    const u = new URL(s);
-    let p = u.pathname.replace(/\/+$/,"");
-    p = p.replace(/\/(api\/stands|stands)$/i, "");
-    p = p.replace(/\/+$/,"");
-    u.pathname = p ? p : "/";
-    u.search = "";
-    u.hash = "";
-    const base = u.origin + (u.pathname === "/" ? "" : u.pathname);
-    return base.replace(/\/+$/,"");
-  } catch (e) {
-    s = s.replace(/\/+$/,"");
-    s = s.replace(/\/(api\/stands|stands)$/i, "");
-    return s.replace(/\/+$/,"");
+    if (!input) return "";
+    let s = String(input).trim();
+    try {
+      const u = new URL(s);
+      let p = u.pathname.replace(/\/+$/,"");
+      p = p.replace(/\/(api\/stands|stands)$/i, "");
+      p = p.replace(/\/+$/,"");
+      u.pathname = p ? p : "/";
+      u.search = "";
+      u.hash = "";
+      const base = u.origin + (u.pathname === "/" ? "" : u.pathname);
+      return base.replace(/\/+$/,"");
+    } catch (e) {
+      s = s.replace(/\/+$/,"");
+      s = s.replace(/\/(api\/stands|stands)$/i, "");
+      return s.replace(/\/+$/,"");
+    }
   }
-}
 
-function getBackendUrl() {
+  function getBackendUrl() {
     const saved = localStorage.getItem(BACKEND_KEY);
     const base = (saved && saved.startsWith("http")) ? saved : DEFAULT_BACKEND;
     return normalizeBackendUrl(base);
   }
-
-  // Status panel initial lines (safe: functions are defined)
-  status(`PAGE: ${location.href}`);
-  status(`SVG_URL: ${SVG_URL}`);
-  status(`DEFAULT_BACKEND: ${DEFAULT_BACKEND}`);
-  status(`SAVED_BACKEND: ${localStorage.getItem(BACKEND_KEY) || "(none)"}`);
-  status(`BACKEND_IN_USE: ${getBackendUrl()}`);
 
   function showToast(show) {
     toast.style.display = show ? "flex" : "none";
@@ -421,8 +400,8 @@ function getBackendUrl() {
     const controller = new AbortController();
     const t = setTimeout(() => controller.abort(), 12000);
     try {
-      const res = await fetch(url, { ...opts, signal: controller.signal });
-      if (!res.ok) { status(`fetchJson FAIL ${url} -> HTTP ${res.status}`); throw new Error(`HTTP ${res.status}`); }
+      const res = await fetch(url, { ...opts, signal: controller.signal, cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
     } finally {
       clearTimeout(t);
@@ -479,26 +458,6 @@ function getBackendUrl() {
     });
   }
 
-  function getElementCenterInPage(elem){
-    const r = elem.getBoundingClientRect();
-    return { x: r.left + r.width/2, y: r.top + r.height/2, w:r.width, h:r.height };
-  }
-
-  function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
-
-  function placeLabelSmart(standPt) {
-    const wrapRect = planWrap.getBoundingClientRect();
-    const margin = 26;
-    const labelW = 240;
-    const labelH = 78;
-
-    const standXRel = (standPt.x - wrapRect.left) / wrapRect.width;
-    const onLeft = standXRel > 0.55;
-    const x = onLeft ? (wrapRect.left + margin + labelW/2) : (wrapRect.right - margin - labelW/2);
-    const y = clamp(standPt.y, wrapRect.top + margin + labelH/2, wrapRect.bottom - margin - labelH/2);
-    return { x, y };
-  }
-
   function clearCallout(){
     while (calloutSvg.firstChild) calloutSvg.removeChild(calloutSvg.firstChild);
     calloutSvg.style.display = "none";
@@ -549,6 +508,7 @@ function getBackendUrl() {
 
       const dotPx = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--dot")) || 10;
       const r = dotPx / 2;
+
       const NS = "http://www.w3.org/2000/svg";
       while (calloutSvg.firstChild) calloutSvg.removeChild(calloutSvg.firstChild);
 
@@ -572,19 +532,13 @@ function getBackendUrl() {
     });
   }
 
-  // Backwards-compatible alias (older code calls updatePointer)
-  function updatePointer(standId){
-    if (!standId) { clearCallout(); return; }
-    drawCallout(standId);
-  }\n
   function applyColours() {
+    const sold = getComputedStyle(document.documentElement).getPropertyValue("--sold").trim();
+    const avail = getComputedStyle(document.documentElement).getPropertyValue("--avail").trim();
     rows.forEach(r => {
       const elem = elementForStand(r.standId);
       if (!elem) return;
-      setFillForElement(elem, r.status === "sold"
-        ? getComputedStyle(document.documentElement).getPropertyValue("--sold").trim()
-        : getComputedStyle(document.documentElement).getPropertyValue("--avail").trim()
-      );
+      setFillForElement(elem, r.status === "sold" ? sold : avail);
     });
   }
 
@@ -625,8 +579,6 @@ function getBackendUrl() {
   }
 
   function selectStand(standId) {
-    setDebug(`Selecting ${standId}`);
-
     selectedStandId = normStandId(standId);
     const row = rows.find(r => r.standId === selectedStandId);
     if (!row) return;
@@ -635,10 +587,23 @@ function getBackendUrl() {
     statusEl.value = row.status;
     companyEl.value = row.company || "";
 
-    applyColours();
     drawCallout(row.standId);
     renderTable();
     updateZoom(row.standId);
+  }
+
+  function forceBlackAndWhite(svg){
+    const all = svg.querySelectorAll("*");
+    all.forEach(n=>{
+      if (n.hasAttribute("style")) n.removeAttribute("style");
+      if (n.tagName !== "text"){
+        n.setAttribute("fill","none");
+        n.setAttribute("stroke","black");
+        n.setAttribute("stroke-width","1");
+      } else {
+        n.setAttribute("fill","black");
+      }
+    });
   }
 
   function updateZoom(standId) {
@@ -646,37 +611,32 @@ function getBackendUrl() {
     zoomRing.style.display = "none";
     if (!standId || !svgRoot) return;
 
-    // clone the SVG into zoom area
     const clone = svgRoot.cloneNode(true);
+    forceBlackAndWhite(clone);
     zoomSvgHost.appendChild(clone);
-    zoomSvgRoot = clone;
 
-    // find element inside clone
-    const key = normalizeDomId(standId);
-    const target = zoomSvgRoot.querySelector("#"+CSS.escape(standId)) ||
-                   zoomSvgRoot.querySelector("#"+CSS.escape("stand-"+standId)) ||
-                   Array.from(zoomSvgRoot.querySelectorAll("[id]")).find(n => normalizeDomId(n.id) === key);
+    let resolved = clone.querySelector("#"+CSS.escape(standId));
+    if (!resolved){
+      const key = normalizeDomId(standId);
+      resolved = Array.from(clone.querySelectorAll("[id]")).find(n => normalizeDomId(n.id) === key);
+    }
+    if (!resolved || !resolved.getBBox) return;
 
-    if (!target || !target.getBBox) return;
-
-    const bbox = target.getBBox();
+    const bbox = resolved.getBBox();
     const pad = Math.max(40, Math.max(bbox.width, bbox.height) * 0.9);
     const vx = bbox.x - pad;
     const vy = bbox.y - pad;
     const vw = bbox.width + pad*2;
     const vh = bbox.height + pad*2;
 
-    zoomSvgRoot.setAttribute("viewBox", `${vx} ${vy} ${vw} ${vh}`);
-    zoomSvgRoot.setAttribute("preserveAspectRatio","xMidYMid meet");
-    zoomSvgRoot.style.width = "100%";
-    zoomSvgRoot.style.height = "auto";
-    zoomSvgRoot.style.display = "block";
+    clone.setAttribute("viewBox", `${vx} ${vy} ${vw} ${vh}`);
+    clone.setAttribute("preserveAspectRatio","xMidYMid meet");
+    clone.style.width = "100%";
+    clone.style.height = "auto";
+    clone.style.display = "block";
 
-    // Draw ring around selected stand (in screen coords within zoomWrap)
-    // We map the target bbox center from SVG coords into zoomWrap client coords by using getBoundingClientRect on a small marker
-    // Easiest: use target.getBoundingClientRect() after layout
     requestAnimationFrame(() => {
-      const r = target.getBoundingClientRect();
+      const r = resolved.getBoundingClientRect();
       const zw = zoomWrap.getBoundingClientRect();
       const cx = (r.left + r.right)/2 - zw.left;
       const cy = (r.top + r.bottom)/2 - zw.top;
@@ -690,30 +650,73 @@ function getBackendUrl() {
     });
   }
 
-  async function loadSvg() {
-    status("SVG: loading…");
-    let res;
+  async function requireAdminPassword(){
+    const backend = getBackendUrl();
+    let settings = null;
     try{
-      res = await fetch(SVG_URL, { cache: "no-store" });
+      settings = await fetchJson(`${backend}/settings`);
     }catch(e){
-      status("SVG: fetch error (network).");
-      throw e;
+      // If settings route fails, allow access (but admin actions may still fail)
+      return;
     }
-    status(`SVG: HTTP ${res.status}`);
-    if (!res.ok) {
-      status("SVG: FAILED. Open SVG_URL directly to confirm.");
-      throw new Error("Could not load SVG");
+    const pwd = (settings && (settings.adminPassword || settings.password || settings.admin_pass || settings.admin_password)) || "";
+    const required = String(pwd || "").trim();
+    if (!required) return;
+    const key = "admin_authed";
+    if (sessionStorage.getItem(key) === "1") return;
+
+    while (true){
+      const entered = prompt("Admin password required:", "");
+      if (entered === null) continue;
+      if (String(entered) === required){
+        sessionStorage.setItem(key, "1");
+        return;
+      }
+      alert("Incorrect password.");
     }
+  }
+
+  async function loadSettings(){
+    const backend = getBackendUrl();
+    let settings = null;
+    try{
+      settings = await fetchJson(`${backend}/settings`);
+    }catch(e){
+      return;
+    }
+    const name = (settings && (settings.eventName || settings.name || settings.event || settings.title)) || "";
+    if (name && eventNameEl) eventNameEl.value = String(name);
+  }
+
+  let settingsSaveTimer = null;
+  function scheduleSaveEventName(){
+    if (!eventNameEl) return;
+    if (settingsSaveTimer) clearTimeout(settingsSaveTimer);
+    settingsSaveTimer = setTimeout(async () => {
+      const backend = getBackendUrl();
+      const payload = { eventName: eventNameEl.value.trim() };
+      try{
+        await fetchJson(`${backend}/settings`, {
+          method:"POST",
+          headers:{ "Content-Type":"application/json" },
+          body: JSON.stringify(payload)
+        });
+        syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+      }catch(e){
+        showToast(true);
+      }
+    }, 600);
+  }
+
+  async function loadSvg() {
+    const res = await fetch(SVG_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error("Could not load SVG");
     const txt = await res.text();
-    status(`SVG: downloaded ${txt.length} chars`);
     svgHost.innerHTML = txt;
     svgRoot = svgHost.querySelector("svg");
-    if (!svgRoot) {
-      status("SVG: parsed but no <svg> root found.");
-      throw new Error("SVG invalid");
-    }
+    if (!svgRoot) throw new Error("SVG invalid");
 
-    // Hide any stray huge circle at 0,0 (the “quarter circle” artifact)
+    // Hide any stray huge circle at 0,0 (artifact)
     svgRoot.querySelectorAll("circle").forEach(c => {
       const cx = c.getAttribute("cx"), cy = c.getAttribute("cy"), r = parseFloat(c.getAttribute("r") || "0");
       if ((cx === "0" || cx === "0.0") && (cy === "0" || cy === "0.0") && r >= 20) {
@@ -727,9 +730,8 @@ function getBackendUrl() {
     svgRoot.style.display = "block";
 
     buildStandMap();
-    status(`SVG: OK. Stand map size = ${standMap.size}`);
 
-    // click-to-select (desktop & mobile is OK for admin)
+    // click-to-select
     svgRoot.style.pointerEvents = "auto";
     svgRoot.addEventListener("click", (ev) => {
       let node = ev.target;
@@ -742,18 +744,25 @@ function getBackendUrl() {
   }
 
   async function loadData() {
-    status("DATA: loading…");
     const backend = getBackendUrl();
-    status(`DATA: GET ${backend}/stands`);
     const data = await fetchJson(`${backend}/stands`);
     rows = (Array.isArray(data) ? data : []).map(normRow).filter(r => r.standId);
-    status(`DATA: OK. rows=${rows.length}`);
+
     applyColours();
     renderTable();
+
     syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
     showToast(false);
-    setDebug(`Data loaded: ${rows.length} stands. Selected: ${selectedStandId||'none'}`);
 
+    // keep selection after refresh
+    if (selectedStandId) {
+      const row = rows.find(r => r.standId === selectedStandId);
+      if (row) {
+        statusEl.value = row.status;
+        companyEl.value = row.company || "";
+        drawCallout(row.standId);
+      }
+    }
   }
 
   async function saveCurrent() {
@@ -765,41 +774,60 @@ function getBackendUrl() {
       company: (statusEl.value === "sold") ? companyEl.value.trim() : ""
     };
 
-    // Try common Worker patterns
-    let ok = false;
-    try {
-      await fetchJson(`${backend}/stands/${encodeURIComponent(selectedStandId)}`, {
-        method:"PUT",
+    try{
+      await fetchJson(`${backend}/stand`, {
+        method:"POST",
         headers:{ "Content-Type":"application/json" },
         body: JSON.stringify(payload)
       });
-      ok = true;
-    } catch (e1) {
-      try {
-        await fetchJson(`${backend}/stands`, {
-          method:"POST",
-          headers:{ "Content-Type":"application/json" },
-          body: JSON.stringify(payload)
-        });
-        ok = true;
-      } catch (e2) {
-        ok = false;
-      }
-    }
-    if (!ok) {
+    }catch(e){
       showToast(true);
       return;
     }
 
-    // Update local copy immediately (so plan updates)
     const idx = rows.findIndex(r => r.standId === selectedStandId);
     if (idx >= 0) rows[idx] = payload;
+
     applyColours();
     renderTable();
-    updatePointer(selectedStandId);
+    drawCallout(selectedStandId);
     syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
   }
 
+  async function resetAll() {
+    if (!rows.length) return;
+    const ok = confirm("Reset ALL stands to Available? This will overwrite sold stands.");
+    if (!ok) return;
+
+    resetBtn.disabled = true;
+    const backend = getBackendUrl();
+
+    // simple sequential to avoid hammering worker
+    for (let i=0;i<rows.length;i++){
+      const r = rows[i];
+      const payload = { standId: r.standId, status:"available", company:"" };
+      try{
+        await fetchJson(`${backend}/stand`, {
+          method:"POST",
+          headers:{ "Content-Type":"application/json" },
+          body: JSON.stringify(payload)
+        });
+      }catch(e){
+        showToast(true);
+        break;
+      }
+      rows[i] = payload;
+    }
+    resetBtn.disabled = false;
+    applyColours();
+    renderTable();
+    clearCallout();
+    selectedStandId = null;
+    standIdEl.value = "";
+    syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+  }
+
+  // Events
   saveBtn.addEventListener("click", saveCurrent);
   markAvailBtn.addEventListener("click", () => {
     statusEl.value = "available";
@@ -810,8 +838,15 @@ function getBackendUrl() {
   searchEl.addEventListener("input", renderTable);
   filterEl.addEventListener("change", renderTable);
 
-  // Simple CSV export/import local to browser (does not need backend)
-  el("exportBtn").addEventListener("click", () => {
+  eventNameEl.addEventListener("input", scheduleSaveEventName);
+
+  pauseBtn.addEventListener("click", () => {
+    autoSync = !autoSync;
+    pauseBtn.textContent = autoSync ? "Pause sync" : "Resume sync";
+    if (autoSync) startPolling(); else stopPolling();
+  });
+
+  exportBtn.addEventListener("click", () => {
     const lines = ["standId,status,company"].concat(rows.map(r => {
       const c = (r.company||"").replaceAll('"','""');
       return `${r.standId},${r.status},"${c}"`;
@@ -824,7 +859,7 @@ function getBackendUrl() {
     URL.revokeObjectURL(a.href);
   });
 
-  el("importBtn").addEventListener("click", async () => {
+  importBtn.addEventListener("click", async () => {
     const inp = document.createElement("input");
     inp.type="file";
     inp.accept=".csv,text/csv";
@@ -843,16 +878,17 @@ function getBackendUrl() {
       rows = out;
       applyColours();
       renderTable();
+      clearCallout();
+      selectedStandId = null;
+      standIdEl.value = "";
     };
     inp.click();
   });
 
-  // Pause sync (polling) - optional
-  el("pauseBtn").addEventListener("click", () => {
-    autoSync = !autoSync;
-    el("pauseBtn").textContent = autoSync ? "Pause sync" : "Resume sync";
-    if (autoSync) startPolling(); else stopPolling();
-  });
+  resetBtn.addEventListener("click", resetAll);
+
+  window.addEventListener("scroll", () => { if (selectedStandId) drawCallout(selectedStandId); }, { passive:true });
+  window.addEventListener("resize", () => { if (selectedStandId) drawCallout(selectedStandId); });
 
   function startPolling(){
     stopPolling();
@@ -866,30 +902,22 @@ function getBackendUrl() {
     syncTimer = null;
   }
 
-  // debug shortcut: press 'D' to draw callout to A1
-  window.addEventListener('keydown', (e)=>{
-    if (String(e.key||'').toLowerCase()==='d'){
-      const row = rows.find(r=>r.standId==='A1') || rows[0];
-      if (row) { selectStand(row.standId); }
-    }
-  });
-
   // init
   (async () => {
-    try {
+    try{
+      await requireAdminPassword();
+      await loadSettings();
       await loadSvg();
-    } catch(e) {
+    }catch(e){
       showToast(true);
-      status("INIT: FAILED during SVG load/password gate. See console too.");
       console.error(e);
       return;
     }
-    try {
+    try{
       await loadData();
       startPolling();
-    } catch(e) {
+    }catch(e){
       showToast(true);
-      status("INIT: FAILED during data load. Backend issue or blocked.");
       console.error(e);
     }
   })();
