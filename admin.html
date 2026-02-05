@@ -306,13 +306,7 @@
   const DEFAULT_BACKEND = "https://floorplansaberdeen.floorplansaberdeen.workers.dev";
   const BACKEND_KEY = "floorplan_backend_url";
   const SVG_URL = new URL("./event_plan.svg", window.location.href).href;
-  status(`PAGE: ${location.href}`);
-  status(`SVG_URL: ${SVG_URL}`);
-  status(`DEFAULT_BACKEND: ${DEFAULT_BACKEND}`);
-  status(`SAVED_BACKEND: ${localStorage.getItem(BACKEND_KEY) || "(none)"}`);
-  status(`BACKEND_IN_USE: ${getBackendUrl()}`);
-
-  const el = (id) => document.getElementById(id);
+const el = (id) => document.getElementById(id);
   const statusLines = el("statusLines");
   const statusLog = [];
   function status(msg){
@@ -401,6 +395,13 @@ function getBackendUrl() {
     const base = (saved && saved.startsWith("http")) ? saved : DEFAULT_BACKEND;
     return normalizeBackendUrl(base);
   }
+
+  // Status panel initial lines (safe: functions are defined)
+  status(`PAGE: ${location.href}`);
+  status(`SVG_URL: ${SVG_URL}`);
+  status(`DEFAULT_BACKEND: ${DEFAULT_BACKEND}`);
+  status(`SAVED_BACKEND: ${localStorage.getItem(BACKEND_KEY) || "(none)"}`);
+  status(`BACKEND_IN_USE: ${getBackendUrl()}`);
 
   function showToast(show) {
     toast.style.display = show ? "flex" : "none";
