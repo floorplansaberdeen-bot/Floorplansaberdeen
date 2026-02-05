@@ -174,6 +174,17 @@
     .toast .actions{ display:flex; gap:10px; }
     .toast button{ background:#fff; }
 
+    
+    @media (min-width: 981px){
+      /* Keep plan visible while scrolling the right-side panel */
+      .side{
+        position: sticky;
+        top: 12px;
+        max-height: calc(100vh - 24px);
+        overflow: auto;
+      }
+    }
+
     @media (max-width: 980px){
       main{ grid-template-columns: 1fr; }
     }
@@ -355,6 +366,12 @@
 
   let autoSync = true;
   let syncTimer = null;
+
+  // Pause auto-refresh while the user is editing fields (prevents resets mid-typing)
+  function isEditing(){
+    const ae = document.activeElement;
+    return ae === companyEl || ae === statusEl || ae === eventNameEl;
+  }
 
   function normalizeBackendUrl(input) {
     if (!input) return "";
@@ -593,15 +610,26 @@
   }
 
   function forceBlackAndWhite(svg){
-    const all = svg.querySelectorAll("*");
-    all.forEach(n=>{
+    // Remove any embedded images (logos) so the zoom is clean
+    svg.querySelectorAll("image").forEach(img => img.remove());
+
+    const shapesSel = "path,rect,polygon,polyline,ellipse,circle,line";
+    svg.querySelectorAll("*").forEach(n => {
       if (n.hasAttribute("style")) n.removeAttribute("style");
-      if (n.tagName !== "text"){
+
+      // Keep text readable: black fill, no stroke
+      if (n.tagName && n.tagName.toLowerCase() === "text"){
+        n.setAttribute("fill","black");
+        n.removeAttribute("stroke");
+        n.removeAttribute("stroke-width");
+        return;
+      }
+
+      // Only force B/W on actual drawable shapes
+      if (n.matches && n.matches(shapesSel)){
         n.setAttribute("fill","none");
         n.setAttribute("stroke","black");
         n.setAttribute("stroke-width","1");
-      } else {
-        n.setAttribute("fill","black");
       }
     });
   }
@@ -734,6 +762,9 @@
     // click-to-select
     svgRoot.style.pointerEvents = "auto";
     svgRoot.addEventListener("click", (ev) => {
+      // On phones, use the list only (no plan tapping)
+      if (window.matchMedia && window.matchMedia('(max-width: 640px)').matches) return;
+
       let node = ev.target;
       while (node && node !== svgRoot && !node.id) node = node.parentElement;
       if (!node || node === svgRoot || !node.id) return;
@@ -894,6 +925,7 @@
     stopPolling();
     syncTimer = setInterval(async () => {
       if (!autoSync) return;
+      if (isEditing()) return; // don't refresh while typing/choosing
       try { await loadData(); } catch(e){ showToast(true); }
     }, 8000);
   }
@@ -914,7 +946,7 @@
       return;
     }
     try{
-      await loadData();
+      if (!isEditing()) await loadData();
       startPolling();
     }catch(e){
       showToast(true);
