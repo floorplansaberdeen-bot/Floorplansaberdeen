@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Floorplan Admin</title>
+  <title>Floorplan Admin (v3-debug)</title>
   <style>
     :root{
       --bg:#ffffff;
@@ -190,6 +190,11 @@
     </div>
   </header>
 
+  <div id="debugBar" style="position:sticky;top:0;z-index:9999;background:#111;color:#fff;padding:8px 12px;font-weight:800;font-size:12px;display:none;">
+    Debug: <span id="dbgText">—</span>
+  </div>
+
+
   <main>
     <section class="card planCard">
       <div class="cardHead">Plan</div>
@@ -326,6 +331,23 @@
   const setBackendBtn = el("setBackendBtn");
   const hideToastBtn = el("hideToastBtn");
   const syncedAt = el("syncedAt");
+
+  const debugBar = el("debugBar");
+  const dbgText = el("dbgText");
+  const DEBUG = true; // set false to hide
+  function setDebug(msg){
+    if (!DEBUG) return;
+    debugBar.style.display = "block";
+    dbgText.textContent = msg;
+  }
+
+
+  // basic DOM sanity checks
+  if (!planStack || !calloutSvg || !lozenge || !lozStand || !lozCompany || !svgHost || !planWrap) {
+    setDebug(`Missing DOM nodes: planStack=${!!planStack} calloutSvg=${!!calloutSvg} lozenge=${!!lozenge} svgHost=${!!svgHost}`);
+  } else {
+    setDebug('DOM ok. Waiting for SVG/data...');
+  }
 
   let svgRoot = null;
   let zoomSvgRoot = null;
@@ -546,6 +568,8 @@ function getBackendUrl() {
   }
 
   function selectStand(standId) {
+    setDebug(`Selecting ${standId}`);
+
     selectedStandId = normStandId(standId);
     const row = rows.find(r => r.standId === selectedStandId);
     if (!row) return;
@@ -631,6 +655,8 @@ function getBackendUrl() {
     svgRoot.style.display = "block";
 
     buildStandMap();
+    setDebug(`SVG loaded. Stand map size: ${standMap.size}`);
+
 
     // click-to-select (desktop & mobile is OK for admin)
     // click-to-select (desktop & mobile is OK for admin)
@@ -653,6 +679,8 @@ function getBackendUrl() {
     renderTable();
     syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
     showToast(false);
+    setDebug(`Data loaded: ${rows.length} stands. Selected: ${selectedStandId||'none'}`);
+
   }
 
   async function saveCurrent() {
@@ -764,6 +792,14 @@ function getBackendUrl() {
     if (syncTimer) clearInterval(syncTimer);
     syncTimer = null;
   }
+
+  // debug shortcut: press 'D' to draw callout to A1
+  window.addEventListener('keydown', (e)=>{
+    if (String(e.key||'').toLowerCase()==='d'){
+      const row = rows.find(r=>r.standId==='A1') || rows[0];
+      if (row) { selectStand(row.standId); }
+    }
+  });
 
   // init
   (async () => {
