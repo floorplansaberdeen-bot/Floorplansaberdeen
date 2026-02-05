@@ -323,24 +323,63 @@ function getBackendUrl() {
       .replace(/[^A-Z0-9]/g,"");
   }
 
+  function hideLargeArtifacts(svg) {
+    if (!svg) return;
+    // Hide any huge filled shapes that sit at the top-left (common export artifact: quarter circle)
+    const nodes = svg.querySelectorAll("path,circle,ellipse,rect,polygon,polyline");
+    nodes.forEach(n => {
+      try {
+        const fill = (n.getAttribute("fill") || "").toLowerCase();
+        const stroke = (n.getAttribute("stroke") || "").toLowerCase();
+        if (!fill || fill === "none") return;
+        if (stroke && stroke !== "none") return;
+        const b = n.getBBox();
+        if (b.x <= 1 && b.y <= 1 && (b.width > 60 || b.height > 60)) {
+          n.style.display = "none";
+        }
+      } catch {}
+    });
+  }
+
+  function svgFromText(txt) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(txt, "image/svg+xml");
+    const svg = doc.querySelector("svg");
+    if (!svg) throw new Error("SVG parse failed");
+    return document.importNode(svg, true);
+  }
+
+
   function buildStandMap() {
     standMap.clear();
     if (!svgRoot) return;
 
-    const all = svgRoot.querySelectorAll("[id]");
-    all.forEach(node => {
-      const key = normalizeDomId(node.id);
+    const consider = (node, rawKey) => {
+      const key = normalizeDomId(rawKey);
       if (!key) return;
-      // Prefer the top-most meaningful shape/group:
-      if (!standMap.has(key)) standMap.set(key, node);
-    });
+      let area = 0;
+      try {
+        const b = node.getBBox();
+        area = Math.max(0, b.width) * Math.max(0, b.height);
+      } catch {}
+      const existing = standMap.get(key);
+      if (!existing) {
+        standMap.set(key, node);
+        return;
+      }
+      // Prefer the element with the larger bounding box (usually the real stand shape/group)
+      try {
+        const eb = existing.getBBox();
+        const eArea = Math.max(0, eb.width) * Math.max(0, eb.height);
+        if (area > eArea) standMap.set(key, node);
+      } catch {
+        // If existing has no bbox, replace it
+        standMap.set(key, node);
+      }
+    };
 
-    // Also support explicit data-stand tags
-    const ds = svgRoot.querySelectorAll("[data-stand]");
-    ds.forEach(node => {
-      const key = normalizeDomId(node.getAttribute("data-stand"));
-      if (key && !standMap.has(key)) standMap.set(key, node);
-    });
+    svgRoot.querySelectorAll("[id]").forEach(node => consider(node, node.id));
+    svgRoot.querySelectorAll("[data-stand]").forEach(node => consider(node, node.getAttribute("data-stand")));
   }
 
   function elementForStand(standId) {
@@ -372,81 +411,68 @@ function getBackendUrl() {
 
   function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
 
-  function placeLabelSmart(standPoint) {
-    const wrapRect = planWrap.getBoundingClientRect();
+  function placeLabelUnder(standCenter, labelW, labelH) {
+    const wrapRect = planWrapEl.getBoundingClientRect();
+    const margin = 18;
 
-    // Preferred label positions outside the plan, so it never covers stands:
-    const margin = 26;
-    const labelW = (window.innerWidth <= 640) ? 220 : 260;
-    const labelH = (window.innerWidth <= 640) ? 92 : 104;
+    const lx = clamp(standCenter.x, wrapRect.left + margin + labelW/2, wrapRect.right - margin - labelW/2);
+    const ly = wrapRect.bottom - margin - labelH/2; // under the plan
 
-    const standXRel = (standPoint.x - wrapRect.left) / wrapRect.width;
-    const onLeft = standXRel > 0.55; // if stand right-ish, put label left
-    const x = onLeft ? (wrapRect.left + margin + labelW/2) : (wrapRect.right - margin - labelW/2);
-
-    // Vertical: align around stand, but keep within wrap and avoid header area
-    const y = clamp(standPoint.y, wrapRect.top + margin + labelH/2, wrapRect.bottom - margin - labelH/2);
-
-    return { x, y, labelW, labelH };
+    return { x: lx, y: ly };
   }
 
-  function updatePointer(selected) {
-    if (!selected || !selected.standId) {
-      lineEl.style.display = "none";
-      dotEl.style.display = "none";
+  function updatePointer() {
+    if (!svgRoot) return;
+
+    if (!selectedStandId) {
+      pointerLineEl.style.display = "none";
+      pointerDotEl.style.display = "none";
       labelEl.style.display = "none";
       return;
     }
-    const elem = elementForStand(selected.standId);
-    if (!elem) {
-      updatePointer(null);
+
+    const standEl = standMap.get(normalizeStandId(selectedStandId));
+    if (!standEl) {
+      pointerLineEl.style.display = "none";
+      pointerDotEl.style.display = "none";
+      labelEl.style.display = "none";
       return;
     }
 
-    const standPt = getElementCenterInPage(elem);
-    const { x: labelCx, y: labelCy } = placeLabelSmart(standPt);
+    const standBox = standEl.getBoundingClientRect();
+    const standCenter = { x: standBox.left + standBox.width/2, y: standBox.top + standBox.height/2 };
 
-    // Convert page coords -> overlay coords
-    const wrapRect = planWrap.getBoundingClientRect();
-    const sx = standPt.x - wrapRect.left;
-    const sy = standPt.y - wrapRect.top;
-
-    const lx = labelCx - wrapRect.left;
-    const ly = labelCy - wrapRect.top;
-
-    // line
-    const dx = sx - lx;
-    const dy = sy - ly;
-    const len = Math.sqrt(dx*dx + dy*dy);
-    const ang = Math.atan2(dy, dx);
-
-    lineEl.style.display = "block";
-    lineEl.style.left = `${lx}px`;
-    lineEl.style.top = `${ly}px`;
-    lineEl.style.width = `${len}px`;
-    lineEl.style.transform = `rotate(${ang}rad)`;
-
-    dotEl.style.display = "block";
-    dotEl.style.left = `${sx}px`;
-    dotEl.style.top = `${sy}px`;
+    const isMobile = window.matchMedia("(max-width: 768px)").matches;
+    const labelW = isMobile ? 220 : 240;
+    const labelH = isMobile ? 78 : 74;
 
     labelEl.style.display = "block";
-    labelEl.style.left = `${lx}px`;
-    labelEl.style.top = `${ly}px`;
+    labelEl.style.width = labelW + "px";
 
-    labelStandEl.textContent = selected.standId;
-    if (selected.company) {
-      labelCompanyEl.style.display = "block";
-      labelCompanyEl.textContent = selected.company;
-      selCompanyEl.style.display = "block";
-      selCompanyEl.textContent = selected.company;
-    } else {
-      labelCompanyEl.style.display = "none";
-      labelCompanyEl.textContent = "";
-      selCompanyEl.style.display = "none";
-      selCompanyEl.textContent = "";
-    }
-    selStandEl.textContent = selected.standId;
+    const { x: lx, y: ly } = placeLabelUnder(standCenter, labelW, labelH);
+    labelEl.style.left = lx + "px";
+    labelEl.style.top  = ly + "px";
+
+    // Line from top-middle of label to stand
+    const startX = lx;
+    const startY = ly - (labelH / 2);
+    const endX = standCenter.x;
+    const endY = standCenter.y;
+
+    pointerLineEl.style.display = "block";
+    pointerLineEl.setAttribute("x1", startX);
+    pointerLineEl.setAttribute("y1", startY);
+    pointerLineEl.setAttribute("x2", endX);
+    pointerLineEl.setAttribute("y2", endY);
+
+    pointerDotEl.style.display = "block";
+    pointerDotEl.setAttribute("cx", endX);
+    pointerDotEl.setAttribute("cy", endY);
+
+    labelStandEl.textContent = selectedStandId;
+    const company = (standsById.get(normalizeStandId(selectedStandId))?.company || "").trim();
+    labelCompanyEl.textContent = company;
+    labelCompanyEl.style.display = company ? "block" : "none";
   }
 
   // ===== Data + UI =====

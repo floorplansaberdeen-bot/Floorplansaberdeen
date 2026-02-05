@@ -86,7 +86,7 @@
       box-shadow: var(--shadow);
       min-width: 200px;
       max-width: 300px;
-      text-align:left;
+      text-align:center;
       pointer-events:none;
       transform: translate(-50%, -50%);
     }
@@ -138,7 +138,7 @@
       flex:1; padding:10px 12px; border-radius:12px; border:1px solid var(--border);
     }
     table{ width:100%; border-collapse:collapse; font-size:13px; }
-    th, td{ padding:10px 10px; border-top:1px solid #f0f0f0; text-align:left; }
+    th, td{ padding:10px 10px; border-top:1px solid #f0f0f0; text-align:center; }
     th{ background:#fafafa; border-top:none; font-size:12px; color:var(--muted); }
     tr.active{ background:#f5f8ff; outline:2px solid #c9d5ff; outline-offset:-2px; }
     .badge{ display:inline-flex; align-items:center; padding:3px 8px; border-radius:999px; font-weight:900; font-size:12px; border:1px solid var(--border); }
@@ -323,6 +323,7 @@
   const syncedAt = el("syncedAt");
 
   let svgRoot = null;
+  let rawSvgText = "";
   let zoomSvgRoot = null;
   let standMap = new Map();
 
@@ -403,17 +404,63 @@ function getBackendUrl() {
       .replace(/[^A-Z0-9]/g,"");
   }
 
+  function hideLargeArtifacts(svg) {
+    if (!svg) return;
+    // Hide any huge filled shapes that sit at the top-left (common export artifact: quarter circle)
+    const nodes = svg.querySelectorAll("path,circle,ellipse,rect,polygon,polyline");
+    nodes.forEach(n => {
+      try {
+        const fill = (n.getAttribute("fill") || "").toLowerCase();
+        const stroke = (n.getAttribute("stroke") || "").toLowerCase();
+        if (!fill || fill === "none") return;
+        if (stroke && stroke !== "none") return;
+        const b = n.getBBox();
+        if (b.x <= 1 && b.y <= 1 && (b.width > 60 || b.height > 60)) {
+          n.style.display = "none";
+        }
+      } catch {}
+    });
+  }
+
+  function svgFromText(txt) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(txt, "image/svg+xml");
+    const svg = doc.querySelector("svg");
+    if (!svg) throw new Error("SVG parse failed");
+    return document.importNode(svg, true);
+  }
+
+
   function buildStandMap() {
     standMap.clear();
     if (!svgRoot) return;
-    svgRoot.querySelectorAll("[id]").forEach(node => {
-      const key = normalizeDomId(node.id);
-      if (key && !standMap.has(key)) standMap.set(key, node);
-    });
-    svgRoot.querySelectorAll("[data-stand]").forEach(node => {
-      const key = normalizeDomId(node.getAttribute("data-stand"));
-      if (key && !standMap.has(key)) standMap.set(key, node);
-    });
+
+    const consider = (node, rawKey) => {
+      const key = normalizeDomId(rawKey);
+      if (!key) return;
+      let area = 0;
+      try {
+        const b = node.getBBox();
+        area = Math.max(0, b.width) * Math.max(0, b.height);
+      } catch {}
+      const existing = standMap.get(key);
+      if (!existing) {
+        standMap.set(key, node);
+        return;
+      }
+      // Prefer the element with the larger bounding box (usually the real stand shape/group)
+      try {
+        const eb = existing.getBBox();
+        const eArea = Math.max(0, eb.width) * Math.max(0, eb.height);
+        if (area > eArea) standMap.set(key, node);
+      } catch {
+        // If existing has no bbox, replace it
+        standMap.set(key, node);
+      }
+    };
+
+    svgRoot.querySelectorAll("[id]").forEach(node => consider(node, node.id));
+    svgRoot.querySelectorAll("[data-stand]").forEach(node => consider(node, node.getAttribute("data-stand")));
   }
 
   function elementForStand(standId){
@@ -441,56 +488,77 @@ function getBackendUrl() {
 
   function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
 
-  function placeLabelSmart(standPt) {
-    const wrapRect = planWrap.getBoundingClientRect();
-    const margin = 26;
-    const labelW = 240;
-    const labelH = 78;
+  function placeLabelUnder(standCenter, labelW, labelH) {
+    const wrapRect = planWrapEl.getBoundingClientRect();
+    const margin = 18;
 
-    const standXRel = (standPt.x - wrapRect.left) / wrapRect.width;
-    const onLeft = standXRel > 0.55;
-    const x = onLeft ? (wrapRect.left + margin + labelW/2) : (wrapRect.right - margin - labelW/2);
-    const y = clamp(standPt.y, wrapRect.top + margin + labelH/2, wrapRect.bottom - margin - labelH/2);
-    return { x, y };
+    const lx = clamp(standCenter.x, wrapRect.left + margin + labelW/2, wrapRect.right - margin - labelW/2);
+    const ly = wrapRect.bottom - margin - labelH/2; // under the plan
+
+    return { x: lx, y: ly };
   }
 
-  function updatePointer(standId) {
-    if (!standId) {
-      lineEl.style.display="none";
-      dotEl.style.display="none";
-      labelEl.style.display="none";
+  function updatePointer() {
+    if (!svgRoot) return;
+
+    if (!selectedStandId) {
+      pointerLineEl.style.display = "none";
+      pointerDotEl.style.display = "none";
+      labelEl.style.display = "none";
       return;
     }
-    const elem = elementForStand(standId);
-    if (!elem) return;
 
-    const standPt = getElementCenterInPage(elem);
-    const { x: labelCx, y: labelCy } = placeLabelSmart(standPt);
-    const wrapRect = planWrap.getBoundingClientRect();
+    const standEl = standMap.get(normalizeStandId(selectedStandId));
+    if (!standEl) {
+      pointerLineEl.style.display = "none";
+      pointerDotEl.style.display = "none";
+      labelEl.style.display = "none";
+      return;
+    }
 
-    const sx = standPt.x - wrapRect.left;
-    const sy = standPt.y - wrapRect.top;
-    const lx = labelCx - wrapRect.left;
-    const ly = labelCy - wrapRect.top;
+    // Stand center in screen coords
+    const standBox = standEl.getBoundingClientRect();
+    const standCenter = { x: standBox.left + standBox.width/2, y: standBox.top + standBox.height/2 };
 
-    const dx = sx - lx, dy = sy - ly;
-    const len = Math.sqrt(dx*dx + dy*dy);
-    const ang = Math.atan2(dy, dx);
+    // Label sizing (kept consistent across admin/index)
+    const isMobile = window.matchMedia("(max-width: 768px)").matches;
+    const labelW = isMobile ? 220 : 240;
+    const labelH = isMobile ? 78 : 74;
 
-    lineEl.style.display="block";
-    lineEl.style.left = `${lx}px`;
-    lineEl.style.top = `${ly}px`;
-    lineEl.style.width = `${len}px`;
-    lineEl.style.transform = `rotate(${ang}rad)`;
+    // Position label under the plan
+    labelEl.style.display = "block";
+    labelEl.style.width = labelW + "px";
+    labelEl.style.left = standCenter.x + "px"; // temp so size is applied
+    labelEl.style.top  = standCenter.y + "px";
 
-    dotEl.style.display="block";
-    dotEl.style.left = `${sx}px`;
-    dotEl.style.top = `${sy}px`;
+    const { x: lx, y: ly } = placeLabelUnder(standCenter, labelW, labelH);
+    labelEl.style.left = lx + "px";
+    labelEl.style.top  = ly + "px";
 
-    labelEl.style.display="block";
-    labelEl.style.left = `${lx}px`;
-    labelEl.style.top = `${ly}px`;
-    labelStandEl.textContent = standId;
+    // Line starts at top-middle of label
+    const startX = lx;
+    const startY = ly - (labelH / 2);
+
+    // Line ends at stand center
+    const endX = standCenter.x;
+    const endY = standCenter.y;
+
+    // Draw line
+    pointerLineEl.style.display = "block";
+    pointerLineEl.setAttribute("x1", startX);
+    pointerLineEl.setAttribute("y1", startY);
+    pointerLineEl.setAttribute("x2", endX);
+    pointerLineEl.setAttribute("y2", endY);
+
+    // Draw dot at stand
+    pointerDotEl.style.display = "block";
+    pointerDotEl.setAttribute("cx", endX);
+    pointerDotEl.setAttribute("cy", endY);
+
+    // Update label content
+    labelStandEl.textContent = selectedStandId;
+    labelCompanyEl.textContent = (standsById.get(normalizeStandId(selectedStandId))?.company || "").trim();
+    labelCompanyEl.style.display = labelCompanyEl.textContent ? "block" : "none";
   }
 
   function applyColours() {
@@ -555,52 +623,75 @@ function getBackendUrl() {
     updateZoom(row.standId);
   }
 
-  function updateZoom(standId) {
-    zoomSvgHost.innerHTML = "";
-    zoomRing.style.display = "none";
-    if (!standId || !svgRoot) return;
+  function updateZoom() {
+    if (!rawSvgText || !zoomHostEl) return;
 
-    // clone the SVG into zoom area
-    const clone = svgRoot.cloneNode(true);
-    zoomSvgHost.appendChild(clone);
-    zoomSvgRoot = clone;
+    zoomHostEl.innerHTML = "";
+    zoomSvgRoot = null;
+    zoomRingEl.style.display = "none";
 
-    // find element inside clone
-    const key = normalizeDomId(standId);
-    const target = zoomSvgRoot.querySelector("#"+CSS.escape(standId)) ||
-                   zoomSvgRoot.querySelector("#"+CSS.escape("stand-"+standId)) ||
-                   Array.from(zoomSvgRoot.querySelectorAll("[id]")).find(n => normalizeDomId(n.id) === key);
+    if (!selectedStandId || !svgRoot) {
+      zoomHintEl.textContent = "Select a stand to zoom in.";
+      return;
+    }
 
-    if (!target || !target.getBBox) return;
+    let zoomSvg;
+    try {
+      zoomSvg = svgFromText(rawSvgText);
+    } catch (e) {
+      console.error(e);
+      zoomHintEl.textContent = "Zoom failed (SVG parse).";
+      return;
+    }
 
-    const bbox = target.getBBox();
-    const pad = Math.max(40, Math.max(bbox.width, bbox.height) * 0.9);
-    const vx = bbox.x - pad;
-    const vy = bbox.y - pad;
-    const vw = bbox.width + pad*2;
-    const vh = bbox.height + pad*2;
-
-    zoomSvgRoot.setAttribute("viewBox", `${vx} ${vy} ${vw} ${vh}`);
-    zoomSvgRoot.setAttribute("preserveAspectRatio","xMidYMid meet");
+    zoomSvgRoot = zoomSvg;
     zoomSvgRoot.style.width = "100%";
-    zoomSvgRoot.style.height = "auto";
+    zoomSvgRoot.style.height = "100%";
     zoomSvgRoot.style.display = "block";
+    zoomSvgRoot.style.pointerEvents = "none";
+    zoomSvgRoot.setAttribute("preserveAspectRatio", "xMidYMid meet");
 
-    // Draw ring around selected stand (in screen coords within zoomWrap)
-    // We map the target bbox center from SVG coords into zoomWrap client coords by using getBoundingClientRect on a small marker
-    // Easiest: use target.getBoundingClientRect() after layout
+    hideLargeArtifacts(zoomSvgRoot);
+    zoomHostEl.appendChild(zoomSvgRoot);
+
+    // Use the selected stand bbox from the main SVG to set the zoom viewBox
+    const standEl = standMap.get(normalizeStandId(selectedStandId));
+    if (!standEl) return;
+
+    let b;
+    try { b = standEl.getBBox(); } catch { return; }
+    const pad = Math.max(b.width, b.height) * 0.6 + 40;
+    const vb = {
+      x: b.x - pad,
+      y: b.y - pad,
+      w: b.width + pad*2,
+      h: b.height + pad*2
+    };
+    zoomSvgRoot.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+
+    // Find the same stand element inside the zoom SVG (for the ring placement)
+    const key = normalizeStandId(selectedStandId);
+    let zEl = null;
+    zoomSvgRoot.querySelectorAll("[id],[data-stand]").forEach(node => {
+      if (zEl) return;
+      const id = node.id || node.getAttribute("data-stand") || "";
+      if (normalizeDomId(id) === key) zEl = node;
+    });
+
+    if (!zEl) return;
+
     requestAnimationFrame(() => {
-      const r = target.getBoundingClientRect();
-      const zw = zoomWrap.getBoundingClientRect();
-      const cx = (r.left + r.right)/2 - zw.left;
-      const cy = (r.top + r.bottom)/2 - zw.top;
-      const radius = Math.max(18, Math.min(60, Math.max(r.width, r.height) * 0.9));
+      const wrap = zoomWrapEl.getBoundingClientRect();
+      const r = zEl.getBoundingClientRect();
+      const cx = r.left + r.width/2 - wrap.left;
+      const cy = r.top + r.height/2 - wrap.top;
+      const radius = Math.max(18, Math.min(90, Math.max(r.width, r.height) * 0.55));
 
-      zoomRing.style.display = "block";
-      zoomRing.style.width = `${radius*2}px`;
-      zoomRing.style.height = `${radius*2}px`;
-      zoomRing.style.left = `${cx - radius}px`;
-      zoomRing.style.top = `${cy - radius}px`;
+      zoomRingEl.style.display = "block";
+      zoomRingEl.style.width = `${radius*2}px`;
+      zoomRingEl.style.height = `${radius*2}px`;
+      zoomRingEl.style.left = `${cx - radius}px`;
+      zoomRingEl.style.top = `${cy - radius}px`;
     });
   }
 
