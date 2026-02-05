@@ -68,6 +68,7 @@
     }
     .planCard{ overflow:hidden; }
     .planBody{ padding:12px; }
+    .planStack{ position:relative; border-radius:14px; overflow:hidden; background:#fff; }
     .planWrap{
       position:relative;
       border-radius:14px;
@@ -76,7 +77,14 @@
       min-height:420px;
     }
     .svgHost{ width:100%; height:auto; display:block; }
-    .overlay{ position:absolute; inset:0; pointer-events:none; }
+    .calloutSvg{ position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; }
+
+    .overlay{ position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; }
+    .labelBay{ background:#fff; border-top:1px solid var(--border); padding:12px; min-height:72px; }
+    .lozenge{ display:inline-block; background:#fff; border-radius:999px; padding:12px 16px; box-shadow: var(--shadow); border:1px solid rgba(0,0,0,.08); max-width: 320px; }
+    .lozStand{ font-size:28px; font-weight:900; line-height:1.1; }
+    .lozCompany{ margin-top:4px; font-size:16px; font-weight:800; opacity:.9; }
+
     .label{
       position:absolute;
       background:var(--sold);
@@ -195,14 +203,20 @@
     <section class="card planCard">
       <div class="cardHead">Plan</div>
       <div class="planBody">
-        <div class="planWrap" id="planWrap">
+        <div class="planStack" id="planStack">
+          <div class="planWrap" id="planWrap">
           <div id="svgHost" class="svgHost"></div>
-          <div class="overlay" id="overlay" aria-hidden="true">
-            <div class="line" id="line" style="display:none;"></div>
-            <div class="dot" id="dot" style="display:none;"></div>
-            <div class="label" id="label" style="display:none;">
-              <div class="stand" id="labelStand">—</div>
-            </div>
+            <svg class="overlay" id="calloutSvg" aria-hidden="true"></svg>
+</div>
+          <div class="labelBay" id="labelBay">
+          <div class="lozenge" id="lozenge" style="display:none;">
+            <div class="lozStand" id="lozStand">—</div>
+          <svg class="calloutSvg" id="calloutSvg" aria-hidden="true"></svg>
+        </div>
+            <div class="lozCompany" id="lozCompany" style="display:none;"></div>
+          </div>
+        </div>
+
           </div>
         </div>
       </div>
@@ -299,11 +313,11 @@
   const zoomSvgHost = el("zoomSvgHost");
   const zoomRing = el("zoomRing");
 
-  const overlay = el("overlay");
-  const lineEl = el("line");
-  const dotEl = el("dot");
-  const labelEl = el("label");
-  const labelStandEl = el("labelStand");
+  const planStack = el("planStack");
+  const calloutSvg = el("calloutSvg");
+  const lozenge = el("lozenge");
+  const lozStand = el("lozStand");
+  const lozCompany = el("lozCompany");
 
   const tbody = el("tbody");
   const searchEl = el("search");
@@ -357,6 +371,36 @@ function getBackendUrl() {
     const base = (saved && saved.startsWith("http")) ? saved : DEFAULT_BACKEND;
     return normalizeBackendUrl(base);
   }
+
+  async function requireAdminPassword(){
+    const backend = getBackendUrl();
+    let settings = null;
+    try{
+      settings = await fetchJson(`${backend}/settings`);
+    }catch(e){
+      // If settings route fails, allow access (but admin actions may still fail)
+      return;
+    }
+    const pwd = (settings && (settings.adminPassword || settings.password || settings.admin_pass || settings.admin_password)) || "";
+    const required = String(pwd || "").trim();
+    if (!required) return; // no password configured
+    const key = "admin_authed";
+    if (sessionStorage.getItem(key) === "1") return;
+
+    while (true){
+      const entered = prompt("Admin password required:", "");
+      if (entered === null) { // cancelled
+        alert("Password required to use admin.");
+        continue;
+      }
+      if (String(entered) === required){
+        sessionStorage.setItem(key, "1");
+        return;
+      }
+      alert("Incorrect password.");
+    }
+  }
+
 
   function showToast(show) {
     toast.style.display = show ? "flex" : "none";
@@ -454,44 +498,58 @@ function getBackendUrl() {
     return { x, y };
   }
 
-  function updatePointer(standId) {
-    if (!standId) {
-      lineEl.style.display="none";
-      dotEl.style.display="none";
-      labelEl.style.display="none";
-      return;
-    }
-    const elem = elementForStand(standId);
-    if (!elem) return;
-
-    const standPt = getElementCenterInPage(elem);
-    const { x: labelCx, y: labelCy } = placeLabelSmart(standPt);
-    const wrapRect = planWrap.getBoundingClientRect();
-
-    const sx = standPt.x - wrapRect.left;
-    const sy = standPt.y - wrapRect.top;
-    const lx = labelCx - wrapRect.left;
-    const ly = labelCy - wrapRect.top;
-
-    const dx = sx - lx, dy = sy - ly;
-    const len = Math.sqrt(dx*dx + dy*dy);
-    const ang = Math.atan2(dy, dx);
-
-    lineEl.style.display="block";
-    lineEl.style.left = `${lx}px`;
-    lineEl.style.top = `${ly}px`;
-    lineEl.style.width = `${len}px`;
-    lineEl.style.transform = `rotate(${ang}rad)`;
-
-    dotEl.style.display="block";
-    dotEl.style.left = `${sx}px`;
-    dotEl.style.top = `${sy}px`;
-
-    labelEl.style.display="block";
-    labelEl.style.left = `${lx}px`;
-    labelEl.style.top = `${ly}px`;
-    labelStandEl.textContent = standId;
+  
+  function clearCallout(){
+    calloutSvg.innerHTML = "";
+    lozenge.style.display = "none";
+    lozStand.textContent = "—";
+    lozCompany.style.display = "none";
+    lozCompany.textContent = "";
   }
+
+  function drawCallout(standId, company){
+    const elem = elementForStand(standId);
+    if (!elem) { clearCallout(); return; }
+
+    // Update lozenge content
+    lozStand.textContent = standId;
+    if (company){
+      lozCompany.style.display = "block";
+      lozCompany.textContent = company;
+    } else {
+      lozCompany.style.display = "none";
+      lozCompany.textContent = "";
+    }
+    lozenge.style.display = "inline-block";
+
+    // Compute points in page coords
+    const standRect = elem.getBoundingClientRect();
+    const standPt = { x: standRect.left + standRect.width/2, y: standRect.top + standRect.height/2 };
+
+    const lozRect = lozenge.getBoundingClientRect();
+    const lozTop = { x: lozRect.left + lozRect.width/2, y: lozRect.top };
+
+    // Convert to planStack local coords
+    const stackRect = planStack.getBoundingClientRect();
+    const x1 = lozTop.x - stackRect.left;
+    const y1 = lozTop.y - stackRect.top;
+    const x2 = standPt.x - stackRect.left;
+    const y2 = standPt.y - stackRect.top;
+
+    // Set viewBox in pixels to match drawn coords
+    calloutSvg.setAttribute("viewBox", `0 0 ${stackRect.width} ${stackRect.height}`);
+    calloutSvg.setAttribute("preserveAspectRatio", "none");
+
+    // Dot radius from CSS var --dot (diameter). Default 10 => r=5
+    const dotPx = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--dot")) || 10;
+    const r = dotPx / 2;
+
+    calloutSvg.innerHTML = `
+      <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="rgba(0,0,0,.70)" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="${x2}" cy="${y2}" r="${r}" fill="rgba(0,0,0,.72)"/>
+    `;
+  }
+
 
   function applyColours() {
     rows.forEach(r => {
@@ -550,9 +608,23 @@ function getBackendUrl() {
     companyEl.value = row.company || "";
 
     applyColours();
-    updatePointer(row.standId);
+    drawCallout(row.standId, (row.status === "sold") ? (row.company||"") : "");
     renderTable();
     updateZoom(row.standId);
+  }
+
+  function forceBlackAndWhite(svg){
+    const all = svg.querySelectorAll("*");
+    all.forEach(n=>{
+      if (n.hasAttribute("style")) n.removeAttribute("style");
+      if (n.tagName !== "text"){
+        n.setAttribute("fill","none");
+        n.setAttribute("stroke","black");
+        n.setAttribute("stroke-width","1");
+      } else {
+        n.setAttribute("fill","black");
+      }
+    });
   }
 
   function updateZoom(standId) {
@@ -560,20 +632,22 @@ function getBackendUrl() {
     zoomRing.style.display = "none";
     if (!standId || !svgRoot) return;
 
-    // clone the SVG into zoom area
+    // clone the SVG into zoom area (raw SVG only)
     const clone = svgRoot.cloneNode(true);
+    forceBlackAndWhite(clone);
     zoomSvgHost.appendChild(clone);
     zoomSvgRoot = clone;
 
-    // find element inside clone
-    const key = normalizeDomId(standId);
-    const target = zoomSvgRoot.querySelector("#"+CSS.escape(standId)) ||
-                   zoomSvgRoot.querySelector("#"+CSS.escape("stand-"+standId)) ||
-                   Array.from(zoomSvgRoot.querySelectorAll("[id]")).find(n => normalizeDomId(n.id) === key);
+    // find element inside clone (prefer exact id match)
+    const target = zoomSvgRoot.querySelector("#"+CSS.escape(standId));
+    let resolved = target;
+    if (!resolved){
+      const key = normalizeDomId(standId);
+      resolved = Array.from(zoomSvgRoot.querySelectorAll("[id]")).find(n => normalizeDomId(n.id) === key);
+    }
+    if (!resolved || !resolved.getBBox) return;
 
-    if (!target || !target.getBBox) return;
-
-    const bbox = target.getBBox();
+    const bbox = resolved.getBBox();
     const pad = Math.max(40, Math.max(bbox.width, bbox.height) * 0.9);
     const vx = bbox.x - pad;
     const vy = bbox.y - pad;
@@ -586,11 +660,8 @@ function getBackendUrl() {
     zoomSvgRoot.style.height = "auto";
     zoomSvgRoot.style.display = "block";
 
-    // Draw ring around selected stand (in screen coords within zoomWrap)
-    // We map the target bbox center from SVG coords into zoomWrap client coords by using getBoundingClientRect on a small marker
-    // Easiest: use target.getBoundingClientRect() after layout
     requestAnimationFrame(() => {
-      const r = target.getBoundingClientRect();
+      const r = resolved.getBoundingClientRect();
       const zw = zoomWrap.getBoundingClientRect();
       const cx = (r.left + r.right)/2 - zw.left;
       const cy = (r.top + r.bottom)/2 - zw.top;
@@ -651,7 +722,7 @@ function getBackendUrl() {
     showToast(false);
   }
 
-  async function saveCurrent() {
+    async function saveCurrent() {
     if (!selectedStandId) return;
     const backend = getBackendUrl();
     const payload = {
@@ -660,28 +731,13 @@ function getBackendUrl() {
       company: (statusEl.value === "sold") ? companyEl.value.trim() : ""
     };
 
-    // Try common Worker patterns
-    let ok = false;
-    try {
-      await fetchJson(`${backend}/stands/${encodeURIComponent(selectedStandId)}`, {
-        method:"PUT",
+    try{
+      await fetchJson(`${backend}/stand`, {
+        method:"POST",
         headers:{ "Content-Type":"application/json" },
         body: JSON.stringify(payload)
       });
-      ok = true;
-    } catch (e1) {
-      try {
-        await fetchJson(`${backend}/stands`, {
-          method:"POST",
-          headers:{ "Content-Type":"application/json" },
-          body: JSON.stringify(payload)
-        });
-        ok = true;
-      } catch (e2) {
-        ok = false;
-      }
-    }
-    if (!ok) {
+    }catch(e){
       showToast(true);
       return;
     }
@@ -691,7 +747,7 @@ function getBackendUrl() {
     if (idx >= 0) rows[idx] = payload;
     applyColours();
     renderTable();
-    updatePointer(selectedStandId);
+    drawCallout(selectedStandId, (payload.status === "sold") ? payload.company : "");
     syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
   }
 
@@ -704,6 +760,13 @@ function getBackendUrl() {
 
   searchEl.addEventListener("input", renderTable);
   filterEl.addEventListener("change", renderTable);
+
+  window.addEventListener("resize", () => {
+    if (selectedStandId) {
+      const row = rows.find(r => r.standId === selectedStandId);
+      if (row) drawCallout(row.standId, (row.status === "sold") ? (row.company||"") : "");
+    }
+  });
 
   // Simple CSV export/import local to browser (does not need backend)
   el("exportBtn").addEventListener("click", () => {
@@ -764,6 +827,7 @@ function getBackendUrl() {
   // init
   (async () => {
     try {
+      await requireAdminPassword();
       await loadSvg();
     } catch(e) {
       showToast(true);
