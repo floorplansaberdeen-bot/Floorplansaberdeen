@@ -771,7 +771,15 @@
     svgRoot.style.height = "auto";
     svgRoot.style.display = "block";
 
+    // If stand numbers/text are on a separate layer, they can block clicks.
+    // Make text/images ignore pointer events so clicks reach the stand shapes.
+    svgRoot.querySelectorAll("text,image").forEach(n => {
+      try{ n.style.pointerEvents = "none"; }catch(e){}
+    });
+
     buildStandMap();
+    // Visual hint: stands are clickable on desktop
+    standMap.forEach((node) => { try{ node.style.cursor = "pointer"; }catch(e){} });
 
     // click-to-select
     svgRoot.style.pointerEvents = "auto";
