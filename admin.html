@@ -379,6 +379,7 @@
 
   let autoSync = true;
   let syncTimer = null;
+  let saveInFlight = false;
 
   // Pause auto-refresh while the user is editing fields (prevents resets mid-typing)
   function isEditing(){
@@ -784,21 +785,22 @@
       // On phones, use the list only (no plan tapping)
       if (window.matchMedia && window.matchMedia('(max-width: 640px)').matches) return;
 
-      const t = ev.target;
-      let node = null;
-      if (t && t.closest) node = t.closest("[id]");
-      // Ensure the node is inside this svg
-      if (!node || !svgRoot.contains(node) || !node.id) return;
-
-      const key = normalizeDomId(node.id);
-      const found = rows.find(r => normalizeDomId(r.standId) === key);
-      if (found) selectStand(found.standId);
+      let node = ev.target;
+      // Walk up through parents and find the first id that matches a known stand
+      for (let i=0; i<30 && node && node !== svgRoot; i++){
+        if (node.id){
+          const key = normalizeDomId(node.id);
+          const found = rows.find(r => normalizeDomId(r.standId) === key);
+          if (found) { selectStand(found.standId); return; }
+        }
+        node = node.parentNode;
+      }
     }, { passive:true });
   }
 
   async function loadData() {
     const backend = getBackendUrl();
-    const data = await fetchJson(`${backend}/stands`);
+    const data = await fetchJson(`${backend}/stands?ts=${Date.now()}`);
     rows = (Array.isArray(data) ? data : []).map(normRow).filter(r => r.standId);
 
     applyColours();
@@ -819,7 +821,8 @@
   }
 
   async function saveCurrent() {
-    if (!selectedStandId) return;
+    saveInFlight = true;
+    if (!selectedStandId) { saveInFlight = false; return; }
     const backend = getBackendUrl();
     const payload = {
       standId: selectedStandId,
@@ -836,6 +839,8 @@
     }catch(e){
       showToast(true);
       return;
+    }finally{
+      saveInFlight = false;
     }
 
     const idx = rows.findIndex(r => r.standId === selectedStandId);
@@ -844,6 +849,9 @@
     applyColours();
     renderTable();
     drawCallout(selectedStandId);
+
+    // Pull fresh data back from backend (authoritative) to prevent reverts
+    try{ await loadData(); }catch(e){}
     syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
   }
 
@@ -948,6 +956,7 @@
     syncTimer = setInterval(async () => {
       if (!autoSync) return;
       if (isEditing()) return; // don't refresh while typing/choosing
+      if (saveInFlight) return; // don't refresh while saving
       try { await loadData(); } catch(e){ showToast(true); }
     }, 8000);
   }
