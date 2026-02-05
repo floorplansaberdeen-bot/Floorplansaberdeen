@@ -633,13 +633,12 @@ function getBackendUrl() {
     buildStandMap();
 
     // click-to-select (desktop & mobile is OK for admin)
+    // click-to-select (desktop & mobile is OK for admin)
+    svgRoot.style.pointerEvents = "auto";
     svgRoot.addEventListener("click", (ev) => {
       let node = ev.target;
-      for (let i=0;i<6 && node;i++){
-        if (node.id) break;
-        node = node.parentElement;
-      }
-      if (!node || !node.id) return;
+      while (node && node !== svgRoot && !node.id) node = node.parentElement;
+      if (!node || node === svgRoot || !node.id) return;
       const key = normalizeDomId(node.id);
       const found = rows.find(r => normalizeDomId(r.standId) === key);
       if (found) selectStand(found.standId);
