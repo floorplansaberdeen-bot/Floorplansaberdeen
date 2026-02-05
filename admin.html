@@ -5,37 +5,780 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Floorplan Admin</title>
   <style>
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f6f7f8}
-    header{padding:14px 16px;background:#fff;border-bottom:1px solid #ddd}
-    main{display:grid;grid-template-columns:1.4fr .6fr;gap:14px;padding:14px}
-    .card{background:#fff;border:1px solid #ddd;border-radius:12px;overflow:hidden}
-    #planWrap{position:relative}
-    #planSvg{width:100%;display:block}
-    #calloutOverlay{position:absolute;inset:0;pointer-events:none}
-    #labelBay{padding:14px;border-top:1px solid #ddd;min-height:56px}
-    #lozenge{background:#fff;border-radius:999px;padding:10px 14px;box-shadow:0 2px 10px rgba(0,0,0,.15);display:inline-block}
+    :root{
+      --bg:#ffffff;
+      --card:#ffffff;
+      --border:#e9e9e9;
+      --text:#111;
+      --muted:#666;
+      --avail: rgba(213,109,50,0.75);
+      --sold:#e63b3b;
+      --shadow: 0 12px 30px rgba(0,0,0,.12);
+      --dot: 10px; /* dot size for pointer (match public) */
+      --line: rgba(0,0,0,.70);
+      --safe: env(safe-area-inset-bottom, 0px);
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      background:var(--bg); color:var(--text);
+    }
+    header{
+      padding:14px 16px;
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      border-bottom:1px solid var(--border);
+      flex-wrap:wrap;
+    }
+    header .title{ font-weight:900; font-size:18px; }
+    header .tools{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    header input{
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid var(--border);
+      min-width: 260px;
+      font-weight:700;
+    }
+    button{
+      border:1px solid var(--border);
+      background:#fff;
+      padding:10px 14px;
+      border-radius:12px;
+      font-weight:800;
+      cursor:pointer;
+    }
+    button.danger{ border-color:#ffd0d0; background:#fff5f5; }
+    button:disabled{ opacity:.45; cursor:not-allowed; }
+    main{
+      padding:16px;
+      display:grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap:16px;
+      align-items:start;
+    }
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:16px;
+      box-shadow: 0 1px 0 rgba(0,0,0,.02);
+    }
+    .cardHead{
+      padding:10px 12px;
+      font-weight:900;
+      border-bottom:1px solid var(--border);
+    }
+    .planCard{ overflow:hidden; }
+    .planBody{ padding:12px; }
+    .planWrap{
+      position:relative;
+      border-radius:14px;
+      overflow:hidden;
+      background:#fff;
+      min-height:420px;
+    }
+    .svgHost{ width:100%; height:auto; display:block; }
+    .overlay{ position:absolute; inset:0; pointer-events:none; }
+    .label{
+      position:absolute;
+      background:var(--sold);
+      color:#fff;
+      border-radius:16px;
+      padding:12px 16px;
+      box-shadow: var(--shadow);
+      min-width: 200px;
+      max-width: 300px;
+      text-align:left;
+      pointer-events:none;
+      transform: translate(-50%, -50%);
+    }
+    .label .stand{ font-size:28px; font-weight:900; }
+    .line{
+      position:absolute; background:var(--line);
+      transform-origin:0 0; height:3px; border-radius:3px;
+    }
+    .dot{
+      position:absolute; width:var(--dot); height:var(--dot);
+      border-radius:999px; background:rgba(0,0,0,.72);
+      transform: translate(-50%, -50%);
+    }
+    .legend{ padding:10px 12px; display:flex; gap:10px; align-items:center; border-top:1px solid var(--border); }
+    .pill{ display:flex; align-items:center; gap:8px; border:1px solid var(--border); padding:6px 10px; border-radius:999px; font-weight:800; font-size:13px; }
+    .sw{ width:10px; height:10px; border-radius:999px; display:inline-block; }
+    .zoomCard .cardHead{ display:flex; justify-content:space-between; }
+    .zoomBody{ padding:12px; }
+    .zoomWrap{
+      position:relative;
+      border:1px solid var(--border);
+      border-radius:14px;
+      overflow:hidden;
+      min-height:260px;
+      background:#fff;
+    }
+    .zoomSvgHost{ width:100%; height:auto; display:block; }
+    .zoomRing{
+      position:absolute;
+      border:4px solid rgba(0,0,0,.75);
+      border-radius:999px;
+      pointer-events:none;
+      box-shadow: 0 6px 18px rgba(0,0,0,.12);
+      display:none;
+    }
+    .hint{ color:var(--muted); font-size:13px; padding:10px 12px 12px; }
+    .side{ padding:12px; display:flex; flex-direction:column; gap:12px; }
+    .formRow{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+    .side label{ display:block; font-weight:800; font-size:12px; color:var(--muted); margin-bottom:6px; }
+    .side input, .side select{
+      width:100%; padding:10px 12px; border-radius:12px; border:1px solid var(--border);
+      font-weight:700;
+    }
+    .btnRow{ display:flex; gap:10px; }
+    .btnRow button{ flex:1; }
+    .tableWrap{ border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+    .tableTools{ padding:10px; display:flex; gap:10px; align-items:center; }
+    .tableTools input{
+      flex:1; padding:10px 12px; border-radius:12px; border:1px solid var(--border);
+    }
+    table{ width:100%; border-collapse:collapse; font-size:13px; }
+    th, td{ padding:10px 10px; border-top:1px solid #f0f0f0; text-align:left; }
+    th{ background:#fafafa; border-top:none; font-size:12px; color:var(--muted); }
+    tr.active{ background:#f5f8ff; outline:2px solid #c9d5ff; outline-offset:-2px; }
+    .badge{ display:inline-flex; align-items:center; padding:3px 8px; border-radius:999px; font-weight:900; font-size:12px; border:1px solid var(--border); }
+    .bSold{ color:#b40000; border-color:#ffd0d0; background:#fff5f5; }
+    .bAvail{ color:#6b3a0f; border-color:#f2dfcf; background:#fff7f0; }
+    .toast{
+      position:fixed;
+      left:16px; right:16px; bottom:16px;
+      background:#111; color:#fff;
+      padding:12px 14px;
+      border-radius:14px;
+      display:none;
+      z-index:999;
+      box-shadow: var(--shadow);
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+    }
+    .toast .msg{ font-weight:800; font-size:13px; line-height:1.3; }
+    .toast .actions{ display:flex; gap:10px; }
+    .toast button{ background:#fff; }
+
+    @media (max-width: 980px){
+      main{ grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px){
+      main{ padding:12px; gap:12px; }
+      header input{ min-width: 200px; width: 100%; }
+      .planWrap{ min-height: 300px; }
+      /* Sticky plan + zoom on phone, scroll stands list */
+      .planCard{ position: sticky; top: 0; z-index: 20; background: var(--bg); }
+      .zoomCard{ position: sticky; top: 320px; z-index: 19; background: var(--bg); }
+      .tableWrap{ padding-bottom: calc(14px + var(--safe)); }
+    }
   </style>
 </head>
 <body>
-<header><strong>Floorplan Admin</strong></header>
-<main>
-  <section class="card">
-    <div id="planWrap">
-      <div id="svgHost"></div>
-      <svg id="calloutOverlay"></svg>
-    </div>
-    <div id="labelBay">
-      <div id="lozenge" hidden>
-        <strong id="lzStandId"></strong>
-        <div id="lzCompany"></div>
+  <header>
+    <div class="title">Floorplan Admin</div>
+    <div class="tools">
+      <div style="color:var(--muted); font-weight:800;">Synced: <span id="syncedAt">—</span></div>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <div style="font-weight:900;">Event name</div>
+        <input id="eventName" placeholder="New Event" />
       </div>
+      <button id="pauseBtn">Pause sync</button>
+      <button id="exportBtn">Export CSV</button>
+      <button id="importBtn">Import CSV</button>
+      <button class="danger" id="resetBtn">Reset all</button>
     </div>
-    <svg id="zoomSvg"></svg>
-  </section>
-  <aside class="card" style="padding:12px">
-    <p>This is the admin panel shell.</p>
-    <p>Backend + SVG logic already wired.</p>
-  </aside>
-</main>
+  </header>
+
+  <main>
+    <section class="card planCard">
+      <div class="cardHead">Plan</div>
+      <div class="planBody">
+        <div class="planWrap" id="planWrap">
+          <div id="svgHost" class="svgHost"></div>
+          <div class="overlay" id="overlay" aria-hidden="true">
+            <div class="line" id="line" style="display:none;"></div>
+            <div class="dot" id="dot" style="display:none;"></div>
+            <div class="label" id="label" style="display:none;">
+              <div class="stand" id="labelStand">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="legend">
+        <div class="pill"><span class="sw" style="background:var(--sold)"></span>Sold</div>
+        <div class="pill"><span class="sw" style="background:var(--avail)"></span>Available</div>
+      </div>
+
+      <section class="card zoomCard" style="margin:12px;">
+        <div class="cardHead">Zoom</div>
+        <div class="zoomBody">
+          <div class="zoomWrap" id="zoomWrap">
+            <div id="zoomSvgHost" class="zoomSvgHost"></div>
+            <div class="zoomRing" id="zoomRing"></div>
+          </div>
+          <div class="hint">Select a stand to zoom in.</div>
+        </div>
+      </section>
+    </section>
+
+    <aside class="card side">
+      <div class="card" style="border:1px solid var(--border); border-radius:14px; padding:12px;">
+        <div style="font-weight:900; margin-bottom:10px;">Selected Stand</div>
+
+        <div style="margin-bottom:10px;">
+          <label>Stand ID</label>
+          <input id="standId" disabled />
+        </div>
+
+        <div class="formRow" style="margin-bottom:10px;">
+          <div>
+            <label>Status</label>
+            <select id="status">
+              <option value="available">Available</option>
+              <option value="sold">Sold</option>
+            </select>
+          </div>
+          <div>
+            <label>Company (sold only)</label>
+            <input id="company" placeholder="Company name…" />
+          </div>
+        </div>
+
+        <div class="btnRow">
+          <button id="saveBtn">Save</button>
+          <button id="markAvailBtn" class="danger">Mark Available</button>
+        </div>
+
+        <div class="hint" style="padding:10px 0 0;">Click a stand on the plan or in the list to edit.</div>
+      </div>
+
+      <div class="card" style="border:1px solid var(--border); border-radius:14px;">
+        <div class="cardHead">Stands</div>
+        <div class="tableTools">
+          <input id="search" placeholder="Search stand or company…" />
+          <select id="filter" style="width:120px; padding:10px 12px; border-radius:12px; border:1px solid var(--border); font-weight:800;">
+            <option value="all">All</option>
+            <option value="sold">Sold</option>
+            <option value="available">Available</option>
+          </select>
+        </div>
+        <div style="padding:0 12px 10px; color:var(--muted); font-weight:800;"><span id="count">0</span> / <span id="total">0</span></div>
+        <div class="tableWrap">
+          <table>
+            <thead>
+              <tr><th style="width:90px;">Stand</th><th style="width:120px;">Status</th><th>Company</th></tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <div class="toast" id="toast">
+    <div class="msg" id="toastMsg">Can't reach the backend right now (this is why the page won't load). If Cloudflare is down, paste your Google Apps Script Web App URL instead.</div>
+    <div class="actions">
+      <button id="setBackendBtn">Set backend URL</button>
+      <button id="hideToastBtn">Hide</button>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const DEFAULT_BACKEND = "https://floorplansaberdeen.floorplansaberdeen.workers.dev";
+  const BACKEND_KEY = "floorplan_backend_url";
+  const SVG_URL = "./event_plan.svg";
+
+  const el = (id) => document.getElementById(id);
+
+  const planWrap = el("planWrap");
+  const svgHost = el("svgHost");
+  const zoomWrap = el("zoomWrap");
+  const zoomSvgHost = el("zoomSvgHost");
+  const zoomRing = el("zoomRing");
+
+  const overlay = el("overlay");
+  const lineEl = el("line");
+  const dotEl = el("dot");
+  const labelEl = el("label");
+  const labelStandEl = el("labelStand");
+
+  const tbody = el("tbody");
+  const searchEl = el("search");
+  const filterEl = el("filter");
+  const countEl = el("count");
+  const totalEl = el("total");
+
+  const standIdEl = el("standId");
+  const statusEl = el("status");
+  const companyEl = el("company");
+  const saveBtn = el("saveBtn");
+  const markAvailBtn = el("markAvailBtn");
+
+  const toast = el("toast");
+  const setBackendBtn = el("setBackendBtn");
+  const hideToastBtn = el("hideToastBtn");
+  const syncedAt = el("syncedAt");
+
+  let svgRoot = null;
+  let zoomSvgRoot = null;
+  let standMap = new Map();
+
+  let rows = [];
+  let selectedStandId = null;
+  let autoSync = true;
+  let syncTimer = null;
+
+  function normalizeBackendUrl(input) {
+  if (!input) return "";
+  let s = String(input).trim();
+  // If someone pastes a full endpoint (e.g. .../stands), strip it back to the base.
+  try {
+    const u = new URL(s);
+    let p = u.pathname.replace(/\/+$/,"");
+    p = p.replace(/\/(api\/stands|stands)$/i, "");
+    p = p.replace(/\/+$/,"");
+    u.pathname = p ? p : "/";
+    u.search = "";
+    u.hash = "";
+    const base = u.origin + (u.pathname === "/" ? "" : u.pathname);
+    return base.replace(/\/+$/,"");
+  } catch (e) {
+    s = s.replace(/\/+$/,"");
+    s = s.replace(/\/(api\/stands|stands)$/i, "");
+    return s.replace(/\/+$/,"");
+  }
+}
+
+function getBackendUrl() {
+    const saved = localStorage.getItem(BACKEND_KEY);
+    const base = (saved && saved.startsWith("http")) ? saved : DEFAULT_BACKEND;
+    return normalizeBackendUrl(base);
+  }
+
+  function showToast(show) {
+    toast.style.display = show ? "flex" : "none";
+  }
+
+  setBackendBtn.addEventListener("click", () => {
+    const current = getBackendUrl();
+    const v = prompt("Paste your backend URL (Cloudflare Worker or Google Apps Script Web App):", current);
+    if (v && v.trim().startsWith("http")) {
+      localStorage.setItem(BACKEND_KEY, v.trim().replace(/\/+$/,""));
+      location.reload();
+    }
+  });
+  hideToastBtn.addEventListener("click", () => showToast(false));
+
+  async function fetchJson(url, opts = {}) {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 12000);
+    try {
+      const res = await fetch(url, { ...opts, signal: controller.signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } finally {
+      clearTimeout(t);
+    }
+  }
+
+  function normStandId(s){ return String(s||"").trim().toUpperCase(); }
+  function normRow(row) {
+    return {
+      standId: normStandId(row.standId ?? row.stand ?? row.id),
+      status: String(row.status || "available").toLowerCase(),
+      company: String(row.company || "").trim()
+    };
+  }
+
+  function normalizeDomId(id) {
+    return String(id || "")
+      .trim()
+      .toUpperCase()
+      .replace(/^STAND[_-]?/,"")
+      .replace(/^ZONE[_-]?/,"")
+      .replace(/^ID[_-]?/,"")
+      .replace(/[^A-Z0-9]/g,"");
+  }
+
+  function buildStandMap() {
+    standMap.clear();
+    if (!svgRoot) return;
+    svgRoot.querySelectorAll("[id]").forEach(node => {
+      const key = normalizeDomId(node.id);
+      if (key && !standMap.has(key)) standMap.set(key, node);
+    });
+    svgRoot.querySelectorAll("[data-stand]").forEach(node => {
+      const key = normalizeDomId(node.getAttribute("data-stand"));
+      if (key && !standMap.has(key)) standMap.set(key, node);
+    });
+  }
+
+  function elementForStand(standId){
+    return standMap.get(normalizeDomId(standId)) || null;
+  }
+
+  function setFillForElement(elem, rgba) {
+    if (!elem) return;
+    const shapes = elem.matches("path,rect,polygon,polyline,ellipse,circle")
+      ? [elem]
+      : Array.from(elem.querySelectorAll("path,rect,polygon,polyline,ellipse,circle"));
+
+    shapes.forEach(s => {
+      const bbox = s.getBBox ? s.getBBox() : null;
+      if (bbox && (bbox.width < 8 || bbox.height < 8)) return;
+      s.style.fill = rgba;
+      s.style.fillOpacity = "1";
+    });
+  }
+
+  function getElementCenterInPage(elem){
+    const r = elem.getBoundingClientRect();
+    return { x: r.left + r.width/2, y: r.top + r.height/2, w:r.width, h:r.height };
+  }
+
+  function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
+
+  function placeLabelSmart(standPt) {
+    const wrapRect = planWrap.getBoundingClientRect();
+    const margin = 26;
+    const labelW = 240;
+    const labelH = 78;
+
+    const standXRel = (standPt.x - wrapRect.left) / wrapRect.width;
+    const onLeft = standXRel > 0.55;
+    const x = onLeft ? (wrapRect.left + margin + labelW/2) : (wrapRect.right - margin - labelW/2);
+    const y = clamp(standPt.y, wrapRect.top + margin + labelH/2, wrapRect.bottom - margin - labelH/2);
+    return { x, y };
+  }
+
+  function updatePointer(standId) {
+    if (!standId) {
+      lineEl.style.display="none";
+      dotEl.style.display="none";
+      labelEl.style.display="none";
+      return;
+    }
+    const elem = elementForStand(standId);
+    if (!elem) return;
+
+    const standPt = getElementCenterInPage(elem);
+    const { x: labelCx, y: labelCy } = placeLabelSmart(standPt);
+    const wrapRect = planWrap.getBoundingClientRect();
+
+    const sx = standPt.x - wrapRect.left;
+    const sy = standPt.y - wrapRect.top;
+    const lx = labelCx - wrapRect.left;
+    const ly = labelCy - wrapRect.top;
+
+    const dx = sx - lx, dy = sy - ly;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    const ang = Math.atan2(dy, dx);
+
+    lineEl.style.display="block";
+    lineEl.style.left = `${lx}px`;
+    lineEl.style.top = `${ly}px`;
+    lineEl.style.width = `${len}px`;
+    lineEl.style.transform = `rotate(${ang}rad)`;
+
+    dotEl.style.display="block";
+    dotEl.style.left = `${sx}px`;
+    dotEl.style.top = `${sy}px`;
+
+    labelEl.style.display="block";
+    labelEl.style.left = `${lx}px`;
+    labelEl.style.top = `${ly}px`;
+    labelStandEl.textContent = standId;
+  }
+
+  function applyColours() {
+    rows.forEach(r => {
+      const elem = elementForStand(r.standId);
+      if (!elem) return;
+      setFillForElement(elem, r.status === "sold"
+        ? getComputedStyle(document.documentElement).getPropertyValue("--sold").trim()
+        : getComputedStyle(document.documentElement).getPropertyValue("--avail").trim()
+      );
+    });
+  }
+
+  function renderTable() {
+    const q = (searchEl.value || "").trim().toLowerCase();
+    const f = filterEl.value;
+
+    const filtered = rows.filter(r => {
+      if (f !== "all" && r.status !== f) return false;
+      if (!q) return true;
+      return r.standId.toLowerCase().includes(q) || (r.company||"").toLowerCase().includes(q);
+    });
+
+    tbody.innerHTML = "";
+    filtered.forEach(r => {
+      const tr = document.createElement("tr");
+      if (r.standId === selectedStandId) tr.classList.add("active");
+
+      const td1 = document.createElement("td");
+      td1.textContent = r.standId;
+
+      const td2 = document.createElement("td");
+      const badge = document.createElement("span");
+      badge.className = "badge " + (r.status === "sold" ? "bSold" : "bAvail");
+      badge.textContent = r.status === "sold" ? "Sold" : "Available";
+      td2.appendChild(badge);
+
+      const td3 = document.createElement("td");
+      td3.textContent = r.company || "";
+
+      tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
+      tr.addEventListener("click", () => selectStand(r.standId));
+      tbody.appendChild(tr);
+    });
+
+    countEl.textContent = String(filtered.length);
+    totalEl.textContent = String(rows.length);
+  }
+
+  function selectStand(standId) {
+    selectedStandId = normStandId(standId);
+    const row = rows.find(r => r.standId === selectedStandId);
+    if (!row) return;
+
+    standIdEl.value = row.standId;
+    statusEl.value = row.status;
+    companyEl.value = row.company || "";
+
+    applyColours();
+    updatePointer(row.standId);
+    renderTable();
+    updateZoom(row.standId);
+  }
+
+  function updateZoom(standId) {
+    zoomSvgHost.innerHTML = "";
+    zoomRing.style.display = "none";
+    if (!standId || !svgRoot) return;
+
+    // clone the SVG into zoom area
+    const clone = svgRoot.cloneNode(true);
+    zoomSvgHost.appendChild(clone);
+    zoomSvgRoot = clone;
+
+    // find element inside clone
+    const key = normalizeDomId(standId);
+    const target = zoomSvgRoot.querySelector("#"+CSS.escape(standId)) ||
+                   zoomSvgRoot.querySelector("#"+CSS.escape("stand-"+standId)) ||
+                   Array.from(zoomSvgRoot.querySelectorAll("[id]")).find(n => normalizeDomId(n.id) === key);
+
+    if (!target || !target.getBBox) return;
+
+    const bbox = target.getBBox();
+    const pad = Math.max(40, Math.max(bbox.width, bbox.height) * 0.9);
+    const vx = bbox.x - pad;
+    const vy = bbox.y - pad;
+    const vw = bbox.width + pad*2;
+    const vh = bbox.height + pad*2;
+
+    zoomSvgRoot.setAttribute("viewBox", `${vx} ${vy} ${vw} ${vh}`);
+    zoomSvgRoot.setAttribute("preserveAspectRatio","xMidYMid meet");
+    zoomSvgRoot.style.width = "100%";
+    zoomSvgRoot.style.height = "auto";
+    zoomSvgRoot.style.display = "block";
+
+    // Draw ring around selected stand (in screen coords within zoomWrap)
+    // We map the target bbox center from SVG coords into zoomWrap client coords by using getBoundingClientRect on a small marker
+    // Easiest: use target.getBoundingClientRect() after layout
+    requestAnimationFrame(() => {
+      const r = target.getBoundingClientRect();
+      const zw = zoomWrap.getBoundingClientRect();
+      const cx = (r.left + r.right)/2 - zw.left;
+      const cy = (r.top + r.bottom)/2 - zw.top;
+      const radius = Math.max(18, Math.min(60, Math.max(r.width, r.height) * 0.9));
+
+      zoomRing.style.display = "block";
+      zoomRing.style.width = `${radius*2}px`;
+      zoomRing.style.height = `${radius*2}px`;
+      zoomRing.style.left = `${cx - radius}px`;
+      zoomRing.style.top = `${cy - radius}px`;
+    });
+  }
+
+  async function loadSvg() {
+    const res = await fetch(SVG_URL);
+    if (!res.ok) throw new Error("Could not load SVG");
+    const txt = await res.text();
+    svgHost.innerHTML = txt;
+    svgRoot = svgHost.querySelector("svg");
+    if (!svgRoot) throw new Error("SVG invalid");
+
+    // Hide any stray huge circle at 0,0 (the “quarter circle” artifact)
+    svgRoot.querySelectorAll("circle").forEach(c => {
+      const cx = c.getAttribute("cx"), cy = c.getAttribute("cy"), r = parseFloat(c.getAttribute("r") || "0");
+      if ((cx === "0" || cx === "0.0") && (cy === "0" || cy === "0.0") && r >= 20) {
+        c.style.display = "none";
+      }
+    });
+
+    svgRoot.setAttribute("preserveAspectRatio","xMidYMid meet");
+    svgRoot.style.width = "100%";
+    svgRoot.style.height = "auto";
+    svgRoot.style.display = "block";
+
+    buildStandMap();
+
+    // click-to-select (desktop & mobile is OK for admin)
+    svgRoot.addEventListener("click", (ev) => {
+      let node = ev.target;
+      for (let i=0;i<6 && node;i++){
+        if (node.id) break;
+        node = node.parentElement;
+      }
+      if (!node || !node.id) return;
+      const key = normalizeDomId(node.id);
+      const found = rows.find(r => normalizeDomId(r.standId) === key);
+      if (found) selectStand(found.standId);
+    }, { passive:true });
+  }
+
+  async function loadData() {
+    const backend = getBackendUrl();
+    const data = await fetchJson(`${backend}/stands`);
+    rows = (Array.isArray(data) ? data : []).map(normRow).filter(r => r.standId);
+    applyColours();
+    renderTable();
+    syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+    showToast(false);
+  }
+
+  async function saveCurrent() {
+    if (!selectedStandId) return;
+    const backend = getBackendUrl();
+    const payload = {
+      standId: selectedStandId,
+      status: statusEl.value,
+      company: (statusEl.value === "sold") ? companyEl.value.trim() : ""
+    };
+
+    // Try common Worker patterns
+    let ok = false;
+    try {
+      await fetchJson(`${backend}/stands/${encodeURIComponent(selectedStandId)}`, {
+        method:"PUT",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify(payload)
+      });
+      ok = true;
+    } catch (e1) {
+      try {
+        await fetchJson(`${backend}/stands`, {
+          method:"POST",
+          headers:{ "Content-Type":"application/json" },
+          body: JSON.stringify(payload)
+        });
+        ok = true;
+      } catch (e2) {
+        ok = false;
+      }
+    }
+    if (!ok) {
+      showToast(true);
+      return;
+    }
+
+    // Update local copy immediately (so plan updates)
+    const idx = rows.findIndex(r => r.standId === selectedStandId);
+    if (idx >= 0) rows[idx] = payload;
+    applyColours();
+    renderTable();
+    updatePointer(selectedStandId);
+    syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+  }
+
+  saveBtn.addEventListener("click", saveCurrent);
+  markAvailBtn.addEventListener("click", () => {
+    statusEl.value = "available";
+    companyEl.value = "";
+    saveCurrent();
+  });
+
+  searchEl.addEventListener("input", renderTable);
+  filterEl.addEventListener("change", renderTable);
+
+  // Simple CSV export/import local to browser (does not need backend)
+  el("exportBtn").addEventListener("click", () => {
+    const lines = ["standId,status,company"].concat(rows.map(r => {
+      const c = (r.company||"").replaceAll('"','""');
+      return `${r.standId},${r.status},"${c}"`;
+    }));
+    const blob = new Blob([lines.join("\n")], { type:"text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "stands.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  el("importBtn").addEventListener("click", async () => {
+    const inp = document.createElement("input");
+    inp.type="file";
+    inp.accept=".csv,text/csv";
+    inp.onchange = async () => {
+      const f = inp.files && inp.files[0];
+      if (!f) return;
+      const txt = await f.text();
+      const lines = txt.split(/\r?\n/).filter(Boolean);
+      const out = [];
+      for (let i=1;i<lines.length;i++){
+        const line = lines[i];
+        const m = line.match(/^([^,]+),([^,]+),"(.*)"$/);
+        if (!m) continue;
+        out.push({ standId: normStandId(m[1]), status: m[2].trim().toLowerCase(), company: m[3].replaceAll('""','"') });
+      }
+      rows = out;
+      applyColours();
+      renderTable();
+    };
+    inp.click();
+  });
+
+  // Pause sync (polling) - optional
+  el("pauseBtn").addEventListener("click", () => {
+    autoSync = !autoSync;
+    el("pauseBtn").textContent = autoSync ? "Pause sync" : "Resume sync";
+    if (autoSync) startPolling(); else stopPolling();
+  });
+
+  function startPolling(){
+    stopPolling();
+    syncTimer = setInterval(async () => {
+      if (!autoSync) return;
+      try { await loadData(); } catch(e){ showToast(true); }
+    }, 8000);
+  }
+  function stopPolling(){
+    if (syncTimer) clearInterval(syncTimer);
+    syncTimer = null;
+  }
+
+  // init
+  (async () => {
+    try {
+      await loadSvg();
+    } catch(e) {
+      showToast(true);
+      console.error(e);
+      return;
+    }
+    try {
+      await loadData();
+      startPolling();
+    } catch(e) {
+      showToast(true);
+      console.error(e);
+    }
+  })();
+})();
+</script>
 </body>
 </html>

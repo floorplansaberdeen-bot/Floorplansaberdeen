@@ -58,7 +58,6 @@
       box-shadow: 0 1px 0 rgba(0,0,0,.02);
     }
     .planCard{ padding:14px; }
-    .planStack{ position:relative; border-radius:14px; overflow:hidden; background:#fff; }
     .planWrap{
       position:relative;
       border-radius:14px;
@@ -72,12 +71,11 @@
       height:auto;
       display:block;
     }
-    .calloutSvg{ position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; }
-    .labelBay{ background:#fff; border-top:1px solid var(--border); padding:12px; min-height:72px; }
-    .lozenge{ display:inline-block; background:#fff; border-radius:999px; padding:12px 16px; box-shadow: var(--shadow); border:1px solid rgba(0,0,0,.08); max-width: 320px; }
-    .lozStand{ font-size:34px; font-weight:900; line-height:1.1; }
-    .lozCompany{ margin-top:4px; font-size:18px; font-weight:800; opacity:.9; }
-
+    .overlay{
+      position:absolute; inset:0;
+      pointer-events:none;
+    }
+    /* pointer label */
     .label{
       position:absolute;
       background:var(--selected);
@@ -189,24 +187,17 @@
 
   <main>
     <section class="card planCard">
-      <div class="planStack" id="planStack">
       <div class="planWrap" id="planWrap">
         <div id="svgHost" class="svgHost"></div>
-        <div class="dot" id="dot" style="display:none;"></div>
+        <div class="overlay" id="overlay" aria-hidden="true">
+          <div class="line" id="line" style="display:none;"></div>
+          <div class="dot" id="dot" style="display:none;"></div>
           <div class="label" id="label" style="display:none;">
             <div class="stand" id="labelStand">—</div>
             <div class="company" id="labelCompany" style="display:none;"></div>
           </div>
         </div>
       </div>
-      <div class="labelBay" id="labelBay">
-        <div class="lozenge" id="lozenge" style="display:none;">
-          <div class="lozStand" id="lozStand">—</div>
-          <div class="lozCompany" id="lozCompany" style="display:none;"></div>
-        </div>
-      </div>
-      <svg class="calloutSvg" id="calloutSvg" aria-hidden="true"></svg>
-    </div>
     </section>
 
     <aside class="card rightCol">
@@ -242,11 +233,12 @@
   const el = (id) => document.getElementById(id);
   const planWrap = el("planWrap");
   const svgHost = el("svgHost");
-  const planStack = el("planStack");
-  const calloutSvg = el("calloutSvg");
-  const lozenge = el("lozenge");
-  const lozStand = el("lozStand");
-  const lozCompany = el("lozCompany");
+  const overlay = el("overlay");
+  const lineEl = el("line");
+  const dotEl = el("dot");
+  const labelEl = el("label");
+  const labelStandEl = el("labelStand");
+  const labelCompanyEl = el("labelCompany");
   const selStandEl = el("selStand");
   const selCompanyEl = el("selCompany");
   const listEl = el("list");
@@ -398,54 +390,64 @@ function getBackendUrl() {
     return { x, y, labelW, labelH };
   }
 
-  
-  function clearCallout(){
-    calloutSvg.innerHTML = "";
-    lozenge.style.display = "none";
-    lozStand.textContent = "—";
-    lozCompany.style.display = "none";
-    lozCompany.textContent = "";
-  }
-
-  function drawCallout(selected){
-    if (!selected || !selected.standId) { clearCallout(); return; }
-    const elem = elementForStand(selected.standId);
-    if (!elem) { clearCallout(); return; }
-
-    lozStand.textContent = selected.standId;
-    if (selected.company){
-      lozCompany.style.display = "block";
-      lozCompany.textContent = selected.company;
-    } else {
-      lozCompany.style.display = "none";
-      lozCompany.textContent = "";
+  function updatePointer(selected) {
+    if (!selected || !selected.standId) {
+      lineEl.style.display = "none";
+      dotEl.style.display = "none";
+      labelEl.style.display = "none";
+      return;
     }
-    lozenge.style.display = "inline-block";
+    const elem = elementForStand(selected.standId);
+    if (!elem) {
+      updatePointer(null);
+      return;
+    }
 
-    const standRect = elem.getBoundingClientRect();
-    const standPt = { x: standRect.left + standRect.width/2, y: standRect.top + standRect.height/2 };
+    const standPt = getElementCenterInPage(elem);
+    const { x: labelCx, y: labelCy } = placeLabelSmart(standPt);
 
-    const lozRect = lozenge.getBoundingClientRect();
-    const lozTop = { x: lozRect.left + lozRect.width/2, y: lozRect.top };
+    // Convert page coords -> overlay coords
+    const wrapRect = planWrap.getBoundingClientRect();
+    const sx = standPt.x - wrapRect.left;
+    const sy = standPt.y - wrapRect.top;
 
-    const stackRect = planStack.getBoundingClientRect();
-    const x1 = lozTop.x - stackRect.left;
-    const y1 = lozTop.y - stackRect.top;
-    const x2 = standPt.x - stackRect.left;
-    const y2 = standPt.y - stackRect.top;
+    const lx = labelCx - wrapRect.left;
+    const ly = labelCy - wrapRect.top;
 
-    calloutSvg.setAttribute("viewBox", `0 0 ${stackRect.width} ${stackRect.height}`);
-    calloutSvg.setAttribute("preserveAspectRatio", "none");
+    // line
+    const dx = sx - lx;
+    const dy = sy - ly;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    const ang = Math.atan2(dy, dx);
 
-    const dotPx = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--dot")) || 10;
-    const r = dotPx / 2;
+    lineEl.style.display = "block";
+    lineEl.style.left = `${lx}px`;
+    lineEl.style.top = `${ly}px`;
+    lineEl.style.width = `${len}px`;
+    lineEl.style.transform = `rotate(${ang}rad)`;
 
-    calloutSvg.innerHTML = `
-      <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="rgba(0,0,0,.70)" stroke-width="3" stroke-linecap="round"/>
-      <circle cx="${x2}" cy="${y2}" r="${r}" fill="rgba(0,0,0,.72)"/>
-    `;
+    dotEl.style.display = "block";
+    dotEl.style.left = `${sx}px`;
+    dotEl.style.top = `${sy}px`;
+
+    labelEl.style.display = "block";
+    labelEl.style.left = `${lx}px`;
+    labelEl.style.top = `${ly}px`;
+
+    labelStandEl.textContent = selected.standId;
+    if (selected.company) {
+      labelCompanyEl.style.display = "block";
+      labelCompanyEl.textContent = selected.company;
+      selCompanyEl.style.display = "block";
+      selCompanyEl.textContent = selected.company;
+    } else {
+      labelCompanyEl.style.display = "none";
+      labelCompanyEl.textContent = "";
+      selCompanyEl.style.display = "none";
+      selCompanyEl.textContent = "";
+    }
+    selStandEl.textContent = selected.standId;
   }
-
 
   // ===== Data + UI =====
   let rows = [];
@@ -496,7 +498,7 @@ function getBackendUrl() {
     selectedStandId = normStandId(standId);
     const row = rows.find(r => r.standId === selectedStandId) || { standId: selectedStandId, status:"available", company:"" };
     applyColours();
-    drawCallout(row);
+    updatePointer(row);
     renderList();
   }
 
@@ -506,7 +508,7 @@ function getBackendUrl() {
     selCompanyEl.style.display = "none";
     selCompanyEl.textContent = "";
     applyColours();
-    clearCallout();
+    updatePointer(null);
     renderList();
   }
 
@@ -585,7 +587,7 @@ function getBackendUrl() {
     // reposition pointer after resize
     if (selectedStandId) {
       const row = rows.find(r => r.standId === selectedStandId);
-      if (row) drawCallout(row);
+      if (row) updatePointer(row);
     }
   });
 
