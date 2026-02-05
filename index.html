@@ -5,428 +5,410 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Floorplan</title>
   <style>
-    :root {
-      --bg: #ffffff;
-      --card: #ffffff;
-      --border: #e7e7e7;
-      --text: #111;
-      --muted: #666;
-      --mainFill: rgba(213, 109, 50, 0.75); /* requested */
-      --selectedFill: #e53935;
-      --selectedLabel: #e53935;
-      --shadow: 0 14px 28px rgba(0,0,0,.12), 0 6px 12px rgba(0,0,0,.10);
+    :root{
+      --bg:#ffffff;
+      --card:#ffffff;
+      --border:#e8e8e8;
+      --text:#111;
+      --muted:#666;
+      --orange: rgba(213,109,50,0.75);
+      --red:#e53935;
+      --line:#111;
     }
     *{box-sizing:border-box}
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
-    .topbar{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;padding:18px 18px 10px}
-    .titlewrap h1{margin:0;font-size:44px;line-height:1.05}
-    .meta{margin-top:6px;color:var(--muted);font-size:14px}
-    .status{margin-top:6px;font-weight:700;color:#0a7a2c}
-    .actions{display:flex;gap:10px}
-    .btn{border:1px solid var(--border);background:#f9f9f9;border-radius:12px;padding:10px 14px;font-weight:700;cursor:pointer}
-    .btn:active{transform:translateY(1px)}
-    .wrap{display:grid;grid-template-columns: minmax(520px, 1fr) 420px;gap:14px;padding:0 18px 18px}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--text);background:var(--bg)}
+    header{padding:18px 20px;border-bottom:1px solid #f3f3f3;display:flex;gap:16px;align-items:flex-start;justify-content:space-between}
+    header h1{margin:0;font-size:42px;line-height:1}
+    header .sub{margin-top:6px;color:var(--muted)}
+    header .right{display:flex;gap:10px;align-items:center}
+    .btn{border:1px solid var(--border);background:#fff;border-radius:10px;padding:10px 14px;font-weight:600;cursor:pointer}
+    .wrap{padding:14px 14px 22px}
+    .grid{display:grid;grid-template-columns: 1.4fr 0.6fr;gap:14px;align-items:start}
     .card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden}
-    .card .hd{padding:12px 14px;border-bottom:1px solid #f1f1f1;font-weight:800}
-    .card .bd{padding:14px}
-    /* Plan area */
-    .planShell{padding:14px}
-    .planFrame{border:1px solid #ededed;border-radius:14px;background:#fff;overflow:hidden}
-    .planStage{position:relative;}
-    .planObject{display:block;width:100%;height:420px;border:0;}
-    .labelArea{height:140px;position:relative;}
-    .labelBox{position:absolute;left:50%;top:18px;transform:translateX(-50%);min-width:220px;max-width:min(520px, 80vw);
-      background:var(--selectedLabel);color:#fff;border-radius:14px;padding:16px 18px;text-align:center;
-      box-shadow:var(--shadow);}
-    .labelBox.hidden{display:none}
-    .labelBox .stand{font-size:40px;font-weight:900;line-height:1}
-    .labelBox .company{margin-top:6px;font-size:18px;font-weight:700;opacity:.95}
-    .overlaySvg{position:absolute;inset:0;pointer-events:none}
-    /* Side panel */
-    .panelTitle{font-weight:900;font-size:14px;margin-bottom:6px}
-    .bigSel{font-size:44px;font-weight:950;line-height:1;margin:6px 0 2px}
-    .selCompany{font-size:22px;font-weight:800;margin:0 0 8px}
-    .hint{color:var(--muted);font-size:13px;line-height:1.35}
-    .search{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:15px;outline:none}
-    .list{margin-top:10px;border:1px solid var(--border);border-radius:12px;overflow:auto;max-height:560px;
-      padding-bottom:calc(28px + env(safe-area-inset-bottom));}
-    .row{padding:12px 12px;border-top:1px solid #f1f1f1;cursor:pointer}
-    .row:first-child{border-top:none}
-    .row.active{background:#fff2f2}
-    .row .nm{font-weight:900;font-size:20px}
-    .row .st{color:var(--muted);margin-top:1px}
-    .help{color:var(--muted);font-size:13px}
-    .error{color:#b00020;font-weight:900}
+    .card h3{margin:0;padding:14px 14px 10px;font-size:16px}
+    .card .body{padding:14px}
+
+    /* Plan */
+    .planCard{position:relative}
+    .planFrame{position:relative;padding:14px}
+    .planStage{position:relative;border:1px solid #f0f0f0;border-radius:14px;overflow:hidden;background:#fff}
+    .svgHost{width:100%;height:100%;display:block}
+    .svgHost object{width:100%;height:100%;display:block}
+
+    /* Give the plan some dedicated height, and reserve space at bottom for label */
+    .planStageInner{position:relative;height:520px}
+    .labelArea{position:absolute;left:0;right:0;bottom:0;height:140px;pointer-events:none}
+
+    /* Overlay spans the whole planStageInner (plan + label area) */
+    .overlay{position:absolute;inset:0;pointer-events:none}
+
+    /* Label */
+    .labelBox{
+      position:absolute;left:50%;bottom:18px;transform:translateX(-50%);
+      min-width:220px;max-width:520px;
+      background:var(--red);color:#fff;
+      border-radius:14px;
+      padding:18px 22px;
+      text-align:center;
+      box-shadow:0 14px 30px rgba(0,0,0,.18);
+      pointer-events:none;
+      display:none;
+    }
+    .labelBox .stand{font-size:34px;font-weight:900;letter-spacing:0.5px;line-height:1}
+    .labelBox .company{margin-top:8px;font-size:18px;font-weight:700;opacity:.95}
+
+    /* Right column */
+    .muted{color:var(--muted)}
+    .infoBig{font-size:44px;font-weight:900;line-height:1;margin:0}
+    .search{width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:15px}
+    .list{max-height:520px;overflow:auto;border:1px solid var(--border);border-radius:12px}
+    .item{padding:12px 12px;border-top:1px solid #f2f2f2;cursor:pointer}
+    .item:first-child{border-top:0}
+    .item .name{font-weight:800}
+    .item .sub{color:var(--muted)}
+    .item.active{background:#fbf0ef}
+
+    /* Phone */
     @media (max-width: 980px){
-      .wrap{grid-template-columns:1fr}
-      .planObject{height:340px}
+      header{flex-direction:column;gap:10px}
+      header h1{font-size:46px}
+      .grid{grid-template-columns: 1fr;}
+      .planStageInner{height:360px}
       .labelArea{height:120px}
-      .titlewrap h1{font-size:40px}
-    }
-    @media (max-width: 560px){
-      .topbar{padding:14px 14px 8px}
-      .wrap{padding:0 14px 14px}
-      .titlewrap h1{font-size:42px}
-      .planObject{height:300px}
-      .labelArea{height:110px}
-      .labelBox .stand{font-size:34px}
+      .labelBox{min-width:200px;max-width:92vw;padding:14px 18px;border-radius:16px}
+      .labelBox .stand{font-size:30px}
       .labelBox .company{font-size:16px}
+      .list{max-height:52vh;padding-bottom:90px}
     }
-    @media print {
-      .actions,.card.side{display:none}
-      .wrap{grid-template-columns:1fr}
-      .labelArea{height:120px}
-      body{background:#fff}
-    }
+
+    /* Reduce motion / performance */
+    .hidden{display:none}
   </style>
 </head>
 <body>
-  <div class="topbar">
-    <div class="titlewrap">
-      <h1 id="eventTitle">Floorplan</h1>
-      <div class="meta">Updated: <span id="updated">—</span></div>
-      <div class="status" id="status">Loading…</div>
-      <div class="error" id="error" style="display:none"></div>
-    </div>
-    <div class="actions">
-      <button class="btn" id="exportBtn">Export PDF</button>
-      <button class="btn" id="clearBtn">Clear selection</button>
-    </div>
+<header>
+  <div>
+    <h1 id="eventTitle">Floorplan</h1>
+    <div class="sub">Updated: <span id="updated">—</span></div>
+    <div class="sub" id="statusLine"><span class="muted">Loading…</span></div>
   </div>
+  <div class="right">
+    <button class="btn" id="exportBtn">Export PDF</button>
+    <button class="btn" id="clearBtn">Clear selection</button>
+  </div>
+</header>
 
-  <div class="wrap">
-    <div class="card">
-      <div class="hd">Plan</div>
-      <div class="planShell">
-        <div class="planFrame">
-          <div class="planStage" id="planStage">
-            <object id="planObj" class="planObject" type="image/svg+xml" data="event_plan.svg"></object>
-            <svg id="overlay" class="overlaySvg"></svg>
-          </div>
-          <div class="labelArea" id="labelArea">
-            <div class="labelBox hidden" id="labelBox">
-              <div class="stand" id="labelStand">—</div>
-              <div class="company" id="labelCompany"></div>
+<div class="wrap">
+  <div class="grid">
+    <div class="card planCard">
+      <h3>Plan</h3>
+      <div class="planFrame">
+        <div class="planStage">
+          <div class="planStageInner" id="planStageInner">
+            <div class="svgHost">
+              <object id="svgObj" data="event_plan.svg" type="image/svg+xml"></object>
+            </div>
+
+            <svg id="overlay" class="overlay" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1" preserveAspectRatio="none"></svg>
+
+            <div class="labelArea">
+              <div class="labelBox" id="labelBox">
+                <div class="stand" id="labelStand">—</div>
+                <div class="company" id="labelCompany"></div>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="card side">
-      <div class="bd">
-        <div class="panelTitle">Selected exhibitor</div>
-        <div class="bigSel" id="selStand">None</div>
-        <div class="selCompany" id="selCompany" style="display:none"></div>
-        <div class="hint">
-          Desktop: click a stand or choose from the list.<br/>
-          Phone: use the list (stand tapping is disabled).
+    <div>
+      <div class="card">
+        <h3>Selected exhibitor</h3>
+        <div class="body">
+          <p class="infoBig" id="selStand">None</p>
+          <div style="font-weight:800;margin-top:6px" id="selCompany"></div>
+          <div class="muted" style="margin-top:10px">Desktop: click a stand or choose from the list.<br/>Phone: use the list (stand tapping is disabled).</div>
         </div>
       </div>
-      <div class="bd" style="padding-top:0">
-        <div class="panelTitle">Sold exhibitors</div>
-        <input class="search" id="search" placeholder="Search company or stand…" />
-        <div class="list" id="list"></div>
+
+      <div class="card" style="margin-top:14px">
+        <h3>Sold exhibitors</h3>
+        <div class="body">
+          <input class="search" id="search" placeholder="Search company or stand…" />
+          <div style="height:10px"></div>
+          <div class="list" id="soldList"></div>
+        </div>
       </div>
-      <div class="bd" style="padding-top:0">
-        <div class="panelTitle">Help</div>
-        <div class="help">Selecting an exhibitor makes their stand red with a label + line.</div>
+
+      <div class="card" style="margin-top:14px">
+        <h3>Help</h3>
+        <div class="body muted">Selecting an exhibitor makes their stand red with a label + line.</div>
       </div>
     </div>
   </div>
+</div>
 
 <script>
-(() => {
+(function(){
   const DEFAULT_BACKEND = "https://floorplansaberdeen.floorplansaberdeen.workers.dev";
+  const MAIN_FILL = "rgba(213,109,50,0.75)";
+  const SELECTED_FILL = "#e53935";
+
+  const el = (id)=>document.getElementById(id);
+  const isPhone = ()=> window.matchMedia('(max-width: 980px)').matches;
+
   const state = {
-    backend: localStorage.getItem("floorplan_backend") || DEFAULT_BACKEND,
+    backend: (localStorage.getItem('floorplan_backend_url') || DEFAULT_BACKEND).replace(/\/$/,''),
+    stands: [],
+    sold: [],
+    selectedId: null,
     svgDoc: null,
     svgRoot: null,
-    stands: [],
-    selectedId: null,
-    isPhone: window.matchMedia("(max-width: 700px)").matches || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent),
+    lastUpdated: null,
+    rafPending: false,
   };
 
-  const el = (id) => document.getElementById(id);
-
-  function setStatus(txt, ok=true) {
-    el("status").textContent = txt;
-    el("status").style.color = ok ? "#0a7a2c" : "#b00020";
-  }
-  function showError(msg) {
-    el("error").style.display = "block";
-    el("error").textContent = msg;
-  }
-  function clearError() {
-    el("error").style.display = "none";
-    el("error").textContent = "";
+  function setStatus(msg, ok=true){
+    el('statusLine').innerHTML = ok ? `<span style="color:#0a7b1f;font-weight:700">${msg} ✅</span>` : `<span style="color:#b00020;font-weight:800">${msg} ✖</span>`;
   }
 
-  async function fetchJson(path, opts={}) {
-    const url = state.backend.replace(/\/$/, "") + path;
-    const res = await fetch(url, {
-      ...opts,
-      headers: {
-        "Content-Type": "application/json",
-        ...(opts.headers||{})
-      },
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      const txt = await res.text().catch(()=> "");
-      throw new Error(`${res.status} ${res.statusText} ${txt ? "- " + txt.slice(0,120) : ""}`);
+  function nowTime(){
+    const d = new Date();
+    return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  }
+
+  async function fetchJson(path, opts){
+    const url = state.backend + path;
+    const res = await fetch(url, Object.assign({headers:{'content-type':'application/json'}}, opts||{}));
+    if(!res.ok){
+      const t = await res.text().catch(()=>"");
+      throw new Error(`${res.status} ${res.statusText} ${t}`);
     }
     return res.json();
   }
 
-  // SVG loading (object tag = reliable on GitHub Pages)
-  function waitForSvgObject(obj) {
-    return new Promise((resolve, reject) => {
-      const done = () => {
-        const doc = obj.contentDocument;
-        if (!doc) return reject(new Error("SVG not available"));
-        const svg = doc.querySelector("svg");
-        if (!svg) return reject(new Error("SVG root missing"));
-        resolve({doc, svg});
-      };
-      if (obj.contentDocument && obj.contentDocument.querySelector("svg")) return done();
-      obj.addEventListener("load", done, {once:true});
-      obj.addEventListener("error", () => reject(new Error("Failed to load event_plan.svg")), {once:true});
-    });
+  async function loadSettings(){
+    try{
+      const s = await fetchJson('/settings');
+      if(s && s.eventName){ el('eventTitle').textContent = s.eventName; }
+    }catch(e){ /* non-fatal */ }
   }
 
-  function getStandElements() {
-    if (!state.svgDoc) return [];
-    // Stands are groups/paths/rects with id equal to standId
-    return Array.from(state.svgDoc.querySelectorAll("[id]")).filter(n => /^([A-Z]{1,2}\d{1,2}|A\d+|B\d+|C\d+|SB\d+|AA\d+|AB\d+|AC\d+|AD\d+)$/i.test(n.id));
-  }
-
-  function applyStandColors() {
-    if (!state.svgDoc) return;
-    const all = getStandElements();
-    all.forEach(node => {
-      node.style.cursor = state.isPhone ? "default" : "pointer";
-      node.style.fill = "var(--mainFill)";
-      node.style.fillOpacity = "1";
-    });
-    if (state.selectedId) {
-      const sel = state.svgDoc.getElementById(state.selectedId);
-      if (sel) sel.style.fill = "var(--selectedFill)";
+  async function refresh(){
+    try{
+      setStatus('Loading…', true);
+      const data = await fetchJson('/stands');
+      if(!Array.isArray(data)) throw new Error('Unexpected /stands response');
+      state.stands = data.map(x=>({standId:String(x.standId||'').toUpperCase(), status:(x.status||'available').toLowerCase(), company:(x.company||'')}));
+      state.sold = state.stands.filter(s=>s.status==='sold');
+      state.lastUpdated = new Date();
+      el('updated').textContent = nowTime();
+      setStatus('Ready', true);
+      renderSoldList();
+      applyColors();
+      requestPointerUpdate();
+    }catch(e){
+      console.error(e);
+      setStatus('Error loading', false);
     }
   }
 
-  function wireClicksDesktopOnly() {
-    if (!state.svgDoc) return;
-    const all = getStandElements();
-    all.forEach(node => {
-      node.onclick = null;
-      if (state.isPhone) return;
-      node.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        selectStand(node.id);
-      });
-    });
+  function getStandEl(id){
+    if(!state.svgDoc) return null;
+    return state.svgDoc.getElementById(id);
   }
 
-  function getStandById(id) {
-    return state.stands.find(s => String(s.standId).toUpperCase() === String(id).toUpperCase()) || null;
+  function allStandEls(){
+    if(!state.svgDoc) return [];
+    // Use known ids from data to avoid touching unrelated SVG elements
+    const out = [];
+    for(const s of state.stands){
+      const n = state.svgDoc.getElementById(s.standId);
+      if(n) out.push(n);
+    }
+    return out;
   }
 
-  function renderList() {
-    const q = el("search").value.trim().toLowerCase();
-    const sold = state.stands.filter(s => String(s.status).toLowerCase() === "sold");
-    const filtered = sold.filter(s => {
-      const sid = (s.standId||"").toLowerCase();
-      const c = (s.company||"").toLowerCase();
-      return !q || sid.includes(q) || c.includes(q);
-    });
-    filtered.sort((a,b) => (a.company||"").localeCompare(b.company||"") || (a.standId||"").localeCompare(b.standId||""));
-    const list = el("list");
-    list.innerHTML = "";
-    filtered.forEach(s => {
-      const row = document.createElement("div");
-      row.className = "row" + (state.selectedId && state.selectedId === s.standId ? " active" : "");
-      row.innerHTML = `<div class="nm">${(s.company||"(No company)")}</div><div class="st">Stand ${s.standId}</div>`;
-      row.addEventListener("click", () => selectStand(s.standId));
-      list.appendChild(row);
-    });
+  function applyColors(){
+    if(!state.svgDoc) return;
+    // default: all stands orange
+    for(const s of state.stands){
+      const node = state.svgDoc.getElementById(s.standId);
+      if(!node) continue;
+      node.style.fill = MAIN_FILL;
+      node.style.stroke = '#111';
+      node.style.strokeWidth = '1';
+      node.style.cursor = (!isPhone()) ? 'pointer' : 'default';
+    }
+    if(state.selectedId){
+      const node = state.svgDoc.getElementById(state.selectedId);
+      if(node){
+        node.style.fill = SELECTED_FILL;
+      }
+    }
   }
 
-  function clearOverlay() {
-    const ov = el("overlay");
-    ov.innerHTML = "";
+  function renderSoldList(){
+    const q = el('search').value.trim().toLowerCase();
+    const list = el('soldList');
+    list.innerHTML = '';
+    const items = state.sold
+      .filter(s => !q || s.standId.toLowerCase().includes(q) || (s.company||'').toLowerCase().includes(q))
+      .sort((a,b)=> (a.company||'').localeCompare(b.company||''));
+
+    for(const s of items){
+      const div = document.createElement('div');
+      div.className = 'item' + (state.selectedId===s.standId ? ' active' : '');
+      div.innerHTML = `<div class="name">${(s.company && s.company.trim()) ? s.company : '(No company)'}</div><div class="sub">Stand ${s.standId}</div>`;
+      div.addEventListener('click', ()=> selectStand(s.standId));
+      list.appendChild(div);
+    }
   }
 
-  function updateLabelAndPointer() {
-    // Hide if nothing selected
-    const box = el("labelBox");
-    if (!state.selectedId || !state.svgRoot) {
-      box.classList.add("hidden");
-      clearOverlay();
+  function setLabelVisible(visible){
+    el('labelBox').style.display = visible ? 'block' : 'none';
+    if(!visible){
+      const ov = el('overlay');
+      ov.innerHTML = '';
+      ov.setAttribute('viewBox','0 0 1 1');
+    }
+  }
+
+  function selectStand(id){
+    state.selectedId = id ? String(id).toUpperCase() : null;
+    if(!state.selectedId){
+      el('selStand').textContent = 'None';
+      el('selCompany').textContent = '';
+      setLabelVisible(false);
+      applyColors();
+      renderSoldList();
       return;
     }
 
-    const st = getStandById(state.selectedId) || {standId: state.selectedId, company: ""};
-    el("labelStand").textContent = st.standId || state.selectedId;
-    el("labelCompany").textContent = st.company || "";
-    box.classList.remove("hidden");
+    const st = state.stands.find(x=>x.standId===state.selectedId) || {standId: state.selectedId, company:''};
+    el('selStand').textContent = st.standId;
+    el('selCompany').textContent = st.company || '';
 
-    // Compute anchor points in screen pixels
-    const standEl = state.svgDoc.getElementById(state.selectedId);
-    if (!standEl || !standEl.getBBox) {
-      clearOverlay();
-      return;
-    }
+    el('labelStand').textContent = st.standId;
+    el('labelCompany').textContent = st.company || '';
+    setLabelVisible(true);
 
-    // Get stand center in SVG coordinates then map to screen
+    applyColors();
+    renderSoldList();
+    requestPointerUpdate();
+  }
+
+  function getStandCenterScreen(standEl){
+    // Use stand's bbox center transformed to screen coords
     const bbox = standEl.getBBox();
-    const cxSvg = bbox.x + bbox.width/2;
-    const cySvg = bbox.y + bbox.height/2;
-
-    // Map SVG coords -> screen coords:
+    const cx = bbox.x + bbox.width/2;
+    const cy = bbox.y + bbox.height/2;
     const pt = state.svgRoot.createSVGPoint();
-    pt.x = cxSvg; pt.y = cySvg;
-    const screenPt = pt.matrixTransform(standEl.getScreenCTM());
+    pt.x = cx; pt.y = cy;
+    const ctm = standEl.getScreenCTM();
+    if(!ctm) return null;
+    return pt.matrixTransform(ctm);
+  }
 
-    const stageRect = el("planStage").getBoundingClientRect();
-    const labelRect = box.getBoundingClientRect();
+  function requestPointerUpdate(){
+    if(state.rafPending) return;
+    state.rafPending = true;
+    requestAnimationFrame(()=>{
+      state.rafPending = false;
+      updatePointer();
+    });
+  }
 
-    const x1 = screenPt.x - stageRect.left;
-    const y1 = screenPt.y - stageRect.top;
+  function updatePointer(){
+    const ov = el('overlay');
+    ov.innerHTML = '';
+    if(!state.selectedId || !state.svgDoc) return;
+    const standEl = getStandEl(state.selectedId);
+    if(!standEl) return;
 
-    // line starts at top-middle of label box
-    const x2 = (labelRect.left + labelRect.width/2) - stageRect.left;
-    const y2 = (labelRect.top) - stageRect.top;
+    const p = getStandCenterScreen(standEl);
+    if(!p) return;
 
-    // Draw line + dot in overlay svg that spans stage+labelArea
-    const ov = el("overlay");
-    ov.setAttribute("width", stageRect.width);
-    ov.setAttribute("height", stageRect.height + el("labelArea").getBoundingClientRect().height);
-    ov.setAttribute("viewBox", `0 0 ${stageRect.width} ${stageRect.height + el("labelArea").getBoundingClientRect().height}`);
+    const frameRect = el('planStageInner').getBoundingClientRect();
+    const boxRect = el('labelBox').getBoundingClientRect();
 
-    ov.innerHTML = "";
-    const ns = "http://www.w3.org/2000/svg";
+    // Translate to overlay coords
+    const x1 = p.x - frameRect.left;
+    const y1 = p.y - frameRect.top;
 
-    const line = document.createElementNS(ns, "line");
-    line.setAttribute("x1", x1); line.setAttribute("y1", y1);
-    line.setAttribute("x2", x2); line.setAttribute("y2", y2);
-    line.setAttribute("stroke", "#111");
-    line.setAttribute("stroke-width", "3");
-    line.setAttribute("stroke-linecap", "round");
+    const x2 = (boxRect.left + boxRect.width/2) - frameRect.left;
+    const y2 = (boxRect.top) - frameRect.top; // top edge of label
+
+    // Set overlay coordinate system
+    ov.setAttribute('width', frameRect.width);
+    ov.setAttribute('height', frameRect.height);
+    ov.setAttribute('viewBox', `0 0 ${frameRect.width} ${frameRect.height}`);
+
+    const ns = 'http://www.w3.org/2000/svg';
+    const line = document.createElementNS(ns,'line');
+    line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+    line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+    line.setAttribute('stroke', getComputedStyle(document.documentElement).getPropertyValue('--line').trim() || '#111');
+    line.setAttribute('stroke-width', '3');
+    line.setAttribute('stroke-linecap','round');
     ov.appendChild(line);
 
-    const dot = document.createElementNS(ns, "circle");
-    dot.setAttribute("cx", x1);
-    dot.setAttribute("cy", y1);
-    dot.setAttribute("r", "6");  // match admin
-    dot.setAttribute("fill", "#111");
-    dot.setAttribute("opacity", "0.85");
+    const dot = document.createElementNS(ns,'circle');
+    dot.setAttribute('cx', x1);
+    dot.setAttribute('cy', y1);
+    dot.setAttribute('r', '5');
+    dot.setAttribute('fill', '#111');
+    dot.setAttribute('opacity','0.85');
     ov.appendChild(dot);
   }
 
-  function selectStand(id) {
-    state.selectedId = String(id).toUpperCase();
-    const st = getStandById(state.selectedId) || null;
-    el("selStand").textContent = st ? st.standId : state.selectedId;
-    if (st && st.company) {
-      el("selCompany").style.display = "block";
-      el("selCompany").textContent = st.company;
-    } else {
-      el("selCompany").style.display = "none";
-      el("selCompany").textContent = "";
-    }
-    applyStandColors();
-    renderList();
-    // Defer pointer calc until layout stabilizes
-    requestAnimationFrame(() => updateLabelAndPointer());
-  }
-
-  function clearSelection() {
-    state.selectedId = null;
-    el("selStand").textContent = "None";
-    el("selCompany").style.display = "none";
-    applyStandColors();
-    renderList();
-    updateLabelAndPointer();
-  }
-
-  async function loadSettings() {
-    try {
-      const s = await fetchJson("/settings");
-      if (s && s.eventName) el("eventTitle").textContent = s.eventName;
-      if (s && s.updatedAt) el("updated").textContent = s.updatedAt;
-      else el("updated").textContent = "—";
-    } catch(e) {
-      // non-fatal
-      el("updated").textContent = "—";
-    }
-  }
-
-  async function loadStands() {
-    const data = await fetchJson("/stands");
-    if (!Array.isArray(data)) throw new Error("Backend returned unexpected data");
-    // normalize
-    state.stands = data.map(s => ({
-      standId: String(s.standId||"").toUpperCase(),
-      status: String(s.status||"").toLowerCase(),
-      company: String(s.company||""),
-    }));
-  }
-
-  async function init() {
-    clearError();
-    try {
-      setStatus("Loading…", true);
-
-      // Load SVG
-      const obj = el("planObj");
-      const {doc, svg} = await waitForSvgObject(obj);
-      state.svgDoc = doc;
-      state.svgRoot = svg;
-
-      // Load backend data
-      await Promise.all([loadSettings(), loadStands()]);
-
-      applyStandColors();
-      wireClicksDesktopOnly();
-      renderList();
-
-      setStatus("Ready ✅", true);
-    } catch(err) {
-      console.error(err);
-      setStatus("Error loading ✗", false);
-      showError("Failed to fetch/load from backend: " + state.backend + " (" + (err.message||err) + ")");
-      // still show SVG if available
-      try {
-        if (!state.svgDoc) {
-          const {doc, svg} = await waitForSvgObject(el("planObj"));
-          state.svgDoc = doc; state.svgRoot = svg;
-          applyStandColors();
-          wireClicksDesktopOnly();
+  function wireSvgClick(){
+    if(!state.svgDoc) return;
+    // Click-to-select on desktop only
+    state.svgRoot.addEventListener('click', (ev)=>{
+      if(isPhone()) return;
+      const t = ev.target;
+      if(!t) return;
+      // walk up to id that matches a stand
+      let node = t;
+      while(node && node !== state.svgRoot){
+        if(node.id && state.stands.some(s=>s.standId===node.id)){
+          selectStand(node.id);
+          return;
         }
-      } catch(_) {}
-    }
-    updateLabelAndPointer();
+        node = node.parentNode;
+      }
+    });
   }
 
-  // Recalculate pointer on resize/scroll (lightweight)
-  let resizeTimer = null;
-  window.addEventListener("resize", () => {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => updateLabelAndPointer(), 50);
+  function hookSvgLoad(){
+    const obj = el('svgObj');
+    obj.addEventListener('load', ()=>{
+      state.svgDoc = obj.contentDocument;
+      state.svgRoot = state.svgDoc && state.svgDoc.documentElement;
+      applyColors();
+      wireSvgClick();
+      requestPointerUpdate();
+    });
+  }
+
+  // PDF export (simple print)
+  el('exportBtn').addEventListener('click', ()=> window.print());
+  el('clearBtn').addEventListener('click', ()=> selectStand(null));
+  el('search').addEventListener('input', renderSoldList);
+
+  // Keep pointer correct on resize/scroll
+  window.addEventListener('resize', requestPointerUpdate);
+  window.addEventListener('scroll', ()=>{ if(!isPhone()) requestPointerUpdate(); }, {passive:true});
+
+  // Init
+  hookSvgLoad();
+  loadSettings().finally(()=>{
+    refresh();
+    setInterval(refresh, 30000);
   });
-  window.addEventListener("scroll", () => {
-    // only matters on mobile where address bar changes viewport
-    if (state.isPhone) requestAnimationFrame(() => updateLabelAndPointer());
-  }, {passive:true});
 
-  el("search").addEventListener("input", renderList);
-  el("clearBtn").addEventListener("click", clearSelection);
-  el("exportBtn").addEventListener("click", () => window.print());
-
-  // start
-  init();
 })();
 </script>
 </body>

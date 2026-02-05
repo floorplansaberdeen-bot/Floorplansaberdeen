@@ -5,578 +5,585 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Floorplan Admin</title>
   <style>
-    :root {
-      --bg: #ffffff;
-      --card: #ffffff;
-      --border: #e7e7e7;
-      --text: #111;
-      --muted: #666;
-      --mainFill: rgba(213, 109, 50, 0.75); /* requested */
-      --soldFill: #e53935;
-      --selFill: #e53935;
-      --shadow: 0 14px 28px rgba(0,0,0,.12), 0 6px 12px rgba(0,0,0,.10);
+    :root{
+      --border:#e8e8e8;
+      --muted:#666;
+      --orange: rgba(213,109,50,0.75);
+      --red:#e53935;
+      --line:#111;
     }
     *{box-sizing:border-box}
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
-    .bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid #f1f1f1}
-    .bar h1{margin:0;font-size:18px}
-    .controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-    .pill{border:1px solid var(--border);background:#fafafa;border-radius:12px;padding:8px 10px;font-weight:700}
-    .btn{border:1px solid var(--border);background:#f9f9f9;border-radius:12px;padding:8px 12px;font-weight:800;cursor:pointer}
-    .btn.danger{border-color:#f4b7b7;background:#fff3f3}
-    .wrap{display:grid;grid-template-columns:minmax(520px,1fr) 520px;gap:14px;padding:14px 16px 16px}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden}
-    .card .hd{padding:12px 14px;border-bottom:1px solid #f1f1f1;font-weight:900}
-    .card .bd{padding:14px}
-    /* Plan */
-    .planShell{padding:14px}
-    .planFrame{border:1px solid #ededed;border-radius:14px;background:#fff;overflow:hidden}
-    .planStage{position:relative;}
-    .planObject{display:block;width:100%;height:420px;border:0;}
-    .labelArea{height:140px;position:relative;}
-    .labelBox{position:absolute;left:40px;top:18px;min-width:220px;max-width:min(520px,80vw);
-      background:var(--selFill);color:#fff;border-radius:14px;padding:16px 18px;text-align:left;
-      box-shadow:var(--shadow);}
-    .labelBox.hidden{display:none}
-    .labelBox .stand{font-size:38px;font-weight:950;line-height:1}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111;background:#fff}
+    header{padding:14px 16px;border-bottom:1px solid #f3f3f3;display:flex;gap:14px;align-items:center;justify-content:space-between}
+    header .left{font-weight:900;font-size:18px}
+    header .right{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .pill{border:1px solid var(--border);border-radius:10px;padding:8px 10px;background:#fff;font-weight:700}
+    .btn{border:1px solid var(--border);background:#fff;border-radius:10px;padding:8px 12px;font-weight:800;cursor:pointer}
+    .btn.danger{border-color:#f2b8b5;background:#fff5f5}
+    .wrap{padding:14px}
+    .grid{display:grid;grid-template-columns: 1.5fr 0.8fr;gap:14px;align-items:start}
+    .card{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#fff}
+    .card h3{margin:0;padding:14px 14px 10px;font-size:16px}
+    .body{padding:14px}
+
+    .planStage{border:1px solid #f0f0f0;border-radius:14px;overflow:hidden;background:#fff}
+    .planStageInner{position:relative;height:520px}
+    .svgHost{width:100%;height:100%}
+    .svgHost object{width:100%;height:100%;display:block}
+
+    .labelArea{position:absolute;left:0;right:0;bottom:0;height:140px;pointer-events:none}
+    .overlay{position:absolute;inset:0;pointer-events:none}
+
+    .labelBox{
+      position:absolute;left:18px;bottom:18px;
+      min-width:220px;max-width:520px;
+      background:var(--red);color:#fff;
+      border-radius:14px;
+      padding:16px 18px;
+      box-shadow:0 14px 30px rgba(0,0,0,.18);
+      pointer-events:none;
+      display:none;
+    }
+    .labelBox .stand{font-size:30px;font-weight:900;letter-spacing:0.5px;line-height:1}
     .labelBox .company{margin-top:6px;font-size:16px;font-weight:800;opacity:.95}
-    .overlaySvg{position:absolute;inset:0;pointer-events:none}
-    .legend{display:flex;gap:10px;align-items:center;padding:10px 14px;border-top:1px solid #f1f1f1}
-    .chip{display:flex;align-items:center;gap:8px;border:1px solid var(--border);padding:6px 10px;border-radius:999px;font-weight:800;background:#fff}
-    .dot{width:10px;height:10px;border-radius:999px}
-    .dot.sold{background:var(--soldFill)}
-    .dot.av{background:var(--mainFill)}
+
+    .row{display:flex;gap:10px;align-items:center}
+    label{font-size:12px;color:var(--muted);font-weight:800;display:block;margin-bottom:6px}
+    input, select{width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:14px}
+    .btnWide{width:100%}
+
+    .tableWrap{border:1px solid var(--border);border-radius:12px;overflow:hidden}
+    table{width:100%;border-collapse:collapse;font-size:14px}
+    th,td{padding:10px 10px;border-top:1px solid #f3f3f3;text-align:left}
+    th{border-top:0;background:#fafafa;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+    tr.active{background:#eef3ff}
+    .tag{display:inline-block;border-radius:999px;padding:3px 10px;font-weight:900;font-size:12px}
+    .tag.sold{background:#fff0f0;border:1px solid #ffd0d0;color:#b00020}
+    .tag.avail{background:#fff7ef;border:1px solid #ffd9b4;color:#7a3a00}
 
     /* Zoom */
-    .zoomWrap{padding:12px 14px 14px}
-    .zoomFrame{border:1px solid #ededed;border-radius:14px;background:#fff;overflow:hidden}
-    .zoomStage{position:relative}
-    .zoomObject{display:block;width:100%;height:250px;border:0}
+    .zoomStage{border:1px solid #f0f0f0;border-radius:14px;overflow:hidden;background:#fff}
+    .zoomInner{position:relative;height:260px}
+    .zoomInner object{width:100%;height:100%;display:block}
     .zoomOverlay{position:absolute;inset:0;pointer-events:none}
 
-    /* Right panel form/list */
-    label{display:block;font-size:12px;font-weight:900;color:#444;margin-bottom:6px}
-    input, select{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;font-size:15px;outline:none}
-    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-    .rowBtns{display:flex;gap:10px;margin-top:10px}
-    .rowBtns .btn{flex:1}
-    .hint{color:var(--muted);font-size:13px;margin-top:8px}
-    .tableWrap{margin-top:12px;border:1px solid var(--border);border-radius:12px;overflow:auto;max-height:520px}
-    table{width:100%;border-collapse:collapse;font-size:14px}
-    th,td{padding:10px 10px;border-top:1px solid #f1f1f1}
-    th{text-align:left;background:#fafafa;position:sticky;top:0;z-index:1}
-    tr.sel{background:#f2f6ff;outline:2px solid #b9c9ff;outline-offset:-2px}
-    .badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;border:1px solid var(--border);font-weight:900;font-size:12px}
-    .badge.sold{background:#fff2f2;border-color:#f3b6b6;color:#b00020}
-    .badge.av{background:#fff7f0;border-color:#f0d0b6;color:#7a3f0a}
-    @media (max-width: 1100px){
-      .wrap{grid-template-columns:1fr}
-      .planObject{height:360px}
+    @media (max-width: 980px){
+      .grid{grid-template-columns:1fr}
+      .planStageInner{height:360px}
+      .labelArea{height:120px}
+      .labelBox{left:50%;transform:translateX(-50%);bottom:14px;min-width:220px;max-width:92vw}
+      .zoomInner{height:220px}
     }
   </style>
 </head>
 <body>
-  <div class="bar">
-    <h1>Floorplan Admin</h1>
-    <div class="controls">
-      <div class="pill">Synced: <span id="synced">—</span></div>
-      <div class="pill">Event name&nbsp; <input id="eventName" style="width:240px;padding:6px 10px;border-radius:10px;border:1px solid var(--border)" placeholder="Event name" /></div>
-      <button class="btn" id="pauseBtn">Pause sync</button>
-      <button class="btn" id="exportBtn">Export CSV</button>
-      <button class="btn" id="importBtn">Import CSV</button>
-      <button class="btn danger" id="resetBtn">Reset all</button>
-    </div>
+<header>
+  <div class="left">Floorplan Admin</div>
+  <div class="right">
+    <div class="pill">Synced: <span id="synced">—</span></div>
+    <div class="pill">Event name <input id="eventName" style="width:240px;border:0;padding:0 0 0 10px;outline:none" placeholder="Event name" /></div>
+    <button class="btn" id="pauseBtn">Pause sync</button>
+    <button class="btn" id="exportBtn">Export CSV</button>
+    <button class="btn" id="importBtn">Import CSV</button>
+    <button class="btn danger" id="resetBtn">Reset all</button>
   </div>
+</header>
 
-  <div class="wrap">
+<div class="wrap">
+  <div class="grid">
     <div class="card">
-      <div class="hd">Plan</div>
-      <div class="planShell">
-        <div class="planFrame">
-          <div class="planStage" id="planStage">
-            <object id="planObj" class="planObject" type="image/svg+xml" data="event_plan.svg"></object>
-            <svg id="overlay" class="overlaySvg"></svg>
-          </div>
-          <div class="labelArea" id="labelArea">
-            <div class="labelBox hidden" id="labelBox">
-              <div class="stand" id="labelStand">—</div>
-              <div class="company" id="labelCompany"></div>
+      <h3>Plan</h3>
+      <div class="body">
+        <div class="planStage">
+          <div class="planStageInner" id="planStageInner">
+            <div class="svgHost">
+              <object id="svgObj" data="event_plan.svg" type="image/svg+xml"></object>
+            </div>
+
+            <svg id="overlay" class="overlay" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1" preserveAspectRatio="none"></svg>
+
+            <div class="labelArea">
+              <div class="labelBox" id="labelBox">
+                <div class="stand" id="labelStand">—</div>
+                <div class="company" id="labelCompany"></div>
+              </div>
             </div>
           </div>
-          <div class="legend">
-            <div class="chip"><span class="dot sold"></span>Sold</div>
-            <div class="chip"><span class="dot av"></span>Available</div>
+        </div>
+        <div style="height:12px"></div>
+        <div class="row" style="gap:14px">
+          <span class="tag sold">● Sold</span>
+          <span class="tag avail">● Available</span>
+        </div>
+        <div style="height:12px"></div>
+        <h3 style="padding:0;margin:0">Zoom</h3>
+        <div style="height:10px"></div>
+        <div class="zoomStage">
+          <div class="zoomInner" id="zoomInner">
+            <object id="zoomObj" data="event_plan.svg" type="image/svg+xml"></object>
+            <svg id="zoomOverlay" class="zoomOverlay" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1" preserveAspectRatio="xMidYMid meet"></svg>
           </div>
         </div>
-      </div>
-
-      <div class="hd">Zoom</div>
-      <div class="zoomWrap">
-        <div class="zoomFrame">
-          <div class="zoomStage" id="zoomStage">
-            <object id="zoomObj" class="zoomObject" type="image/svg+xml" data="event_plan.svg"></object>
-            <svg id="zoomOverlay" class="zoomOverlay"></svg>
-          </div>
-        </div>
-        <div class="hint">Select a stand to zoom in.</div>
+        <div style="margin-top:8px;color:var(--muted);font-size:13px">Select a stand to zoom in.</div>
       </div>
     </div>
 
     <div class="card">
-      <div class="hd">Selected Stand</div>
-      <div class="bd">
-        <div class="grid2">
-          <div>
+      <h3>Selected Stand</h3>
+      <div class="body">
+        <div class="row">
+          <div style="flex:1">
             <label>Stand ID</label>
             <input id="standId" placeholder="Stand ID" />
           </div>
-          <div></div>
         </div>
-        <div class="grid2" style="margin-top:10px">
-          <div>
+        <div style="height:12px"></div>
+        <div class="row">
+          <div style="flex:1">
             <label>Status</label>
             <select id="status">
               <option value="available">Available</option>
               <option value="sold">Sold</option>
             </select>
           </div>
-          <div>
+          <div style="flex:1">
             <label>Company (sold only)</label>
             <input id="company" placeholder="Company name…" />
           </div>
         </div>
-        <div class="rowBtns">
-          <button class="btn" id="saveBtn">Save</button>
-          <button class="btn danger" id="markAvailBtn">Mark Available</button>
+        <div style="height:12px"></div>
+        <div class="row">
+          <button class="btn btnWide" id="saveBtn">Save</button>
+          <button class="btn btnWide danger" id="markAvailBtn">Mark Available</button>
         </div>
-        <div class="hint">Click a stand on the plan or in the list to edit.</div>
-      </div>
+        <div style="margin-top:10px;color:var(--muted);font-size:13px">Click a stand on the plan or in the list to edit.</div>
 
-      <div class="hd">Stands</div>
-      <div class="bd">
-        <div class="grid2">
+        <div style="height:16px"></div>
+        <h3 style="padding:0;margin:0">Stands</h3>
+        <div style="height:10px"></div>
+        <div class="row">
           <input id="search" placeholder="Search stand or company…" />
-          <select id="filter">
+          <select id="filter" style="max-width:120px">
             <option value="all">All</option>
             <option value="sold">Sold</option>
             <option value="available">Available</option>
           </select>
         </div>
-        <div class="hint"><span id="count">0</span> / <span id="total">0</span></div>
+        <div style="height:10px"></div>
+        <div class="muted" style="font-size:13px"><span id="count">0</span> / <span id="total">0</span></div>
+        <div style="height:10px"></div>
         <div class="tableWrap">
           <table>
-            <thead>
-              <tr><th>Stand</th><th>Status</th><th>Company</th></tr>
-            </thead>
+            <thead><tr><th>Stand</th><th>Status</th><th>Company</th></tr></thead>
             <tbody id="tbody"></tbody>
           </table>
         </div>
       </div>
     </div>
   </div>
+</div>
 
 <script>
-(() => {
+(function(){
   const DEFAULT_BACKEND = "https://floorplansaberdeen.floorplansaberdeen.workers.dev";
+  const ORANGE = "rgba(213,109,50,0.75)";
+  const RED = "#e53935";
+
+  const el = (id)=>document.getElementById(id);
+  const isPhone = ()=> window.matchMedia('(max-width: 980px)').matches;
+
   const state = {
-    backend: localStorage.getItem("floorplan_backend") || DEFAULT_BACKEND,
+    backend: (localStorage.getItem('floorplan_backend_url') || DEFAULT_BACKEND).replace(/\/$/,''),
     stands: [],
     selectedId: null,
+    svgDoc: null,
+    svgRoot: null,
+    zoomDoc: null,
+    zoomRoot: null,
+    zoomFullViewBox: null,
     paused: false,
-    svgDoc: null, svgRoot: null,
-    zoomDoc: null, zoomRoot: null,
   };
-  const el = (id) => document.getElementById(id);
 
-  async function fetchJson(path, opts={}) {
-    const url = state.backend.replace(/\/$/, "") + path;
-    const res = await fetch(url, {
-      ...opts,
-      headers: {
-        "Content-Type": "application/json",
-        ...(opts.headers||{})
-      },
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      const txt = await res.text().catch(()=> "");
-      throw new Error(`${res.status} ${res.statusText} ${txt ? "- " + txt.slice(0,120) : ""}`);
+  function nowTime(){
+    const d = new Date();
+    return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  }
+
+  async function fetchJson(path, opts){
+    const url = state.backend + path;
+    const res = await fetch(url, Object.assign({headers:{'content-type':'application/json'}}, opts||{}));
+    if(!res.ok){
+      const t = await res.text().catch(()=>"");
+      throw new Error(`${res.status} ${res.statusText} ${t}`);
     }
     return res.json();
   }
 
-  function waitForSvgObject(obj) {
-    return new Promise((resolve, reject) => {
-      const done = () => {
-        const doc = obj.contentDocument;
-        if (!doc) return reject(new Error("SVG not available"));
-        const svg = doc.querySelector("svg");
-        if (!svg) return reject(new Error("SVG root missing"));
-        resolve({doc, svg});
-      };
-      if (obj.contentDocument && obj.contentDocument.querySelector("svg")) return done();
-      obj.addEventListener("load", done, {once:true});
-      obj.addEventListener("error", () => reject(new Error("Failed to load event_plan.svg")), {once:true});
-    });
-  }
+  async function ensureAdminPassword(){
+    // optional enforcement via /settings.adminPassword
+    try{
+      const s = await fetchJson('/settings');
+      if(s && s.eventName) el('eventName').value = s.eventName;
 
-  function getStandElements(doc) {
-    if (!doc) return [];
-    return Array.from(doc.querySelectorAll("[id]")).filter(n => /^([A-Z]{1,2}\d{1,2}|A\d+|B\d+|C\d+|SB\d+|AA\d+|AB\d+|AC\d+|AD\d+)$/i.test(n.id));
-  }
+      const required = s && s.adminPassword;
+      if(!required) return;
 
-  function normalizeStands(list) {
-    return (list||[]).map(s => ({
-      standId: String(s.standId||"").toUpperCase(),
-      status: String(s.status||"").toLowerCase(),
-      company: String(s.company||""),
-    }));
-  }
+      const cached = sessionStorage.getItem('floorplan_admin_authed') === '1';
+      if(cached) return;
 
-  function getStandById(id) {
-    const key = String(id||"").toUpperCase();
-    return state.stands.find(s => s.standId === key) || null;
-  }
-
-  function applyPlanColors() {
-    if (!state.svgDoc) return;
-    const all = getStandElements(state.svgDoc);
-    all.forEach(node => {
-      const st = getStandById(node.id);
-      const sold = st && st.status === "sold";
-      node.style.fill = sold ? "var(--soldFill)" : "var(--mainFill)";
-      node.style.cursor = "pointer";
-    });
-    if (state.selectedId) {
-      const sel = state.svgDoc.getElementById(state.selectedId);
-      if (sel) sel.style.filter = "brightness(1.02)";
+      let ok = false;
+      for(let i=0;i<5;i++){
+        const pw = prompt('Admin password');
+        if(pw === null) continue;
+        if(pw === String(required)) { ok = true; break; }
+      }
+      if(!ok){
+        alert('Incorrect password.');
+        throw new Error('Auth failed');
+      }
+      sessionStorage.setItem('floorplan_admin_authed','1');
+    }catch(e){
+      // if auth failed, stop further actions
+      if(String(e.message||'').includes('Auth failed')) throw e;
     }
   }
 
-  function clearOverlay(which) {
-    el(which).innerHTML = "";
+  function getStand(id){
+    const uid = String(id||'').toUpperCase();
+    return state.stands.find(s=>s.standId===uid) || null;
   }
 
-  function updateLabelAndPointer() {
-    const box = el("labelBox");
-    if (!state.selectedId || !state.svgRoot) {
-      box.classList.add("hidden");
-      clearOverlay("overlay");
-      return;
+  function applyPlanColors(){
+    if(!state.svgDoc) return;
+    for(const s of state.stands){
+      const node = state.svgDoc.getElementById(s.standId);
+      if(!node) continue;
+      node.style.fill = (s.status==='sold') ? RED : ORANGE;
+      node.style.stroke = '#111';
+      node.style.strokeWidth = '1';
+      node.style.cursor = (!isPhone()) ? 'pointer' : 'default';
     }
-    const st = getStandById(state.selectedId) || {standId: state.selectedId, company:""};
-    el("labelStand").textContent = st.standId;
-    el("labelCompany").textContent = st.company || (st.status === "sold" ? "" : "");
-    box.classList.remove("hidden");
+    if(state.selectedId){
+      const node = state.svgDoc.getElementById(state.selectedId);
+      if(node){ node.style.filter = 'drop-shadow(0 0 0 rgba(0,0,0,0))'; }
+    }
+  }
 
-    const standEl = state.svgDoc.getElementById(state.selectedId);
-    if (!standEl || !standEl.getBBox) {
-      clearOverlay("overlay");
-      return;
+  function setLabelVisible(v){
+    el('labelBox').style.display = v ? 'block' : 'none';
+    if(!v){
+      const ov = el('overlay');
+      ov.innerHTML='';
+      ov.setAttribute('viewBox','0 0 1 1');
     }
+  }
+
+  function getStandCenterScreen(standEl){
     const bbox = standEl.getBBox();
-    const cxSvg = bbox.x + bbox.width/2;
-    const cySvg = bbox.y + bbox.height/2;
-
     const pt = state.svgRoot.createSVGPoint();
-    pt.x = cxSvg; pt.y = cySvg;
-    const screenPt = pt.matrixTransform(standEl.getScreenCTM());
+    pt.x = bbox.x + bbox.width/2;
+    pt.y = bbox.y + bbox.height/2;
+    const ctm = standEl.getScreenCTM();
+    if(!ctm) return null;
+    return pt.matrixTransform(ctm);
+  }
 
-    const stageRect = el("planStage").getBoundingClientRect();
-    const labelRect = box.getBoundingClientRect();
-    const x1 = screenPt.x - stageRect.left;
-    const y1 = screenPt.y - stageRect.top;
+  let rafPending=false;
+  function requestPointer(){
+    if(rafPending) return;
+    rafPending=true;
+    requestAnimationFrame(()=>{ rafPending=false; updatePointer(); });
+  }
 
-    const x2 = (labelRect.left + labelRect.width/2) - stageRect.left;
-    const y2 = (labelRect.top) - stageRect.top;
+  function updatePointer(){
+    const ov = el('overlay');
+    ov.innerHTML='';
+    if(!state.selectedId || !state.svgDoc) return;
+    const standEl = state.svgDoc.getElementById(state.selectedId);
+    if(!standEl) return;
 
-    const ov = el("overlay");
-    const totalH = stageRect.height + el("labelArea").getBoundingClientRect().height;
-    ov.setAttribute("width", stageRect.width);
-    ov.setAttribute("height", totalH);
-    ov.setAttribute("viewBox", `0 0 ${stageRect.width} ${totalH}`);
-    ov.innerHTML = "";
-    const ns = "http://www.w3.org/2000/svg";
-    const line = document.createElementNS(ns, "line");
-    line.setAttribute("x1", x1); line.setAttribute("y1", y1);
-    line.setAttribute("x2", x2); line.setAttribute("y2", y2);
-    line.setAttribute("stroke", "#111");
-    line.setAttribute("stroke-width", "3");
-    line.setAttribute("stroke-linecap", "round");
+    const p = getStandCenterScreen(standEl);
+    if(!p) return;
+
+    const frameRect = el('planStageInner').getBoundingClientRect();
+    const boxRect = el('labelBox').getBoundingClientRect();
+    const x1 = p.x - frameRect.left;
+    const y1 = p.y - frameRect.top;
+    const x2 = (boxRect.left + boxRect.width/2) - frameRect.left;
+    const y2 = (boxRect.top) - frameRect.top;
+
+    ov.setAttribute('width', frameRect.width);
+    ov.setAttribute('height', frameRect.height);
+    ov.setAttribute('viewBox', `0 0 ${frameRect.width} ${frameRect.height}`);
+
+    const ns='http://www.w3.org/2000/svg';
+    const line = document.createElementNS(ns,'line');
+    line.setAttribute('x1',x1); line.setAttribute('y1',y1);
+    line.setAttribute('x2',x2); line.setAttribute('y2',y2);
+    line.setAttribute('stroke','#111');
+    line.setAttribute('stroke-width','3');
+    line.setAttribute('stroke-linecap','round');
     ov.appendChild(line);
-    const dot = document.createElementNS(ns, "circle");
-    dot.setAttribute("cx", x1);
-    dot.setAttribute("cy", y1);
-    dot.setAttribute("r", "6");
-    dot.setAttribute("fill", "#111");
-    dot.setAttribute("opacity", "0.85");
+
+    const dot = document.createElementNS(ns,'circle');
+    dot.setAttribute('cx',x1); dot.setAttribute('cy',y1);
+    dot.setAttribute('r','5');
+    dot.setAttribute('fill','#111');
+    dot.setAttribute('opacity','0.85');
     ov.appendChild(dot);
   }
 
-  function buildZoomRaw() {
-    if (!state.zoomDoc) return;
-    // remove fills so it's raw/outline
-    getStandElements(state.zoomDoc).forEach(node => {
-      node.style.fill = "#fff";
-      node.style.stroke = "#111";
-      node.style.strokeWidth = "1";
+  function renderTable(){
+    const q = el('search').value.trim().toLowerCase();
+    const f = el('filter').value;
+    let arr = state.stands.slice();
+    if(f !== 'all') arr = arr.filter(s=>s.status===f);
+    if(q) arr = arr.filter(s=> s.standId.toLowerCase().includes(q) || (s.company||'').toLowerCase().includes(q));
+
+    el('count').textContent = String(arr.length);
+    el('total').textContent = String(state.stands.length);
+
+    const tb = el('tbody');
+    tb.innerHTML='';
+    for(const s of arr){
+      const tr = document.createElement('tr');
+      if(state.selectedId===s.standId) tr.className='active';
+      const tag = `<span class="tag ${s.status==='sold'?'sold':'avail'}">${s.status==='sold'?'Sold':'Available'}</span>`;
+      tr.innerHTML = `<td>${s.standId}</td><td>${tag}</td><td>${s.company||''}</td>`;
+      tr.addEventListener('click', ()=>selectStand(s.standId));
+      tb.appendChild(tr);
+    }
+  }
+
+  function updateForm(){
+    const st = getStand(state.selectedId) || {standId: state.selectedId||'', status:'available', company:''};
+    el('standId').value = st.standId || '';
+    el('status').value = (st.status==='sold') ? 'sold' : 'available';
+    el('company').value = st.company || '';
+    el('company').disabled = el('status').value !== 'sold';
+  }
+
+  function selectStand(id){
+    state.selectedId = id ? String(id).toUpperCase() : null;
+    updateForm();
+
+    if(!state.selectedId){
+      setLabelVisible(false);
+      applyPlanColors();
+      updateZoom();
+      renderTable();
+      return;
+    }
+
+    const st = getStand(state.selectedId) || {standId: state.selectedId, status:'available', company:''};
+    el('labelStand').textContent = st.standId;
+    el('labelCompany').textContent = (st.status==='sold' && st.company) ? st.company : (st.status==='sold' ? '(No company)' : '');
+    setLabelVisible(true);
+
+    applyPlanColors();
+    renderTable();
+    requestPointer();
+    updateZoom();
+  }
+
+  async function refresh(){
+    if(state.paused) return;
+    const data = await fetchJson('/stands');
+    state.stands = (Array.isArray(data)?data:[]).map(x=>({standId:String(x.standId||'').toUpperCase(), status:(x.status||'available').toLowerCase(), company:(x.company||'')}));
+    el('synced').textContent = nowTime();
+    applyPlanColors();
+    renderTable();
+    requestPointer();
+    if(state.selectedId) updateForm();
+  }
+
+  async function saveStand(payload){
+    await fetchJson('/stand', {method:'POST', body: JSON.stringify(payload)});
+  }
+
+  async function saveSettings(payload){
+    await fetchJson('/settings', {method:'POST', body: JSON.stringify(payload)});
+  }
+
+  function hookSvgLoad(){
+    const obj = el('svgObj');
+    obj.addEventListener('load', ()=>{
+      state.svgDoc = obj.contentDocument;
+      state.svgRoot = state.svgDoc && state.svgDoc.documentElement;
+      applyPlanColors();
+      // click-to-select desktop only
+      state.svgRoot.addEventListener('click', (ev)=>{
+        if(isPhone()) return;
+        let n = ev.target;
+        while(n && n!==state.svgRoot){
+          if(n.id && getStand(n.id)) { selectStand(n.id); return; }
+          n = n.parentNode;
+        }
+      });
+      requestPointer();
     });
   }
 
-  function updateZoomHighlight() {
-    const ov = el("zoomOverlay");
-    ov.innerHTML = "";
-    if (!state.selectedId || !state.zoomRoot || !state.zoomDoc) return;
+  function hookZoomLoad(){
+    const obj = el('zoomObj');
+    obj.addEventListener('load', ()=>{
+      state.zoomDoc = obj.contentDocument;
+      state.zoomRoot = state.zoomDoc && state.zoomDoc.documentElement;
+      if(!state.zoomRoot) return;
+
+      // Force raw (black/white) look
+      for(const s of state.stands){
+        const node = state.zoomDoc.getElementById(s.standId);
+        if(!node) continue;
+        node.style.fill = '#fff';
+        node.style.stroke = '#111';
+        node.style.strokeWidth = '1';
+      }
+
+      // Capture full viewBox
+      const vb = state.zoomRoot.viewBox && state.zoomRoot.viewBox.baseVal;
+      if(vb && vb.width){
+        state.zoomFullViewBox = {x:vb.x,y:vb.y,width:vb.width,height:vb.height};
+      } else {
+        const bb = state.zoomRoot.getBBox();
+        state.zoomFullViewBox = {x:bb.x,y:bb.y,width:bb.width,height:bb.height};
+        state.zoomRoot.setAttribute('viewBox', `${bb.x} ${bb.y} ${bb.width} ${bb.height}`);
+      }
+
+      updateZoom();
+    });
+  }
+
+  function updateZoom(){
+    const ov = el('zoomOverlay');
+    ov.innerHTML='';
+    if(!state.zoomDoc || !state.zoomRoot || !state.zoomFullViewBox){
+      ov.setAttribute('viewBox','0 0 1 1');
+      return;
+    }
+
+    if(!state.selectedId){
+      // reset zoom
+      const f = state.zoomFullViewBox;
+      state.zoomRoot.setAttribute('viewBox', `${f.x} ${f.y} ${f.width} ${f.height}`);
+      ov.setAttribute('viewBox', `${f.x} ${f.y} ${f.width} ${f.height}`);
+      return;
+    }
 
     const standEl = state.zoomDoc.getElementById(state.selectedId);
-    if (!standEl || !standEl.getBBox) return;
+    if(!standEl || !standEl.getBBox) return;
 
-    const bbox = standEl.getBBox();
-    const pad = 8;
-    const x = bbox.x - pad, y = bbox.y - pad, w = bbox.width + pad*2, h = bbox.height + pad*2;
+    const bb = standEl.getBBox();
+    const pad = 18;
+    const x = bb.x - pad, y = bb.y - pad, w = bb.width + pad*2, h = bb.height + pad*2;
 
-    // Use SVG coords, set overlay viewBox to match zoom root
-    const vb = state.zoomRoot.viewBox && state.zoomRoot.viewBox.baseVal;
-    let viewBox = null;
-    if (vb && vb.width) {
-      viewBox = {x: vb.x, y: vb.y, width: vb.width, height: vb.height};
-    } else {
-      const bb = state.zoomRoot.getBBox();
-      viewBox = {x: bb.x, y: bb.y, width: bb.width, height: bb.height};
-    }
-    ov.setAttribute("viewBox", `${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`);
-    ov.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    // Set viewBox to zoom
+    state.zoomRoot.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
+    ov.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
 
-    const ns = "http://www.w3.org/2000/svg";
-    const rect = document.createElementNS(ns, "rect");
-    rect.setAttribute("x", x);
-    rect.setAttribute("y", y);
-    rect.setAttribute("width", w);
-    rect.setAttribute("height", h);
-    rect.setAttribute("rx", "10");
-    rect.setAttribute("fill", "none");
-    rect.setAttribute("stroke", "#111");
-    rect.setAttribute("stroke-width", "6");
-    rect.setAttribute("opacity", "0.9");
+    // Draw rounded highlight
+    const ns='http://www.w3.org/2000/svg';
+    const rect = document.createElementNS(ns,'rect');
+    rect.setAttribute('x', bb.x - 6);
+    rect.setAttribute('y', bb.y - 6);
+    rect.setAttribute('width', bb.width + 12);
+    rect.setAttribute('height', bb.height + 12);
+    rect.setAttribute('rx','10');
+    rect.setAttribute('fill','none');
+    rect.setAttribute('stroke','#111');
+    rect.setAttribute('stroke-width','6');
+    rect.setAttribute('opacity','0.85');
     ov.appendChild(rect);
   }
 
-  function selectStand(id) {
-    state.selectedId = String(id).toUpperCase();
-    const st = getStandById(state.selectedId) || {standId: state.selectedId, status:"available", company:""};
-    el("standId").value = st.standId;
-    el("status").value = st.status === "sold" ? "sold" : "available";
-    el("company").value = st.company || "";
-    // ensure company disabled unless sold
-    el("company").disabled = el("status").value !== "sold";
+  // UI events
+  el('status').addEventListener('change', ()=>{ el('company').disabled = el('status').value !== 'sold'; });
+  el('search').addEventListener('input', renderTable);
+  el('filter').addEventListener('change', renderTable);
 
-    renderTable();
-    applyPlanColors();
-    requestAnimationFrame(() => updateLabelAndPointer());
-    updateZoomHighlight();
-  }
-
-  function renderTable() {
-    const q = el("search").value.trim().toLowerCase();
-    const f = el("filter").value;
-    let rows = state.stands.slice();
-    if (f !== "all") rows = rows.filter(s => s.status === f);
-    if (q) rows = rows.filter(s => s.standId.toLowerCase().includes(q) || (s.company||"").toLowerCase().includes(q));
-    rows.sort((a,b)=>a.standId.localeCompare(b.standId));
-    el("count").textContent = String(rows.length);
-    el("total").textContent = String(state.stands.length);
-
-    const tb = el("tbody");
-    tb.innerHTML = "";
-    rows.forEach(s => {
-      const tr = document.createElement("tr");
-      if (state.selectedId === s.standId) tr.classList.add("sel");
-      const badgeClass = s.status === "sold" ? "sold" : "av";
-      const badgeText = s.status === "sold" ? "Sold" : "Available";
-      tr.innerHTML = `
-        <td><b>${s.standId}</b></td>
-        <td><span class="badge ${badgeClass}">${badgeText}</span></td>
-        <td>${s.company || ""}</td>
-      `;
-      tr.addEventListener("click", ()=>selectStand(s.standId));
-      tb.appendChild(tr);
-    });
-  }
-
-  function wirePlanClicks() {
-    if (!state.svgDoc) return;
-    getStandElements(state.svgDoc).forEach(node => {
-      node.onclick = null;
-      node.addEventListener("click", (e)=>{
-        e.preventDefault(); e.stopPropagation();
-        selectStand(node.id);
-      });
-    });
-  }
-
-  async function loadAll() {
-    // SVGs
-    const p = await waitForSvgObject(el("planObj"));
-    state.svgDoc = p.doc; state.svgRoot = p.svg;
-    const z = await waitForSvgObject(el("zoomObj"));
-    state.zoomDoc = z.doc; state.zoomRoot = z.svg;
-    buildZoomRaw();
-
-    // Data
-    const [stands, settings] = await Promise.all([
-      fetchJson("/stands"),
-      fetchJson("/settings").catch(()=>null),
-    ]);
-    state.stands = normalizeStands(stands);
-    if (settings && settings.eventName) el("eventName").value = settings.eventName;
-    if (settings && settings.updatedAt) el("synced").textContent = settings.updatedAt;
-    else el("synced").textContent = new Date().toLocaleTimeString();
-
-    applyPlanColors();
-    wirePlanClicks();
-    renderTable();
-  }
-
-  async function saveStand() {
-    const standId = el("standId").value.trim().toUpperCase();
-    if (!standId) return alert("Stand ID required");
-    const status = el("status").value;
-    const company = (status === "sold") ? el("company").value.trim() : "";
-    await fetchJson("/stand", {
-      method: "POST",
-      body: JSON.stringify({ standId, status, company })
-    });
+  el('saveBtn').addEventListener('click', async ()=>{
+    const standId = el('standId').value.trim().toUpperCase();
+    if(!standId) return;
+    const status = el('status').value;
+    const company = (status==='sold') ? (el('company').value||'') : '';
+    await saveStand({standId, status, company});
     await refresh();
     selectStand(standId);
-  }
+  });
 
-  async function markAvailable() {
-    const standId = el("standId").value.trim().toUpperCase();
-    if (!standId) return;
-    await fetchJson("/stand", {
-      method: "POST",
-      body: JSON.stringify({ standId, status: "available", company: "" })
-    });
+  el('markAvailBtn').addEventListener('click', async ()=>{
+    const standId = el('standId').value.trim().toUpperCase();
+    if(!standId) return;
+    await saveStand({standId, status:'available', company:''});
     await refresh();
     selectStand(standId);
-  }
+  });
 
-  async function saveSettings() {
-    const eventName = el("eventName").value.trim();
-    await fetchJson("/settings", {
-      method: "POST",
-      body: JSON.stringify({ eventName })
-    });
-  }
+  el('pauseBtn').addEventListener('click', ()=>{
+    state.paused = !state.paused;
+    el('pauseBtn').textContent = state.paused ? 'Resume sync' : 'Pause sync';
+  });
 
-  async function refresh() {
-    const stands = await fetchJson("/stands");
-    state.stands = normalizeStands(stands);
-    el("synced").textContent = new Date().toLocaleTimeString();
-    applyPlanColors();
-    renderTable();
-  }
+  el('eventName').addEventListener('change', async ()=>{
+    await saveSettings({eventName: el('eventName').value.trim()});
+  });
 
-  // CSV helpers
-  function standsToCsv(list) {
-    const lines = [["standId","status","company"]];
-    list.forEach(s => lines.push([s.standId, s.status, (s.company||"").replaceAll('"','""')]));
-    return lines.map(r => r.map(v => `"${String(v)}"`).join(",")).join("\n");
-  }
-  function download(name, content, mime) {
-    const blob = new Blob([content], {type:mime});
-    const a = document.createElement("a");
+  el('exportBtn').addEventListener('click', ()=>{
+    // basic CSV export
+    const rows = [['standId','status','company']].concat(state.stands.map(s=>[s.standId,s.status,s.company||'']));
+    const csv = rows.map(r=>r.map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv'});
+    const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = name;
-    document.body.appendChild(a);
+    a.download = 'stands.csv';
     a.click();
-    setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();}, 500);
-  }
-  function parseCsv(text) {
-    const rows = text.trim().split(/\r?\n/).map(l => l.split(",").map(x => x.replace(/^"|"$/g,"").replaceAll('""','"')));
-    const header = rows.shift().map(h=>h.trim());
-    const idx = {
-      standId: header.indexOf("standId"),
-      status: header.indexOf("status"),
-      company: header.indexOf("company"),
-    };
-    return rows.filter(r=>r.length>=2).map(r=>({
-      standId: (r[idx.standId]||"").toUpperCase(),
-      status: (r[idx.status]||"available").toLowerCase(),
-      company: (r[idx.company]||""),
-    })).filter(x=>x.standId);
-  }
-
-  // UI wiring
-  el("status").addEventListener("change", () => {
-    el("company").disabled = el("status").value !== "sold";
-    if (el("status").value !== "sold") el("company").value = "";
+    URL.revokeObjectURL(a.href);
   });
-  el("saveBtn").addEventListener("click", saveStand);
-  el("markAvailBtn").addEventListener("click", markAvailable);
-  el("search").addEventListener("input", renderTable);
-  el("filter").addEventListener("change", renderTable);
-  el("eventName").addEventListener("change", saveSettings);
 
-  el("exportBtn").addEventListener("click", () => {
-    download("stands.csv", standsToCsv(state.stands), "text/csv");
-  });
-  el("importBtn").addEventListener("click", async () => {
-    const inp = document.createElement("input");
-    inp.type = "file"; inp.accept = ".csv,text/csv";
-    inp.onchange = async () => {
-      const file = inp.files[0];
-      if (!file) return;
-      const txt = await file.text();
-      const rows = parseCsv(txt);
-      if (!confirm(`Import ${rows.length} rows? This will overwrite those stand IDs.`)) return;
-      for (const r of rows) {
-        await fetchJson("/stand", {
-          method: "POST",
-          body: JSON.stringify({ standId: r.standId, status: r.status, company: r.company })
-        });
+  el('importBtn').addEventListener('click', ()=>{
+    const inp = document.createElement('input');
+    inp.type='file'; inp.accept='.csv,text/csv';
+    inp.onchange = async ()=>{
+      const file = inp.files && inp.files[0];
+      if(!file) return;
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter(Boolean);
+      const header = lines.shift();
+      for(const line of lines){
+        const cols = line.split(',').map(x=>x.replace(/^"|"$/g,'').replace(/""/g,'"'));
+        const standId = (cols[0]||'').trim().toUpperCase();
+        const status = (cols[1]||'available').trim().toLowerCase();
+        const company = (cols[2]||'');
+        if(!standId) continue;
+        await saveStand({standId, status:(status==='sold'?'sold':'available'), company:(status==='sold'?company:'')});
       }
       await refresh();
-      alert("Import complete");
     };
     inp.click();
   });
-  el("resetBtn").addEventListener("click", async () => {
-    if (!confirm("Reset all stands to Available with no company?")) return;
-    for (const s of state.stands) {
-      await fetchJson("/stand", {
-        method: "POST",
-        body: JSON.stringify({ standId: s.standId, status: "available", company: "" })
-      });
+
+  el('resetBtn').addEventListener('click', async ()=>{
+    if(!confirm('Reset ALL stands to available?')) return;
+    for(const s of state.stands){
+      await saveStand({standId:s.standId, status:'available', company:''});
     }
     await refresh();
-  });
-  el("pauseBtn").addEventListener("click", () => {
-    state.paused = !state.paused;
-    el("pauseBtn").textContent = state.paused ? "Resume sync" : "Pause sync";
+    selectStand(null);
   });
 
-  // Recalc label line on resize/scroll
-  let resizeTimer = null;
-  window.addEventListener("resize", () => {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => updateLabelAndPointer(), 50);
-  });
-  window.addEventListener("scroll", () => requestAnimationFrame(()=>updateLabelAndPointer()), {passive:true});
+  window.addEventListener('resize', ()=>{ requestPointer(); updateZoom(); });
+  window.addEventListener('scroll', ()=>{ if(!isPhone()) requestPointer(); }, {passive:true});
 
-  // Auto sync
-  setInterval(async () => {
-    if (state.paused) return;
-    try {
-      await refresh();
-    } catch(e) {}
-  }, 15000);
+  // Init
+  hookSvgLoad();
+  hookZoomLoad();
 
-  // Start
-  loadAll().catch(err => {
-    console.error(err);
-    alert("Failed to load from backend: " + state.backend + "\n" + (err.message||err));
-  });
+  (async ()=>{
+    await ensureAdminPassword();
+    await refresh();
+    setInterval(refresh, 30000);
+  })().catch((e)=>{ console.error(e); });
+
 })();
 </script>
 </body>
