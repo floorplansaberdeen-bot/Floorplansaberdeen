@@ -331,9 +331,31 @@
   let autoSync = true;
   let syncTimer = null;
 
-  function getBackendUrl() {
+  function normalizeBackendUrl(input) {
+  if (!input) return "";
+  let s = String(input).trim();
+  // If someone pastes a full endpoint (e.g. .../stands), strip it back to the base.
+  try {
+    const u = new URL(s);
+    let p = u.pathname.replace(/\/+$/,"");
+    p = p.replace(/\/(api\/stands|stands)$/i, "");
+    p = p.replace(/\/+$/,"");
+    u.pathname = p ? p : "/";
+    u.search = "";
+    u.hash = "";
+    const base = u.origin + (u.pathname === "/" ? "" : u.pathname);
+    return base.replace(/\/+$/,"");
+  } catch (e) {
+    s = s.replace(/\/+$/,"");
+    s = s.replace(/\/(api\/stands|stands)$/i, "");
+    return s.replace(/\/+$/,"");
+  }
+}
+
+function getBackendUrl() {
     const saved = localStorage.getItem(BACKEND_KEY);
-    return (saved && saved.startsWith("http")) ? saved.replace(/\/+$/,"") : DEFAULT_BACKEND;
+    const base = (saved && saved.startsWith("http")) ? saved : DEFAULT_BACKEND;
+    return normalizeBackendUrl(base);
   }
 
   function showToast(show) {
