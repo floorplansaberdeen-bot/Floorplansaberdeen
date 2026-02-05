@@ -58,19 +58,19 @@
       box-shadow: 0 1px 0 rgba(0,0,0,.02);
     }
     .planCard{ padding:14px; }
-    .planWrap{
+    .planWrap{--labelGutter:110px;
+
       position:relative;
       border-radius:14px;
       overflow:hidden;
       background:#fff;
       min-height:420px;
-    }
+    
+  padding-bottom: var(--labelGutter);
+}
     /* The SVG inserted is inside .svgHost */
-    .svgHost{
-      width:100%;
-      height:auto;
-      display:block;
-    }
+    .svgHost{position:absolute; left:0; right:0; top:0; bottom:var(--labelGutter);}
+
     .overlay{
       position:absolute; inset:0;
       pointer-events:none;
@@ -91,7 +91,8 @@
     }
     .label .stand{ font-size:38px; font-weight:900; letter-spacing:.02em; }
     .label .company{ margin-top:6px; font-size:18px; font-weight:800; opacity:.95; }
-    .line{
+    .line{display:none;
+
       position:absolute;
       background:var(--line);
       transform-origin: 0 0;
@@ -99,7 +100,8 @@
       border-radius:3px;
       pointer-events:none;
     }
-    .dot{
+    .dot{display:none;
+
       position:absolute;
       width:var(--dot); height:var(--dot);
       border-radius:999px;
@@ -412,228 +414,21 @@ function getBackendUrl() {
   function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
 
   function placeLabelUnder(standCenter, labelW, labelH) {
-    const wrapRect = planWrapEl.getBoundingClientRect();
-    const margin = 18;
+    // Coordinates are in planWrap space (0..width, 0..height)
+    const wrapW = planWrap.clientWidth;
+    const wrapH = planWrap.clientHeight;
 
-    const lx = clamp(standCenter.x, wrapRect.left + margin + labelW/2, wrapRect.right - margin - labelW/2);
-    const ly = wrapRect.bottom - margin - labelH/2; // under the plan
+    const gutterCss = getComputedStyle(planWrap).getPropertyValue("--labelGutter").trim();
+    const gutter = gutterCss ? parseFloat(gutterCss) : 110;
 
-    return { x: lx, y: ly };
-  }
+    const margin = 12;
+    let x = standCenter.x;
+    x = Math.max(margin + labelW / 2, Math.min(wrapW - margin - labelW / 2, x));
 
-  function updatePointer() {
-    if (!svgRoot) return;
+    // Lock label into the reserved bottom gutter area (keeps it off the plan)
+    const y = wrapH - gutter / 2;
 
-    if (!selectedStandId) {
-      pointerLineEl.style.display = "none";
-      pointerDotEl.style.display = "none";
-      labelEl.style.display = "none";
-      return;
-    }
-
-    const standEl = standMap.get(normalizeStandId(selectedStandId));
-    if (!standEl) {
-      pointerLineEl.style.display = "none";
-      pointerDotEl.style.display = "none";
-      labelEl.style.display = "none";
-      return;
-    }
-
-    const standBox = standEl.getBoundingClientRect();
-    const standCenter = { x: standBox.left + standBox.width/2, y: standBox.top + standBox.height/2 };
-
-    const isMobile = window.matchMedia("(max-width: 768px)").matches;
-    const labelW = isMobile ? 220 : 240;
-    const labelH = isMobile ? 78 : 74;
-
-    labelEl.style.display = "block";
-    labelEl.style.width = labelW + "px";
-
-    const { x: lx, y: ly } = placeLabelUnder(standCenter, labelW, labelH);
-    labelEl.style.left = lx + "px";
-    labelEl.style.top  = ly + "px";
-
-    // Line from top-middle of label to stand
-    const startX = lx;
-    const startY = ly - (labelH / 2);
-    const endX = standCenter.x;
-    const endY = standCenter.y;
-
-    pointerLineEl.style.display = "block";
-    pointerLineEl.setAttribute("x1", startX);
-    pointerLineEl.setAttribute("y1", startY);
-    pointerLineEl.setAttribute("x2", endX);
-    pointerLineEl.setAttribute("y2", endY);
-
-    pointerDotEl.style.display = "block";
-    pointerDotEl.setAttribute("cx", endX);
-    pointerDotEl.setAttribute("cy", endY);
-
-    labelStandEl.textContent = selectedStandId;
-    const company = (standsById.get(normalizeStandId(selectedStandId))?.company || "").trim();
-    labelCompanyEl.textContent = company;
-    labelCompanyEl.style.display = company ? "block" : "none";
-  }
-
-  // ===== Data + UI =====
-  let rows = [];
-  let selectedStandId = null;
-
-  function renderList() {
-    const q = (searchEl.value || "").trim().toLowerCase();
-    const sold = rows.filter(r => r.status === "sold");
-    const filtered = q
-      ? sold.filter(r =>
-          r.standId.toLowerCase().includes(q) ||
-          (r.company || "").toLowerCase().includes(q)
-        )
-      : sold;
-
-    listEl.innerHTML = "";
-    filtered.forEach(r => {
-      const div = document.createElement("div");
-      div.className = "item" + (r.standId === selectedStandId ? " active" : "");
-      const name = document.createElement("div");
-      name.className = "name";
-      name.textContent = r.company ? r.company : "(No company)";
-      const sub = document.createElement("div");
-      sub.className = "sub";
-      sub.textContent = `Stand ${r.standId}`;
-      div.appendChild(name);
-      div.appendChild(sub);
-      div.addEventListener("click", () => selectStand(r.standId));
-      listEl.appendChild(div);
-    });
-  }
-
-  function applyColours() {
-    if (!svgRoot) return;
-    // All stands = main colour; selected = red
-    rows.forEach(r => {
-      const elem = elementForStand(r.standId);
-      if (!elem) return;
-      setFillForElement(elem, getComputedStyle(document.documentElement).getPropertyValue("--accent").trim());
-    });
-    if (selectedStandId) {
-      const elem = elementForStand(selectedStandId);
-      if (elem) setFillForElement(elem, getComputedStyle(document.documentElement).getPropertyValue("--selected").trim());
-    }
-  }
-
-  function selectStand(standId) {
-    selectedStandId = normStandId(standId);
-    const row = rows.find(r => r.standId === selectedStandId) || { standId: selectedStandId, status:"available", company:"" };
-    applyColours();
-    updatePointer(row);
-    renderList();
-  }
-
-  function clearSelection() {
-    selectedStandId = null;
-    selStandEl.textContent = "None";
-    selCompanyEl.style.display = "none";
-    selCompanyEl.textContent = "";
-    applyColours();
-    updatePointer(null);
-    renderList();
-  }
-
-  function isPhone() { return window.matchMedia("(max-width: 640px)").matches; }
-
-  function attachStandClicks() {
-    if (!svgRoot) return;
-
-    // Disable stand tapping on phone (requested)
-    if (isPhone()) return;
-
-    svgRoot.addEventListener("click", (ev) => {
-      const t = ev.target;
-      if (!t) return;
-      // climb to an id-bearing ancestor
-      let node = t;
-      for (let i=0; i<6 && node; i++){
-        if (node.id) break;
-        node = node.parentElement;
-      }
-      if (!node || !node.id) return;
-      const key = normalizeDomId(node.id);
-      if (!key) return;
-      // Only select if this key exists in rows
-      const found = rows.find(r => normalizeDomId(r.standId) === key);
-      if (found) selectStand(found.standId);
-    }, { passive:true });
-  }
-
-  async function loadSvg() {
-    const res = await fetch(SVG_URL);
-    if (!res.ok) throw new Error("Could not load SVG");
-    const txt = await res.text();
-    svgHost.innerHTML = txt;
-
-    svgRoot = svgHost.querySelector("svg");
-    if (!svgRoot) throw new Error("SVG invalid");
-
-    // Remove any stray shapes we might have created in older versions (the “grey quarter circle”)
-    // If someone left a <circle> at 0,0 with huge radius, hide it:
-    svgRoot.querySelectorAll("circle").forEach(c => {
-      const cx = c.getAttribute("cx"), cy = c.getAttribute("cy"), r = c.getAttribute("r");
-      const rr = parseFloat(r || "0");
-      if ((cx === "0" || cx === "0.0") && (cy === "0" || cy === "0.0") && rr >= 20) {
-        c.style.display = "none";
-      }
-    });
-
-    // Make sure SVG scales nicely
-    svgRoot.setAttribute("preserveAspectRatio", "xMidYMid meet");
-    svgRoot.style.width = "100%";
-    svgRoot.style.height = "auto";
-    svgRoot.style.display = "block";
-
-    buildStandMap();
-    attachStandClicks();
-  }
-
-  async function loadData() {
-    const backend = getBackendUrl();
-    const data = await fetchJson(`${backend}/stands`);
-    rows = (Array.isArray(data) ? data : []).map(normRow).filter(r => r.standId);
-    applyColours();
-    renderList();
-    readyRow.style.display = "flex";
-    updatedAtEl.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
-    clearError();
-  }
-
-  // very lightweight "PDF export": print dialog (keeps working across browsers)
-  exportBtn.addEventListener("click", () => window.print());
-  clearBtn.addEventListener("click", clearSelection);
-
-  searchEl.addEventListener("input", renderList);
-  window.addEventListener("resize", () => {
-    // reposition pointer after resize
-    if (selectedStandId) {
-      const row = rows.find(r => r.standId === selectedStandId);
-      if (row) updatePointer(row);
-    }
-  });
-
-  // init
-  (async () => {
-    try {
-      await loadSvg();
-    } catch (e) {
-      showError("Error loading plan SVG.");
-      console.error(e);
-      return;
-    }
-
-    try {
-      await loadData();
-    } catch (e) {
-      showError("Failed to fetch (backend not reachable).");
-      console.error(e);
-    }
-  })();
+    return { x, y };
 })();
 </script>
 </body>

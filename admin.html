@@ -68,14 +68,18 @@
     }
     .planCard{ overflow:hidden; }
     .planBody{ padding:12px; }
-    .planWrap{
+    .planWrap{--labelGutter:110px;
+
       position:relative;
       border-radius:14px;
       overflow:hidden;
       background:#fff;
       min-height:420px;
-    }
-    .svgHost{ width:100%; height:auto; display:block; }
+    
+  padding-bottom: var(--labelGutter);
+}
+    .svgHost{position:absolute; left:0; right:0; top:0; bottom:var(--labelGutter);}
+
     .overlay{ position:absolute; inset:0; pointer-events:none; }
     .label{
       position:absolute;
@@ -91,11 +95,13 @@
       transform: translate(-50%, -50%);
     }
     .label .stand{ font-size:28px; font-weight:900; }
-    .line{
+    .line{display:none;
+
       position:absolute; background:var(--line);
       transform-origin:0 0; height:3px; border-radius:3px;
     }
-    .dot{
+    .dot{display:none;
+
       position:absolute; width:var(--dot); height:var(--dot);
       border-radius:999px; background:rgba(0,0,0,.72);
       transform: translate(-50%, -50%);
@@ -489,7 +495,7 @@ function getBackendUrl() {
   function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
 
   function placeLabelUnder(standCenter, labelW, labelH) {
-    const wrapRect = planWrapEl.getBoundingClientRect();
+    const wrapRect = planWrap.getBoundingClientRect();
     const margin = 18;
 
     const lx = clamp(standCenter.x, wrapRect.left + margin + labelW/2, wrapRect.right - margin - labelW/2);
@@ -499,376 +505,76 @@ function getBackendUrl() {
   }
 
   function updatePointer() {
-    if (!svgRoot) return;
-
     if (!selectedStandId) {
-      pointerLineEl.style.display = "none";
-      pointerDotEl.style.display = "none";
-      labelEl.style.display = "none";
-      return;
+        lineEl.style.display = "none";
+        dotEl.style.display = "none";
+        labelEl.style.display = "none";
+        return;
     }
 
-    const standEl = standMap.get(normalizeStandId(selectedStandId));
+    const key = normalizeDomId(selectedStandId);
+    const standEl = standMap.get(key);
     if (!standEl) {
-      pointerLineEl.style.display = "none";
-      pointerDotEl.style.display = "none";
-      labelEl.style.display = "none";
-      return;
+        lineEl.style.display = "none";
+        dotEl.style.display = "none";
+        labelEl.style.display = "none";
+        return;
     }
 
-    // Stand center in screen coords
-    const standBox = standEl.getBoundingClientRect();
-    const standCenter = { x: standBox.left + standBox.width/2, y: standBox.top + standBox.height/2 };
+    const wrapRect = planWrap.getBoundingClientRect();
+    const standRect = standEl.getBoundingClientRect();
 
-    // Label sizing (kept consistent across admin/index)
-    const isMobile = window.matchMedia("(max-width: 768px)").matches;
-    const labelW = isMobile ? 220 : 240;
-    const labelH = isMobile ? 78 : 74;
+    const standCenter = {
+        x: (standRect.left - wrapRect.left) + (standRect.width / 2),
+        y: (standRect.top - wrapRect.top) + (standRect.height / 2),
+    };
 
-    // Position label under the plan
+    // Label text
+    labelStand.textContent = selectedStandId;
+    const st = standsById.get(selectedStandId);
+    const company = (st?.company || "").trim();
+    labelCompany.textContent = company || "";
+
+    // Measure label
     labelEl.style.display = "block";
+    const labelW = 220;
     labelEl.style.width = labelW + "px";
-    labelEl.style.left = standCenter.x + "px"; // temp so size is applied
-    labelEl.style.top  = standCenter.y + "px";
+    const labelRect = labelEl.getBoundingClientRect();
+    const labelH = labelRect.height;
 
-    const { x: lx, y: ly } = placeLabelUnder(standCenter, labelW, labelH);
+    // Place label in reserved bottom gutter (off the plan)
+    const gutterCss = getComputedStyle(planWrap).getPropertyValue("--labelGutter").trim();
+    const gutter = gutterCss ? parseFloat(gutterCss) : 110;
+    const margin = 12;
+
+    let lx = standCenter.x;
+    lx = Math.max(margin + labelW / 2, Math.min(planWrap.clientWidth - margin - labelW / 2, lx));
+    const ly = planWrap.clientHeight - gutter / 2;
+
     labelEl.style.left = lx + "px";
     labelEl.style.top  = ly + "px";
 
-    // Line starts at top-middle of label
+    // Line from top-middle of label to stand center
     const startX = lx;
     const startY = ly - (labelH / 2);
-
-    // Line ends at stand center
     const endX = standCenter.x;
     const endY = standCenter.y;
 
-    // Draw line
-    pointerLineEl.style.display = "block";
-    pointerLineEl.setAttribute("x1", startX);
-    pointerLineEl.setAttribute("y1", startY);
-    pointerLineEl.setAttribute("x2", endX);
-    pointerLineEl.setAttribute("y2", endY);
+    const dx = endX - startX;
+    const dy = endY - startY;
+    const len = Math.max(1, Math.hypot(dx, dy));
+    const ang = Math.atan2(dy, dx);
 
-    // Draw dot at stand
-    pointerDotEl.style.display = "block";
-    pointerDotEl.setAttribute("cx", endX);
-    pointerDotEl.setAttribute("cy", endY);
+    lineEl.style.display = "block";
+    lineEl.style.left = startX + "px";
+    lineEl.style.top  = startY + "px";
+    lineEl.style.width = len + "px";
+    lineEl.style.transform = "rotate(" + ang + "rad)";
 
-    // Update label content
-    labelStandEl.textContent = selectedStandId;
-    labelCompanyEl.textContent = (standsById.get(normalizeStandId(selectedStandId))?.company || "").trim();
-    labelCompanyEl.style.display = labelCompanyEl.textContent ? "block" : "none";
-  }
-
-  function applyColours() {
-    rows.forEach(r => {
-      const elem = elementForStand(r.standId);
-      if (!elem) return;
-      setFillForElement(elem, r.status === "sold"
-        ? getComputedStyle(document.documentElement).getPropertyValue("--sold").trim()
-        : getComputedStyle(document.documentElement).getPropertyValue("--avail").trim()
-      );
-    });
-  }
-
-  function renderTable() {
-    const q = (searchEl.value || "").trim().toLowerCase();
-    const f = filterEl.value;
-
-    const filtered = rows.filter(r => {
-      if (f !== "all" && r.status !== f) return false;
-      if (!q) return true;
-      return r.standId.toLowerCase().includes(q) || (r.company||"").toLowerCase().includes(q);
-    });
-
-    tbody.innerHTML = "";
-    filtered.forEach(r => {
-      const tr = document.createElement("tr");
-      if (r.standId === selectedStandId) tr.classList.add("active");
-
-      const td1 = document.createElement("td");
-      td1.textContent = r.standId;
-
-      const td2 = document.createElement("td");
-      const badge = document.createElement("span");
-      badge.className = "badge " + (r.status === "sold" ? "bSold" : "bAvail");
-      badge.textContent = r.status === "sold" ? "Sold" : "Available";
-      td2.appendChild(badge);
-
-      const td3 = document.createElement("td");
-      td3.textContent = r.company || "";
-
-      tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
-      tr.addEventListener("click", () => selectStand(r.standId));
-      tbody.appendChild(tr);
-    });
-
-    countEl.textContent = String(filtered.length);
-    totalEl.textContent = String(rows.length);
-  }
-
-  function selectStand(standId) {
-    selectedStandId = normStandId(standId);
-    const row = rows.find(r => r.standId === selectedStandId);
-    if (!row) return;
-
-    standIdEl.value = row.standId;
-    statusEl.value = row.status;
-    companyEl.value = row.company || "";
-
-    applyColours();
-    updatePointer(row.standId);
-    renderTable();
-    updateZoom(row.standId);
-  }
-
-  function updateZoom() {
-    if (!rawSvgText || !zoomHostEl) return;
-
-    zoomHostEl.innerHTML = "";
-    zoomSvgRoot = null;
-    zoomRingEl.style.display = "none";
-
-    if (!selectedStandId || !svgRoot) {
-      zoomHintEl.textContent = "Select a stand to zoom in.";
-      return;
-    }
-
-    let zoomSvg;
-    try {
-      zoomSvg = svgFromText(rawSvgText);
-    } catch (e) {
-      console.error(e);
-      zoomHintEl.textContent = "Zoom failed (SVG parse).";
-      return;
-    }
-
-    zoomSvgRoot = zoomSvg;
-    zoomSvgRoot.style.width = "100%";
-    zoomSvgRoot.style.height = "100%";
-    zoomSvgRoot.style.display = "block";
-    zoomSvgRoot.style.pointerEvents = "none";
-    zoomSvgRoot.setAttribute("preserveAspectRatio", "xMidYMid meet");
-
-    hideLargeArtifacts(zoomSvgRoot);
-    zoomHostEl.appendChild(zoomSvgRoot);
-
-    // Use the selected stand bbox from the main SVG to set the zoom viewBox
-    const standEl = standMap.get(normalizeStandId(selectedStandId));
-    if (!standEl) return;
-
-    let b;
-    try { b = standEl.getBBox(); } catch { return; }
-    const pad = Math.max(b.width, b.height) * 0.6 + 40;
-    const vb = {
-      x: b.x - pad,
-      y: b.y - pad,
-      w: b.width + pad*2,
-      h: b.height + pad*2
-    };
-    zoomSvgRoot.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
-
-    // Find the same stand element inside the zoom SVG (for the ring placement)
-    const key = normalizeStandId(selectedStandId);
-    let zEl = null;
-    zoomSvgRoot.querySelectorAll("[id],[data-stand]").forEach(node => {
-      if (zEl) return;
-      const id = node.id || node.getAttribute("data-stand") || "";
-      if (normalizeDomId(id) === key) zEl = node;
-    });
-
-    if (!zEl) return;
-
-    requestAnimationFrame(() => {
-      const wrap = zoomWrapEl.getBoundingClientRect();
-      const r = zEl.getBoundingClientRect();
-      const cx = r.left + r.width/2 - wrap.left;
-      const cy = r.top + r.height/2 - wrap.top;
-      const radius = Math.max(18, Math.min(90, Math.max(r.width, r.height) * 0.55));
-
-      zoomRingEl.style.display = "block";
-      zoomRingEl.style.width = `${radius*2}px`;
-      zoomRingEl.style.height = `${radius*2}px`;
-      zoomRingEl.style.left = `${cx - radius}px`;
-      zoomRingEl.style.top = `${cy - radius}px`;
-    });
-  }
-
-  async function loadSvg() {
-    const res = await fetch(SVG_URL);
-    if (!res.ok) throw new Error("Could not load SVG");
-    const txt = await res.text();
-    svgHost.innerHTML = txt;
-    svgRoot = svgHost.querySelector("svg");
-    if (!svgRoot) throw new Error("SVG invalid");
-
-    // Hide any stray huge circle at 0,0 (the “quarter circle” artifact)
-    svgRoot.querySelectorAll("circle").forEach(c => {
-      const cx = c.getAttribute("cx"), cy = c.getAttribute("cy"), r = parseFloat(c.getAttribute("r") || "0");
-      if ((cx === "0" || cx === "0.0") && (cy === "0" || cy === "0.0") && r >= 20) {
-        c.style.display = "none";
-      }
-    });
-
-    svgRoot.setAttribute("preserveAspectRatio","xMidYMid meet");
-    svgRoot.style.width = "100%";
-    svgRoot.style.height = "auto";
-    svgRoot.style.display = "block";
-
-    buildStandMap();
-
-    // click-to-select (desktop & mobile is OK for admin)
-    svgRoot.addEventListener("click", (ev) => {
-      let node = ev.target;
-      for (let i=0;i<6 && node;i++){
-        if (node.id) break;
-        node = node.parentElement;
-      }
-      if (!node || !node.id) return;
-      const key = normalizeDomId(node.id);
-      const found = rows.find(r => normalizeDomId(r.standId) === key);
-      if (found) selectStand(found.standId);
-    }, { passive:true });
-  }
-
-  async function loadData() {
-    const backend = getBackendUrl();
-    const data = await fetchJson(`${backend}/stands`);
-    rows = (Array.isArray(data) ? data : []).map(normRow).filter(r => r.standId);
-    applyColours();
-    renderTable();
-    syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
-    showToast(false);
-  }
-
-  async function saveCurrent() {
-    if (!selectedStandId) return;
-    const backend = getBackendUrl();
-    const payload = {
-      standId: selectedStandId,
-      status: statusEl.value,
-      company: (statusEl.value === "sold") ? companyEl.value.trim() : ""
-    };
-
-    // Try common Worker patterns
-    let ok = false;
-    try {
-      await fetchJson(`${backend}/stands/${encodeURIComponent(selectedStandId)}`, {
-        method:"PUT",
-        headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify(payload)
-      });
-      ok = true;
-    } catch (e1) {
-      try {
-        await fetchJson(`${backend}/stands`, {
-          method:"POST",
-          headers:{ "Content-Type":"application/json" },
-          body: JSON.stringify(payload)
-        });
-        ok = true;
-      } catch (e2) {
-        ok = false;
-      }
-    }
-    if (!ok) {
-      showToast(true);
-      return;
-    }
-
-    // Update local copy immediately (so plan updates)
-    const idx = rows.findIndex(r => r.standId === selectedStandId);
-    if (idx >= 0) rows[idx] = payload;
-    applyColours();
-    renderTable();
-    updatePointer(selectedStandId);
-    syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
-  }
-
-  saveBtn.addEventListener("click", saveCurrent);
-  markAvailBtn.addEventListener("click", () => {
-    statusEl.value = "available";
-    companyEl.value = "";
-    saveCurrent();
-  });
-
-  searchEl.addEventListener("input", renderTable);
-  filterEl.addEventListener("change", renderTable);
-
-  // Simple CSV export/import local to browser (does not need backend)
-  el("exportBtn").addEventListener("click", () => {
-    const lines = ["standId,status,company"].concat(rows.map(r => {
-      const c = (r.company||"").replaceAll('"','""');
-      return `${r.standId},${r.status},"${c}"`;
-    }));
-    const blob = new Blob([lines.join("\n")], { type:"text/csv" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "stands.csv";
-    a.click();
-    URL.revokeObjectURL(a.href);
-  });
-
-  el("importBtn").addEventListener("click", async () => {
-    const inp = document.createElement("input");
-    inp.type="file";
-    inp.accept=".csv,text/csv";
-    inp.onchange = async () => {
-      const f = inp.files && inp.files[0];
-      if (!f) return;
-      const txt = await f.text();
-      const lines = txt.split(/\r?\n/).filter(Boolean);
-      const out = [];
-      for (let i=1;i<lines.length;i++){
-        const line = lines[i];
-        const m = line.match(/^([^,]+),([^,]+),"(.*)"$/);
-        if (!m) continue;
-        out.push({ standId: normStandId(m[1]), status: m[2].trim().toLowerCase(), company: m[3].replaceAll('""','"') });
-      }
-      rows = out;
-      applyColours();
-      renderTable();
-    };
-    inp.click();
-  });
-
-  // Pause sync (polling) - optional
-  el("pauseBtn").addEventListener("click", () => {
-    autoSync = !autoSync;
-    el("pauseBtn").textContent = autoSync ? "Pause sync" : "Resume sync";
-    if (autoSync) startPolling(); else stopPolling();
-  });
-
-  function startPolling(){
-    stopPolling();
-    syncTimer = setInterval(async () => {
-      if (!autoSync) return;
-      try { await loadData(); } catch(e){ showToast(true); }
-    }, 8000);
-  }
-  function stopPolling(){
-    if (syncTimer) clearInterval(syncTimer);
-    syncTimer = null;
-  }
-
-  // init
-  (async () => {
-    try {
-      await loadSvg();
-    } catch(e) {
-      showToast(true);
-      console.error(e);
-      return;
-    }
-    try {
-      await loadData();
-      startPolling();
-    } catch(e) {
-      showToast(true);
-      console.error(e);
-    }
-  })();
+    dotEl.style.display = "block";
+    const dotSize = dotEl.offsetWidth || 10;
+    dotEl.style.left = (endX - dotSize / 2) + "px";
+    dotEl.style.top  = (endY - dotSize / 2) + "px";
 })();
 </script>
 </body>
