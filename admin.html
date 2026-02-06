@@ -184,6 +184,11 @@
         <div style="font-weight:900;">Event name</div>
         <input id="eventName" placeholder="New Event" />
       </div>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <div style="font-weight:900;">Admin password</div>
+        <input id="adminPwd" type="password" placeholder="Enter password" style="min-width:200px;" />
+        <button id="setPwdBtn" title="Save password for this session">Set</button>
+      </div>
       <button id="pauseBtn">Pause sync</button>
       <button id="exportBtn">Export CSV</button>
       <button id="importBtn">Import CSV</button>
@@ -321,6 +326,8 @@
   const setBackendBtn = el("setBackendBtn");
   const hideToastBtn = el("hideToastBtn");
   const syncedAt = el("syncedAt");
+  const adminPwdEl = el("adminPwd");
+  const setPwdBtn = el("setPwdBtn");
 
   let svgRoot = null;
   let zoomSvgRoot = null;
@@ -330,6 +337,7 @@
   let selectedStandId = null;
   let autoSync = true;
   let syncTimer = null;
+  let adminPassword = sessionStorage.getItem("admin_pwd") || "";
 
   function normalizeBackendUrl(input) {
   if (!input) return "";
@@ -352,6 +360,19 @@
   }
 }
 
+async function requireAdminPassword(){
+  let adminPassword = sessionStorage.getItem("admin_pwd") || "";
+  if (adminPassword) return;
+  while(true){
+    const entered = prompt("Admin password required:", "");
+    if (entered === null){ alert("Password required to use admin."); continue; }
+    const v = String(entered||"").trim();
+    if (!v){ alert("Password required."); continue; }
+    sessionStorage.setItem("admin_pwd", v);
+    return;
+  }
+}
+
 function getBackendUrl() {
     const saved = localStorage.getItem(BACKEND_KEY);
     const base = (saved && saved.startsWith("http")) ? saved : DEFAULT_BACKEND;
@@ -371,6 +392,19 @@ function getBackendUrl() {
     }
   });
   hideToastBtn.addEventListener("click", () => showToast(false));
+
+  function syncPwdUI(){
+    if (!adminPwdEl) return;
+    adminPwdEl.value = adminPassword || "";
+  }
+  syncPwdUI();
+  if (setPwdBtn) setPwdBtn.addEventListener("click", () => {
+    const v = String(adminPwdEl ? adminPwdEl.value : "").trim();
+    if (!v){ alert("Enter the admin password first."); return; }
+    adminPassword = v;
+    sessionStorage.setItem("admin_pwd", adminPassword);
+    alert("Password set for this session.");
+  });
 
   async function fetchJson(url, opts = {}) {
     const controller = new AbortController();
