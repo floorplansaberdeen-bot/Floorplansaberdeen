@@ -139,11 +139,13 @@
     /* Mobile: plan pinned top, search pinned under plan, list scrollable underneath */
     @media (max-width: 640px){
       main{ padding:12px; gap:12px; }
+      .planWrap{ min-height: 260px; }
       .planCard{ position: sticky; top: 0; z-index: 30; background: var(--bg); }
       .side{ padding:0; }
-      .panel{ position: sticky; top: calc(12px + 340px); z-index: 25; } /* below plan */
+      #selectedPanel{ display:none; }
+      #listPanel{ position: sticky; top: calc(12px + 340px); z-index: 25; } /* below plan */
       .listWrap{
-        max-height: calc(100vh - 520px);
+        max-height: calc(100vh - 410px);
         overflow:auto;
         padding-bottom: calc(18px + var(--safe));
       }
@@ -181,7 +183,7 @@
     </section>
 
     <aside class="side">
-      <div class="panel">
+      <div class="panel" id="selectedPanel">
         <div class="panelHead">Selected exhibitor</div>
         <div class="panelBody">
           <div style="font-size:44px; font-weight:950; line-height:1;" id="selStand">None</div>
