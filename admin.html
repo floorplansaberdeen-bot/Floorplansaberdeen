@@ -14,13 +14,14 @@
       --avail: rgba(213,109,50,0.75);
       --sold:#e63b3b;
       --shadow: 0 12px 30px rgba(0,0,0,.12);
-      --dot: 10px; /* dot size for pointer (match public) */
+      --dot: 10px; /* dot DIAMETER (match public) */
       --line: rgba(0,0,0,.70);
       --safe: env(safe-area-inset-bottom, 0px);
     }
     *{ box-sizing:border-box; }
     body{
-      margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
       background:var(--bg); color:var(--text);
     }
     header{
@@ -28,6 +29,7 @@
       display:flex; align-items:center; justify-content:space-between; gap:12px;
       border-bottom:1px solid var(--border);
       flex-wrap:wrap;
+      background:#fff;
     }
     header .title{ font-weight:900; font-size:18px; }
     header .tools{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
@@ -48,6 +50,7 @@
     }
     button.danger{ border-color:#ffd0d0; background:#fff5f5; }
     button:disabled{ opacity:.45; cursor:not-allowed; }
+
     main{
       padding:16px;
       display:grid;
@@ -68,6 +71,9 @@
     }
     .planCard{ overflow:hidden; }
     .planBody{ padding:12px; }
+
+    /* ===== Plan + Label bay + Callout overlay ===== */
+    .planStack{ position:relative; border-radius:14px; overflow:hidden; background:#fff; }
     .planWrap{
       position:relative;
       border-radius:14px;
@@ -75,34 +81,37 @@
       background:#fff;
       min-height:420px;
     }
-    .svgHost{ width:100%; height:auto; display:block; }
-    .overlay{ position:absolute; inset:0; pointer-events:none; }
-    .label{
-      position:absolute;
-      background:var(--sold);
-      color:#fff;
-      border-radius:16px;
+    .svgHost{ width:100%; height:auto; display:block; pointer-events:auto; }
+
+    /* Overlay spans BOTH plan + label bay */
+    .calloutSvg{
+      position:absolute; left:0; top:0;
+      width:100%; height:100%;
+      pointer-events:none;
+    }
+
+    .labelBay{
+      background:#fff;
+      border-top:1px solid var(--border);
+      padding:12px;
+      min-height:72px;
+    }
+    .lozenge{
+      display:inline-block;
+      background:#fff;
+      border-radius:999px;
       padding:12px 16px;
       box-shadow: var(--shadow);
-      min-width: 200px;
-      max-width: 300px;
-      text-align:left;
-      pointer-events:none;
-      transform: translate(-50%, -50%);
+      border:1px solid rgba(0,0,0,.08);
+      max-width: 340px;
     }
-    .label .stand{ font-size:28px; font-weight:900; }
-    .line{
-      position:absolute; background:var(--line);
-      transform-origin:0 0; height:3px; border-radius:3px;
-    }
-    .dot{
-      position:absolute; width:var(--dot); height:var(--dot);
-      border-radius:999px; background:rgba(0,0,0,.72);
-      transform: translate(-50%, -50%);
-    }
+    .lozStand{ font-size:28px; font-weight:900; line-height:1.1; }
+    .lozCompany{ margin-top:4px; font-size:16px; font-weight:800; opacity:.9; }
+
     .legend{ padding:10px 12px; display:flex; gap:10px; align-items:center; border-top:1px solid var(--border); }
     .pill{ display:flex; align-items:center; gap:8px; border:1px solid var(--border); padding:6px 10px; border-radius:999px; font-weight:800; font-size:13px; }
     .sw{ width:10px; height:10px; border-radius:999px; display:inline-block; }
+
     .zoomCard .cardHead{ display:flex; justify-content:space-between; }
     .zoomBody{ padding:12px; }
     .zoomWrap{
@@ -123,6 +132,7 @@
       display:none;
     }
     .hint{ color:var(--muted); font-size:13px; padding:10px 12px 12px; }
+
     .side{ padding:12px; display:flex; flex-direction:column; gap:12px; }
     .formRow{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
     .side label{ display:block; font-weight:800; font-size:12px; color:var(--muted); margin-bottom:6px; }
@@ -132,10 +142,12 @@
     }
     .btnRow{ display:flex; gap:10px; }
     .btnRow button{ flex:1; }
+
     .tableWrap{ border:1px solid var(--border); border-radius:14px; overflow:hidden; }
     .tableTools{ padding:10px; display:flex; gap:10px; align-items:center; }
     .tableTools input{
       flex:1; padding:10px 12px; border-radius:12px; border:1px solid var(--border);
+      font-weight:800;
     }
     table{ width:100%; border-collapse:collapse; font-size:13px; }
     th, td{ padding:10px 10px; border-top:1px solid #f0f0f0; text-align:left; }
@@ -144,6 +156,7 @@
     .badge{ display:inline-flex; align-items:center; padding:3px 8px; border-radius:999px; font-weight:900; font-size:12px; border:1px solid var(--border); }
     .bSold{ color:#b40000; border-color:#ffd0d0; background:#fff5f5; }
     .bAvail{ color:#6b3a0f; border-color:#f2dfcf; background:#fff7f0; }
+
     .toast{
       position:fixed;
       left:16px; right:16px; bottom:16px;
@@ -151,7 +164,7 @@
       padding:12px 14px;
       border-radius:14px;
       display:none;
-      z-index:999;
+      z-index:9999;
       box-shadow: var(--shadow);
       align-items:center;
       justify-content:space-between;
@@ -160,6 +173,30 @@
     .toast .msg{ font-weight:800; font-size:13px; line-height:1.3; }
     .toast .actions{ display:flex; gap:10px; }
     .toast button{ background:#fff; }
+
+    
+    
+    @media (min-width: 981px){
+      /* Keep the whole right panel visible; only the stands list area scrolls */
+      .side{
+        position: sticky;
+        top: 12px;
+        max-height: calc(100vh - 24px);
+        overflow: hidden;          /* IMPORTANT: prevent whole panel scrolling */
+      }
+      .standsCard{
+        display:flex;
+        flex-direction:column;
+        min-height: 0;             /* allow inner scrolling */
+        flex: 1;
+      }
+      .standsCard .tableWrap{
+        flex: 1;
+        overflow: auto;            /* ONLY the list scrolls */
+      }
+    }
+
+    }
 
     @media (max-width: 980px){
       main{ grid-template-columns: 1fr; }
@@ -184,11 +221,6 @@
         <div style="font-weight:900;">Event name</div>
         <input id="eventName" placeholder="New Event" />
       </div>
-      <div style="display:flex; gap:10px; align-items:center;">
-        <div style="font-weight:900;">Admin password</div>
-        <input id="adminPwd" type="password" placeholder="Enter password" style="min-width:200px;" />
-        <button id="setPwdBtn" title="Save password for this session">Set</button>
-      </div>
       <button id="pauseBtn">Pause sync</button>
       <button id="exportBtn">Export CSV</button>
       <button id="importBtn">Import CSV</button>
@@ -200,17 +232,23 @@
     <section class="card planCard">
       <div class="cardHead">Plan</div>
       <div class="planBody">
-        <div class="planWrap" id="planWrap">
-          <div id="svgHost" class="svgHost"></div>
-          <div class="overlay" id="overlay" aria-hidden="true">
-            <div class="line" id="line" style="display:none;"></div>
-            <div class="dot" id="dot" style="display:none;"></div>
-            <div class="label" id="label" style="display:none;">
-              <div class="stand" id="labelStand">—</div>
+        <div class="planStack" id="planStack">
+          <div class="planWrap" id="planWrap">
+            <div id="svgHost" class="svgHost"></div>
+          </div>
+
+          <div class="labelBay" id="labelBay">
+            <div class="lozenge" id="lozenge" style="display:none;">
+              <div class="lozStand" id="lozStand">—</div>
+              <div class="lozCompany" id="lozCompany" style="display:none;"></div>
             </div>
           </div>
+
+          <!-- ONE overlay only, spanning plan + label bay -->
+          <svg class="calloutSvg" id="calloutSvg" aria-hidden="true"></svg>
         </div>
       </div>
+
       <div class="legend">
         <div class="pill"><span class="sw" style="background:var(--sold)"></span>Sold</div>
         <div class="pill"><span class="sw" style="background:var(--avail)"></span>Available</div>
@@ -259,7 +297,7 @@
         <div class="hint" style="padding:10px 0 0;">Click a stand on the plan or in the list to edit.</div>
       </div>
 
-      <div class="card" style="border:1px solid var(--border); border-radius:14px;">
+      <div class="card standsCard" style="border:1px solid var(--border); border-radius:14px;">
         <div class="cardHead">Stands</div>
         <div class="tableTools">
           <input id="search" placeholder="Search stand or company…" />
@@ -283,7 +321,7 @@
   </main>
 
   <div class="toast" id="toast">
-    <div class="msg" id="toastMsg">Can't reach the backend right now (this is why the page won't load). If Cloudflare is down, paste your Google Apps Script Web App URL instead.</div>
+    <div class="msg" id="toastMsg">Can't reach the backend right now. If Cloudflare is down, you can paste your Google Apps Script Web App URL instead.</div>
     <div class="actions">
       <button id="setBackendBtn">Set backend URL</button>
       <button id="hideToastBtn">Hide</button>
@@ -294,7 +332,7 @@
 (() => {
   const DEFAULT_BACKEND = "https://floorplansaberdeen.floorplansaberdeen.workers.dev";
   const BACKEND_KEY = "floorplan_backend_url";
-  const SVG_URL = "./event_plan.svg";
+  const SVG_URL = new URL("./event_plan.svg", window.location.href).href;
 
   const el = (id) => document.getElementById(id);
 
@@ -304,11 +342,11 @@
   const zoomSvgHost = el("zoomSvgHost");
   const zoomRing = el("zoomRing");
 
-  const overlay = el("overlay");
-  const lineEl = el("line");
-  const dotEl = el("dot");
-  const labelEl = el("label");
-  const labelStandEl = el("labelStand");
+  const planStack = el("planStack");
+  const calloutSvg = el("calloutSvg");
+  const lozenge = el("lozenge");
+  const lozStand = el("lozStand");
+  const lozCompany = el("lozCompany");
 
   const tbody = el("tbody");
   const searchEl = el("search");
@@ -326,54 +364,51 @@
   const setBackendBtn = el("setBackendBtn");
   const hideToastBtn = el("hideToastBtn");
   const syncedAt = el("syncedAt");
-  const adminPwdEl = el("adminPwd");
-  const setPwdBtn = el("setPwdBtn");
+
+  const eventNameEl = el("eventName");
+  const pauseBtn = el("pauseBtn");
+  const exportBtn = el("exportBtn");
+  const importBtn = el("importBtn");
+  const resetBtn = el("resetBtn");
 
   let svgRoot = null;
-  let zoomSvgRoot = null;
   let standMap = new Map();
 
   let rows = [];
   let selectedStandId = null;
+
   let autoSync = true;
   let syncTimer = null;
-  let adminPassword = sessionStorage.getItem("admin_pwd") || "";
+  let adminPassword = sessionStorage.getItem('admin_pwd') || '';
+  let saveInFlight = false;
+
+  // Pause auto-refresh while the user is editing fields (prevents resets mid-typing)
+  function isEditing(){
+    const ae = document.activeElement;
+    return ae === companyEl || ae === statusEl || ae === eventNameEl;
+  }
 
   function normalizeBackendUrl(input) {
-  if (!input) return "";
-  let s = String(input).trim();
-  // If someone pastes a full endpoint (e.g. .../stands), strip it back to the base.
-  try {
-    const u = new URL(s);
-    let p = u.pathname.replace(/\/+$/,"");
-    p = p.replace(/\/(api\/stands|stands)$/i, "");
-    p = p.replace(/\/+$/,"");
-    u.pathname = p ? p : "/";
-    u.search = "";
-    u.hash = "";
-    const base = u.origin + (u.pathname === "/" ? "" : u.pathname);
-    return base.replace(/\/+$/,"");
-  } catch (e) {
-    s = s.replace(/\/+$/,"");
-    s = s.replace(/\/(api\/stands|stands)$/i, "");
-    return s.replace(/\/+$/,"");
+    if (!input) return "";
+    let s = String(input).trim();
+    try {
+      const u = new URL(s);
+      let p = u.pathname.replace(/\/+$/,"");
+      p = p.replace(/\/(api\/stands|stands)$/i, "");
+      p = p.replace(/\/+$/,"");
+      u.pathname = p ? p : "/";
+      u.search = "";
+      u.hash = "";
+      const base = u.origin + (u.pathname === "/" ? "" : u.pathname);
+      return base.replace(/\/+$/,"");
+    } catch (e) {
+      s = s.replace(/\/+$/,"");
+      s = s.replace(/\/(api\/stands|stands)$/i, "");
+      return s.replace(/\/+$/,"");
+    }
   }
-}
 
-async function requireAdminPassword(){
-  let adminPassword = sessionStorage.getItem("admin_pwd") || "";
-  if (adminPassword) return;
-  while(true){
-    const entered = prompt("Admin password required:", "");
-    if (entered === null){ alert("Password required to use admin."); continue; }
-    const v = String(entered||"").trim();
-    if (!v){ alert("Password required."); continue; }
-    sessionStorage.setItem("admin_pwd", v);
-    return;
-  }
-}
-
-function getBackendUrl() {
+  function getBackendUrl() {
     const saved = localStorage.getItem(BACKEND_KEY);
     const base = (saved && saved.startsWith("http")) ? saved : DEFAULT_BACKEND;
     return normalizeBackendUrl(base);
@@ -393,30 +428,38 @@ function getBackendUrl() {
   });
   hideToastBtn.addEventListener("click", () => showToast(false));
 
-  function syncPwdUI(){
-    if (!adminPwdEl) return;
-    adminPwdEl.value = adminPassword || "";
-  }
-  syncPwdUI();
-  if (setPwdBtn) setPwdBtn.addEventListener("click", () => {
-    const v = String(adminPwdEl ? adminPwdEl.value : "").trim();
-    if (!v){ alert("Enter the admin password first."); return; }
-    adminPassword = v;
-    sessionStorage.setItem("admin_pwd", adminPassword);
-    alert("Password set for this session.");
-  });
-
   async function fetchJson(url, opts = {}) {
     const controller = new AbortController();
     const t = setTimeout(() => controller.abort(), 12000);
     try {
-      const res = await fetch(url, { ...opts, signal: controller.signal });
+      const res = await fetch(url, { ...opts, signal: controller.signal, cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
     } finally {
       clearTimeout(t);
     }
   }
+  async function ensureAdminPassword(){
+    if (adminPassword) return adminPassword;
+    while (true){
+      const entered = prompt("Admin password required:", "");
+      if (entered === null){
+        alert("Password required to save changes.");
+        continue;
+      }
+      const v = String(entered || "").trim();
+      if (!v){ alert("Password required."); continue; }
+      adminPassword = v;
+      sessionStorage.setItem("admin_pwd", adminPassword);
+      return adminPassword;
+    }
+  }
+
+  function clearAdminPassword(){
+    adminPassword = "";
+    sessionStorage.removeItem("admin_pwd");
+  }
+
 
   function normStandId(s){ return String(s||"").trim().toUpperCase(); }
   function normRow(row) {
@@ -468,73 +511,87 @@ function getBackendUrl() {
     });
   }
 
-  function getElementCenterInPage(elem){
-    const r = elem.getBoundingClientRect();
-    return { x: r.left + r.width/2, y: r.top + r.height/2, w:r.width, h:r.height };
+  function clearCallout(){
+    while (calloutSvg.firstChild) calloutSvg.removeChild(calloutSvg.firstChild);
+    calloutSvg.style.display = "none";
+    lozenge.style.display = "none";
+    lozStand.textContent = "—";
+    lozCompany.style.display = "none";
+    lozCompany.textContent = "";
   }
 
-  function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
+  function drawCallout(standId){
+    const row = rows.find(r => r.standId === normStandId(standId));
+    const elem = row ? elementForStand(row.standId) : elementForStand(standId);
+    if (!elem) { clearCallout(); return; }
 
-  function placeLabelSmart(standPt) {
-    const wrapRect = planWrap.getBoundingClientRect();
-    const margin = 26;
-    const labelW = 240;
-    const labelH = 78;
-
-    const standXRel = (standPt.x - wrapRect.left) / wrapRect.width;
-    const onLeft = standXRel > 0.55;
-    const x = onLeft ? (wrapRect.left + margin + labelW/2) : (wrapRect.right - margin - labelW/2);
-    const y = clamp(standPt.y, wrapRect.top + margin + labelH/2, wrapRect.bottom - margin - labelH/2);
-    return { x, y };
-  }
-
-  function updatePointer(standId) {
-    if (!standId) {
-      lineEl.style.display="none";
-      dotEl.style.display="none";
-      labelEl.style.display="none";
-      return;
+    // Update lozenge content
+    lozStand.textContent = row ? row.standId : standId;
+    const company = (row && row.status === "sold") ? (row.company || "") : "";
+    if (company){
+      lozCompany.style.display = "block";
+      lozCompany.textContent = company;
+    } else {
+      lozCompany.style.display = "none";
+      lozCompany.textContent = "";
     }
-    const elem = elementForStand(standId);
-    if (!elem) return;
+    lozenge.style.display = "inline-block";
 
-    const standPt = getElementCenterInPage(elem);
-    const { x: labelCx, y: labelCy } = placeLabelSmart(standPt);
-    const wrapRect = planWrap.getBoundingClientRect();
+    // Force layout so getBoundingClientRect is accurate
+    void lozenge.offsetWidth;
 
-    const sx = standPt.x - wrapRect.left;
-    const sy = standPt.y - wrapRect.top;
-    const lx = labelCx - wrapRect.left;
-    const ly = labelCy - wrapRect.top;
+    requestAnimationFrame(() => {
+      const standRect = elem.getBoundingClientRect();
+      const standPt = { x: standRect.left + standRect.width/2, y: standRect.top + standRect.height/2 };
 
-    const dx = sx - lx, dy = sy - ly;
-    const len = Math.sqrt(dx*dx + dy*dy);
-    const ang = Math.atan2(dy, dx);
+      const lozRect = lozenge.getBoundingClientRect();
+      const lozTop = { x: lozRect.left + lozRect.width/2, y: lozRect.top };
 
-    lineEl.style.display="block";
-    lineEl.style.left = `${lx}px`;
-    lineEl.style.top = `${ly}px`;
-    lineEl.style.width = `${len}px`;
-    lineEl.style.transform = `rotate(${ang}rad)`;
+      const stackRect = planStack.getBoundingClientRect();
+      const x1 = lozTop.x - stackRect.left;
+      const y1 = lozTop.y - stackRect.top;
+      const x2 = standPt.x - stackRect.left;
+      const y2 = standPt.y - stackRect.top;
 
-    dotEl.style.display="block";
-    dotEl.style.left = `${sx}px`;
-    dotEl.style.top = `${sy}px`;
+      calloutSvg.setAttribute("viewBox", `0 0 ${stackRect.width} ${stackRect.height}`);
+      calloutSvg.setAttribute("preserveAspectRatio", "none");
+      calloutSvg.setAttribute("width", String(stackRect.width));
+      calloutSvg.setAttribute("height", String(stackRect.height));
+      calloutSvg.style.display = "block";
 
-    labelEl.style.display="block";
-    labelEl.style.left = `${lx}px`;
-    labelEl.style.top = `${ly}px`;
-    labelStandEl.textContent = standId;
+      const dotPx = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--dot")) || 10;
+      const r = dotPx / 2;
+
+      const NS = "http://www.w3.org/2000/svg";
+      while (calloutSvg.firstChild) calloutSvg.removeChild(calloutSvg.firstChild);
+
+      const line = document.createElementNS(NS, "line");
+      line.setAttribute("x1", String(x1));
+      line.setAttribute("y1", String(y1));
+      line.setAttribute("x2", String(x2));
+      line.setAttribute("y2", String(y2));
+      line.setAttribute("stroke", getComputedStyle(document.documentElement).getPropertyValue("--line").trim() || "rgba(0,0,0,.70)");
+      line.setAttribute("stroke-width", "3");
+      line.setAttribute("stroke-linecap", "round");
+
+      const dot = document.createElementNS(NS, "circle");
+      dot.setAttribute("cx", String(x2));
+      dot.setAttribute("cy", String(y2));
+      dot.setAttribute("r", String(r));
+      dot.setAttribute("fill", "rgba(0,0,0,.72)");
+
+      calloutSvg.appendChild(line);
+      calloutSvg.appendChild(dot);
+    });
   }
 
   function applyColours() {
+    const sold = getComputedStyle(document.documentElement).getPropertyValue("--sold").trim();
+    const avail = getComputedStyle(document.documentElement).getPropertyValue("--avail").trim();
     rows.forEach(r => {
       const elem = elementForStand(r.standId);
       if (!elem) return;
-      setFillForElement(elem, r.status === "sold"
-        ? getComputedStyle(document.documentElement).getPropertyValue("--sold").trim()
-        : getComputedStyle(document.documentElement).getPropertyValue("--avail").trim()
-      );
+      setFillForElement(elem, r.status === "sold" ? sold : avail);
     });
   }
 
@@ -583,10 +640,34 @@ function getBackendUrl() {
     statusEl.value = row.status;
     companyEl.value = row.company || "";
 
-    applyColours();
-    updatePointer(row.standId);
+    drawCallout(row.standId);
     renderTable();
     updateZoom(row.standId);
+  }
+
+  function forceBlackAndWhite(svg){
+    // Remove any embedded images (logos) so the zoom is clean
+    svg.querySelectorAll("image").forEach(img => img.remove());
+
+    const shapesSel = "path,rect,polygon,polyline,ellipse,circle,line";
+    svg.querySelectorAll("*").forEach(n => {
+      if (n.hasAttribute("style")) n.removeAttribute("style");
+
+      // Keep text readable: black fill, no stroke
+      if (n.tagName && n.tagName.toLowerCase() === "text"){
+        n.setAttribute("fill","black");
+        n.removeAttribute("stroke");
+        n.removeAttribute("stroke-width");
+        return;
+      }
+
+      // Only force B/W on actual drawable shapes
+      if (n.matches && n.matches(shapesSel)){
+        n.setAttribute("fill","none");
+        n.setAttribute("stroke","black");
+        n.setAttribute("stroke-width","1");
+      }
+    });
   }
 
   function updateZoom(standId) {
@@ -594,37 +675,32 @@ function getBackendUrl() {
     zoomRing.style.display = "none";
     if (!standId || !svgRoot) return;
 
-    // clone the SVG into zoom area
     const clone = svgRoot.cloneNode(true);
+    forceBlackAndWhite(clone);
     zoomSvgHost.appendChild(clone);
-    zoomSvgRoot = clone;
 
-    // find element inside clone
-    const key = normalizeDomId(standId);
-    const target = zoomSvgRoot.querySelector("#"+CSS.escape(standId)) ||
-                   zoomSvgRoot.querySelector("#"+CSS.escape("stand-"+standId)) ||
-                   Array.from(zoomSvgRoot.querySelectorAll("[id]")).find(n => normalizeDomId(n.id) === key);
+    let resolved = clone.querySelector("#"+CSS.escape(standId));
+    if (!resolved){
+      const key = normalizeDomId(standId);
+      resolved = Array.from(clone.querySelectorAll("[id]")).find(n => normalizeDomId(n.id) === key);
+    }
+    if (!resolved || !resolved.getBBox) return;
 
-    if (!target || !target.getBBox) return;
-
-    const bbox = target.getBBox();
+    const bbox = resolved.getBBox();
     const pad = Math.max(40, Math.max(bbox.width, bbox.height) * 0.9);
     const vx = bbox.x - pad;
     const vy = bbox.y - pad;
     const vw = bbox.width + pad*2;
     const vh = bbox.height + pad*2;
 
-    zoomSvgRoot.setAttribute("viewBox", `${vx} ${vy} ${vw} ${vh}`);
-    zoomSvgRoot.setAttribute("preserveAspectRatio","xMidYMid meet");
-    zoomSvgRoot.style.width = "100%";
-    zoomSvgRoot.style.height = "auto";
-    zoomSvgRoot.style.display = "block";
+    clone.setAttribute("viewBox", `${vx} ${vy} ${vw} ${vh}`);
+    clone.setAttribute("preserveAspectRatio","xMidYMid meet");
+    clone.style.width = "100%";
+    clone.style.height = "auto";
+    clone.style.display = "block";
 
-    // Draw ring around selected stand (in screen coords within zoomWrap)
-    // We map the target bbox center from SVG coords into zoomWrap client coords by using getBoundingClientRect on a small marker
-    // Easiest: use target.getBoundingClientRect() after layout
     requestAnimationFrame(() => {
-      const r = target.getBoundingClientRect();
+      const r = resolved.getBoundingClientRect();
       const zw = zoomWrap.getBoundingClientRect();
       const cx = (r.left + r.right)/2 - zw.left;
       const cy = (r.top + r.bottom)/2 - zw.top;
@@ -638,15 +714,73 @@ function getBackendUrl() {
     });
   }
 
+  async function requireAdminPassword(){
+    const backend = getBackendUrl();
+    let settings = null;
+    try{
+      settings = await fetchJson(`${backend}/settings`);
+    }catch(e){
+      // If settings route fails, allow access (but admin actions may still fail)
+      return;
+    }
+    const pwd = (settings && (settings.adminPassword || settings.password || settings.admin_pass || settings.admin_password)) || "";
+    const required = String(pwd || "").trim();
+    if (!required) return;
+    const key = "admin_authed";
+    if (sessionStorage.getItem(key) === "1") return;
+
+    while (true){
+      const entered = prompt("Admin password required:", "");
+      if (entered === null) continue;
+      if (String(entered) === required){
+        sessionStorage.setItem(key, "1");
+        return;
+      }
+      alert("Incorrect password.");
+    }
+  }
+
+  async function loadSettings(){
+    const backend = getBackendUrl();
+    let settings = null;
+    try{
+      settings = await fetchJson(`${backend}/settings`);
+    }catch(e){
+      return;
+    }
+    const name = (settings && (settings.eventName || settings.name || settings.event || settings.title)) || "";
+    if (name && eventNameEl) eventNameEl.value = String(name);
+  }
+
+  let settingsSaveTimer = null;
+  function scheduleSaveEventName(){
+    if (!eventNameEl) return;
+    if (settingsSaveTimer) clearTimeout(settingsSaveTimer);
+    settingsSaveTimer = setTimeout(async () => {
+      const backend = getBackendUrl();
+      const payload = { eventName: eventNameEl.value.trim() };
+      try{
+        await fetchJson(`${backend}/settings`, {
+          method:"POST",
+          headers:{ "Content-Type":"application/json" },
+          body: JSON.stringify(payload)
+        });
+        syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+      }catch(e){
+        showToast(true);
+      }
+    }, 600);
+  }
+
   async function loadSvg() {
-    const res = await fetch(SVG_URL);
+    const res = await fetch(SVG_URL, { cache: "no-store" });
     if (!res.ok) throw new Error("Could not load SVG");
     const txt = await res.text();
     svgHost.innerHTML = txt;
     svgRoot = svgHost.querySelector("svg");
     if (!svgRoot) throw new Error("SVG invalid");
 
-    // Hide any stray huge circle at 0,0 (the “quarter circle” artifact)
+    // Hide any stray huge circle at 0,0 (artifact)
     svgRoot.querySelectorAll("circle").forEach(c => {
       const cx = c.getAttribute("cx"), cy = c.getAttribute("cy"), r = parseFloat(c.getAttribute("r") || "0");
       if ((cx === "0" || cx === "0.0") && (cy === "0" || cy === "0.0") && r >= 20) {
@@ -659,35 +793,67 @@ function getBackendUrl() {
     svgRoot.style.height = "auto";
     svgRoot.style.display = "block";
 
-    buildStandMap();
+    // If stand numbers/text are on a separate layer, they can block clicks.
+    // Make text/images ignore pointer events so clicks reach the stand shapes.
+    svgRoot.querySelectorAll("text,image").forEach(n => {
+      try{ n.style.pointerEvents = "none"; }catch(e){}
+    });
 
-    // click-to-select (desktop & mobile is OK for admin)
+    buildStandMap();
+    // Visual hint: stands are clickable on desktop
+    standMap.forEach((node) => { try{ node.style.cursor = "pointer"; }catch(e){} });
+
+    // click-to-select
+    svgRoot.style.pointerEvents = "auto";
+    svgRoot.style.pointerEvents = "auto";
+    // Ensure shapes receive pointer events (some SVGs disable this)
+    svgRoot.querySelectorAll("path,rect,polygon,polyline,ellipse,circle,g").forEach(n => {
+      try{ n.style.pointerEvents = "all"; }catch(e){}
+    });
+
     svgRoot.addEventListener("click", (ev) => {
+      // On phones, use the list only (no plan tapping)
+      if (window.matchMedia && window.matchMedia('(max-width: 640px)').matches) return;
+
       let node = ev.target;
-      for (let i=0;i<6 && node;i++){
-        if (node.id) break;
-        node = node.parentElement;
+      // Walk up through parents and find the first id that matches a known stand
+      for (let i=0; i<30 && node && node !== svgRoot; i++){
+        if (node.id){
+          const key = normalizeDomId(node.id);
+          const found = rows.find(r => normalizeDomId(r.standId) === key);
+          if (found) { selectStand(found.standId); return; }
+        }
+        node = node.parentNode;
       }
-      if (!node || !node.id) return;
-      const key = normalizeDomId(node.id);
-      const found = rows.find(r => normalizeDomId(r.standId) === key);
-      if (found) selectStand(found.standId);
     }, { passive:true });
   }
 
   async function loadData() {
     const backend = getBackendUrl();
-    const data = await fetchJson(`${backend}/stands`);
+    const data = await fetchJson(`${backend}/stands?ts=${Date.now()}`);
     rows = (Array.isArray(data) ? data : []).map(normRow).filter(r => r.standId);
+
     applyColours();
     renderTable();
+
     syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
     showToast(false);
+
+    // keep selection after refresh
+    if (selectedStandId) {
+      const row = rows.find(r => r.standId === selectedStandId);
+      if (row) {
+        statusEl.value = row.status;
+        companyEl.value = row.company || "";
+        drawCallout(row.standId);
+      }
+    }
   }
 
   async function saveCurrent() {
-    await requireAdminPassword();
-    if (!selectedStandId) return;
+    await ensureAdminPassword();
+    saveInFlight = true;
+    if (!selectedStandId) { saveInFlight = false; return; }
     const backend = getBackendUrl();
     const payload = {
       standId: selectedStandId,
@@ -696,41 +862,76 @@ function getBackendUrl() {
       adminPassword: adminPassword
     };
 
-    // Try common Worker patterns
-    let ok = false;
-    try {
-      await fetchJson(`${backend}/stands/${encodeURIComponent(selectedStandId)}`, {
-        method:"PUT",
+    try{
+      const resp = await fetchJson(`${backend}/stand`, {
+        method:"POST",
         headers:{ "Content-Type":"application/json" },
         body: JSON.stringify(payload)
       });
-      ok = true;
-    } catch (e1) {
-      try {
-        await fetchJson(`${backend}/stands`, {
+    
+      if (resp && resp.ok === false){
+        const msg = String(resp.error || "Save failed.");
+        if (/invalid admin password/i.test(msg)){
+          clearAdminPassword();
+          alert("Incorrect admin password. Please try again.");
+        } else {
+          alert(msg);
+        }
+        return;
+      }
+}catch(e){
+      showToast(true);
+      return;
+    }finally{
+      saveInFlight = false;
+    }
+
+    const idx = rows.findIndex(r => r.standId === selectedStandId);
+    if (idx >= 0) rows[idx] = payload;
+
+    applyColours();
+    renderTable();
+    drawCallout(selectedStandId);
+
+    // Pull fresh data back from backend (authoritative) to prevent reverts
+    try{ await loadData(); }catch(e){}
+    syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+  }
+
+  async function resetAll() {
+    if (!rows.length) return;
+    const ok = confirm("Reset ALL stands to Available? This will overwrite sold stands.");
+    if (!ok) return;
+
+    resetBtn.disabled = true;
+    const backend = getBackendUrl();
+
+    // simple sequential to avoid hammering worker
+    for (let i=0;i<rows.length;i++){
+      const r = rows[i];
+      const payload = { standId: r.standId, status:"available", company:"" };
+      try{
+        const resp = await fetchJson(`${backend}/stand`, {
           method:"POST",
           headers:{ "Content-Type":"application/json" },
           body: JSON.stringify(payload)
         });
-        ok = true;
-      } catch (e2) {
-        ok = false;
+      }catch(e){
+        showToast(true);
+        break;
       }
+      rows[i] = payload;
     }
-    if (!ok) {
-      showToast(true);
-      return;
-    }
-
-    // Update local copy immediately (so plan updates)
-    const idx = rows.findIndex(r => r.standId === selectedStandId);
-    if (idx >= 0) rows[idx] = payload;
+    resetBtn.disabled = false;
     applyColours();
     renderTable();
-    updatePointer(selectedStandId);
+    clearCallout();
+    selectedStandId = null;
+    standIdEl.value = "";
     syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
   }
 
+  // Events
   saveBtn.addEventListener("click", saveCurrent);
   markAvailBtn.addEventListener("click", () => {
     statusEl.value = "available";
@@ -741,8 +942,15 @@ function getBackendUrl() {
   searchEl.addEventListener("input", renderTable);
   filterEl.addEventListener("change", renderTable);
 
-  // Simple CSV export/import local to browser (does not need backend)
-  el("exportBtn").addEventListener("click", () => {
+  eventNameEl.addEventListener("input", scheduleSaveEventName);
+
+  pauseBtn.addEventListener("click", () => {
+    autoSync = !autoSync;
+    pauseBtn.textContent = autoSync ? "Pause sync" : "Resume sync";
+    if (autoSync) startPolling(); else stopPolling();
+  });
+
+  exportBtn.addEventListener("click", () => {
     const lines = ["standId,status,company"].concat(rows.map(r => {
       const c = (r.company||"").replaceAll('"','""');
       return `${r.standId},${r.status},"${c}"`;
@@ -755,7 +963,7 @@ function getBackendUrl() {
     URL.revokeObjectURL(a.href);
   });
 
-  el("importBtn").addEventListener("click", async () => {
+  importBtn.addEventListener("click", async () => {
     const inp = document.createElement("input");
     inp.type="file";
     inp.accept=".csv,text/csv";
@@ -774,21 +982,24 @@ function getBackendUrl() {
       rows = out;
       applyColours();
       renderTable();
+      clearCallout();
+      selectedStandId = null;
+      standIdEl.value = "";
     };
     inp.click();
   });
 
-  // Pause sync (polling) - optional
-  el("pauseBtn").addEventListener("click", () => {
-    autoSync = !autoSync;
-    el("pauseBtn").textContent = autoSync ? "Pause sync" : "Resume sync";
-    if (autoSync) startPolling(); else stopPolling();
-  });
+  resetBtn.addEventListener("click", resetAll);
+
+  window.addEventListener("scroll", () => { if (selectedStandId) drawCallout(selectedStandId); }, { passive:true });
+  window.addEventListener("resize", () => { if (selectedStandId) drawCallout(selectedStandId); });
 
   function startPolling(){
     stopPolling();
     syncTimer = setInterval(async () => {
       if (!autoSync) return;
+      if (isEditing()) return; // don't refresh while typing/choosing
+      if (saveInFlight) return; // don't refresh while saving
       try { await loadData(); } catch(e){ showToast(true); }
     }, 8000);
   }
@@ -799,17 +1010,19 @@ function getBackendUrl() {
 
   // init
   (async () => {
-    try {
+    try{
+      await requireAdminPassword();
+      await loadSettings();
       await loadSvg();
-    } catch(e) {
+    }catch(e){
       showToast(true);
       console.error(e);
       return;
     }
-    try {
-      await loadData();
+    try{
+      if (!isEditing()) await loadData();
       startPolling();
-    } catch(e) {
+    }catch(e){
       showToast(true);
       console.error(e);
     }
