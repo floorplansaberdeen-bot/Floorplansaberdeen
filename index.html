@@ -335,6 +335,54 @@
 
       // Desktop: allow plan click. Mobile: disable plan tapping.
       core.enablePlanClick({ enabled:true, disableOnMobile:true });
+
+// --- Polling (public auto-refresh) ---
+let pollTimer = null;
+async function pollOnce(){
+  try{
+    const prevSelected = core.selectedStandId;
+    await core.loadStands();
+    soldRows = core.rows.filter(r=>r.status === "sold" && (r.company||"").trim().length > 0);
+    renderList();
+
+    // keep selection if still exists
+    if (prevSelected){
+      const still = core.rows.find(r=>r.standId === prevSelected);
+      if (still){
+        core.selectedStandId = prevSelected;
+        core.applyColoursPublic();
+        core.drawCallout(still.standId, still.company || "");
+      } else {
+        clearSelection();
+      }
+    } else {
+      core.applyColoursPublic();
+    }
+
+    updatedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+  }catch(e){
+    updatedAt.textContent = "Offline";
+    console.error(e);
+  }
+}
+
+function startPolling(){
+  stopPolling();
+  pollTimer = setInterval(pollOnce, 12000);
+}
+function stopPolling(){
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = null;
+}
+
+// Pause polling when tab is hidden (saves battery / data)
+document.addEventListener("visibilitychange", ()=>{
+  if (document.hidden) stopPolling();
+  else { pollOnce(); startPolling(); }
+});
+
+startPolling();
+
     })();
   })();
   </script>
