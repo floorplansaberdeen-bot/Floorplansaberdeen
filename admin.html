@@ -48,6 +48,13 @@
       font-weight:800;
       cursor:pointer;
     }
+    button.primary{
+      background:#16a34a;
+      border-color:#16a34a;
+      color:#fff;
+    }
+    button.primary:hover{ filter: brightness(0.95); }
+    button.primary:active{ filter: brightness(0.9); }
     button.danger{ border-color:#ffd0d0; background:#fff5f5; }
     button:disabled{ opacity:.45; cursor:not-allowed; }
 
@@ -290,7 +297,7 @@
         </div>
 
         <div class="btnRow">
-          <button id="saveBtn">Save</button>
+          <button id="saveBtn" class="primary">Save</button>
           <button id="markAvailBtn" class="danger">Mark Available</button>
         </div>
 
@@ -933,6 +940,13 @@
 
   // Events
   saveBtn.addEventListener("click", saveCurrent);
+  // Press Enter in the Company field to save
+  companyEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter"){
+      e.preventDefault();
+      saveCurrent();
+    }
+  });
   markAvailBtn.addEventListener("click", () => {
     statusEl.value = "available";
     companyEl.value = "";
