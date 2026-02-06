@@ -271,8 +271,7 @@
     <div class="tools">
       <div style="color:var(--muted); font-weight:800;">Synced: <span id="syncedAt">—</span></div>
       <div style="display:flex; gap:10px; align-items:center;">
-        <div style="font-weight:900;">Event name  <button id="setEventBtn" class="primary" title="Save event name">Set</button>
-      </div>
+        <div style="font-weight:900;">Event name</div>
         <input id="eventName" placeholder="New Event" />
         <button id="setEventBtn" class="primary" title="Save event name">Set</button>
       </div>
@@ -808,6 +807,50 @@
     const name = (settings && (settings.eventName || settings.name || settings.event || settings.title)) || "";
     if (name && eventNameEl) eventNameEl.value = String(name);
   }
+
+  async function saveEventName(){
+    if (!eventNameEl) return;
+    const name = String(eventNameEl.value || "").trim();
+    if (!name) { alert("Please enter an event name."); return; }
+
+    // Must be user-triggered (Set button) so prompt works on iOS Safari
+    ensureAdminPassword();
+
+    const backend = getBackendUrl();
+    let resp = null;
+    try{
+      resp = await fetchJson(`${backend}/settings`, {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ eventName: name, adminPassword })
+      });
+    }catch(e){
+      showToast(true);
+      alert("Could not save event name (backend unreachable).");
+      return;
+    }
+
+    if (resp && resp.ok === false){
+      const msg = String(resp.error || "Event name save failed.");
+      if (/invalid admin password/i.test(msg)){
+        clearAdminPassword();
+        alert("Incorrect admin password. Please try again.");
+      } else {
+        alert(msg);
+      }
+      return;
+    }
+
+    // Re-read settings to confirm (source of truth)
+    await loadSettings();
+    const after = String(eventNameEl.value || "").trim();
+    if (after !== name){
+      alert('Event name did not update on the backend (it reverted to: "' + after + '").');
+    } else {
+      syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+    }
+  }
+
 
   let settingsSaveTimer = null;
   function scheduleSaveEventName(){
