@@ -216,14 +216,40 @@
       main{ grid-template-columns: 1fr; }
     }
     @media (max-width: 640px){
-      main{ padding:12px; gap:12px; }
-      header input{ min-width: 200px; width: 100%; }
-      .planWrap{ min-height: 300px; }
-      /* Sticky plan + zoom on phone, scroll stands list */
-      .planCard{ position: sticky; top: 0; z-index: 20; background: var(--bg); }
-      .zoomCard{ position: sticky; top: 320px; z-index: 19; background: var(--bg); }
-      .tableWrap{ padding-bottom: calc(14px + var(--safe)); }
+      main{ grid-template-columns: 1fr; padding:12px; gap:12px; }
+      header input{ min-width: 180px; width: 100%; }
+      .planWrap{ min-height: 260px; }
+
+      /* Hide zoom on phone */
+      .zoomCard{ display:none; }
+
+      /* Pin plan + selected stand at top */
+      .planCard{
+        position: sticky;
+        top: 0;
+        z-index: 30;
+        background: var(--bg);
+      }
+      #selectedCard{
+        position: sticky;
+        top: 330px; /* will be corrected in JS on load/resize */
+        z-index: 29;
+        background: var(--bg);
+      }
+
+      /* Make the stands list area scroll under pinned panels */
+      #standsCard{ max-height: none; }
+      #tableWrap{
+        max-height: 55vh; /* will be corrected in JS on load/resize */
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: calc(18px + var(--safe));
+      }
+
+      /* Extra safe-area padding so browser bar doesn’t block last row */
+      .tableWrap{ padding-bottom: calc(18px + var(--safe)); }
     }
+
   </style>
 </head>
 <body>
@@ -281,7 +307,7 @@
     </section>
 
     <aside class="card side">
-      <div class="card" style="border:1px solid var(--border); border-radius:14px; padding:12px;">
+      <div class="card" id="selectedCard" style="border:1px solid var(--border); border-radius:14px; padding:12px;">
         <div style="font-weight:900; margin-bottom:10px;">Selected Stand</div>
 
         <div style="margin-bottom:10px;">
@@ -322,7 +348,7 @@
           </select>
         </div>
         <div style="padding:0 12px 10px; color:var(--muted); font-weight:800;"><span id="count">0</span> / <span id="total">0</span></div>
-        <div class="tableWrap">
+        <div class="tableWrap" id="tableWrap">
           <table>
             <thead>
               <tr><th style="width:90px;">Stand</th><th style="width:120px;">Status</th><th>Company</th></tr>
@@ -1035,6 +1061,7 @@
       await requireAdminPassword();
       await loadSettings();
       await loadSvg();
+      layoutMobile();
     }catch(e){
       showToast(true);
       console.error(e);
@@ -1049,6 +1076,36 @@
     }
   })();
 })();
+
+  function layoutMobile(){
+    // Only on small screens
+    if (window.matchMedia && !window.matchMedia('(max-width: 640px)').matches) return;
+    const plan = document.querySelector('.planCard');
+    const selected = document.getElementById('selectedCard');
+    const tableWrap = document.getElementById('tableWrap');
+    if (!plan || !selected || !tableWrap) return;
+
+    // Compute top offset for selected card just below plan card
+    const planRect = plan.getBoundingClientRect();
+    // planRect.top should be 0 when sticky; use its height
+    const top = Math.round(planRect.height + 12); // small gap
+    selected.style.top = top + 'px';
+
+    // Compute available height for tableWrap (viewport minus header minus sticky blocks)
+    const header = document.querySelector('header');
+    const headerH = header ? header.getBoundingClientRect().height : 0;
+
+    // Heights of sticky blocks (planCard includes its own header, plan, label bay, legend)
+    const planH = plan ? plan.getBoundingClientRect().height : 0;
+    const selectedH = selected ? selected.getBoundingClientRect().height : 0;
+
+    // Leave a little breathing room
+    const available = Math.max(200, window.innerHeight - headerH - planH - selectedH - 24);
+
+    tableWrap.style.maxHeight = available + 'px';
+  }
+
+
 </script>
 </body>
 </html>
