@@ -1000,6 +1000,23 @@
     saveCurrent();
   });
 
+
+  // Event name sync: shared via backend /settings
+  let eventNameTimer = null;
+  if (eventNameEl){
+    eventNameEl.addEventListener("blur", () => { saveEventName(); });
+    eventNameEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter"){
+        e.preventDefault();
+        saveEventName();
+      }
+    });
+    eventNameEl.addEventListener("input", () => {
+      if (eventNameTimer) clearTimeout(eventNameTimer);
+      eventNameTimer = setTimeout(() => saveEventName(), 900);
+    });
+  }
+
   searchEl.addEventListener("input", renderTable);
   filterEl.addEventListener("change", renderTable);
 
@@ -1076,6 +1093,7 @@
       await loadSettings();
       await loadSvg();
       layoutMobile();
+      await loadSettings();
     }catch(e){
       showToast(true);
       console.error(e);
