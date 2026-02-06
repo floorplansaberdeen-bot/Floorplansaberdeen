@@ -220,6 +220,19 @@
       header input{ min-width: 180px; width: 100%; }
       .planWrap{ min-height: 260px; }
 
+      /* Reduce empty white space under the plan on phone */
+      .planBody{ padding:8px; }
+      .planWrap{ min-height: 0 !important; }
+      .planStack{ padding-bottom: 0; }
+      .labelBay{ min-height: 0; padding:8px; }
+
+      /* When nothing is selected, collapse the label bay entirely (Safari-safe, no :has) */
+      .planStack.noSel .labelBay{
+        padding:0;
+        min-height:0;
+        border-top:0;
+      }
+
       /* Hide zoom on phone */
       .zoomCard{ display:none; }
 
@@ -272,7 +285,7 @@
     <section class="card planCard">
       <div class="cardHead">Plan</div>
       <div class="planBody">
-        <div class="planStack" id="planStack">
+        <div class="planStack noSel" id="planStack">
           <div class="planWrap" id="planWrap">
             <div id="svgHost" class="svgHost"></div>
           </div>
@@ -576,6 +589,7 @@
       lozCompany.textContent = "";
     }
     lozenge.style.display = "inline-block";
+    planStack.classList.remove("noSel");
 
     // Force layout so getBoundingClientRect is accurate
     void lozenge.offsetWidth;
