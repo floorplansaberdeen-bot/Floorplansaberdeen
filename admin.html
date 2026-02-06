@@ -271,8 +271,10 @@
     <div class="tools">
       <div style="color:var(--muted); font-weight:800;">Synced: <span id="syncedAt">—</span></div>
       <div style="display:flex; gap:10px; align-items:center;">
-        <div style="font-weight:900;">Event name</div>
+        <div style="font-weight:900;">Event name  <button id="setEventBtn" class="primary" title="Save event name">Set</button>
+      </div>
         <input id="eventName" placeholder="New Event" />
+        <button id="setEventBtn" class="primary" title="Save event name">Set</button>
       </div>
       <button id="pauseBtn">Pause sync</button>
       <button id="exportBtn">Export CSV</button>
@@ -419,6 +421,7 @@
   const syncedAt = el("syncedAt");
 
   const eventNameEl = el("eventName");
+  const setEventBtn = el("setEventBtn");
   const pauseBtn = el("pauseBtn");
   const exportBtn = el("exportBtn");
   const importBtn = el("importBtn");
@@ -987,6 +990,12 @@
 
   // Events
   saveBtn.addEventListener("click", saveCurrent);
+  if (setEventBtn){
+    setEventBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      saveEventName();
+    });
+  }
   // Press Enter in the Company field to save
   companyEl.addEventListener("keydown", (e) => {
     if (e.key === "Enter"){
