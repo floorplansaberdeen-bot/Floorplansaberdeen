@@ -1001,8 +1001,7 @@
   });
 
 
-  // Event name sync: shared via backend /settings
-  let eventNameTimer = null;
+  // Event name sync: saved to backend /settings (shared across devices)
   if (eventNameEl){
     eventNameEl.addEventListener("blur", () => { saveEventName(); });
     eventNameEl.addEventListener("keydown", (e) => {
@@ -1010,10 +1009,6 @@
         e.preventDefault();
         saveEventName();
       }
-    });
-    eventNameEl.addEventListener("input", () => {
-      if (eventNameTimer) clearTimeout(eventNameTimer);
-      eventNameTimer = setTimeout(() => saveEventName(), 900);
     });
   }
 
@@ -1078,7 +1073,7 @@
       if (!autoSync) return;
       if (isEditing()) return; // don't refresh while typing/choosing
       if (saveInFlight) return; // don't refresh while saving
-      try { await loadData(); } catch(e){ showToast(true); }
+      try { await loadData(); await loadSettings(); } catch(e){ showToast(true); }
     }, 8000);
   }
   function stopPolling(){
