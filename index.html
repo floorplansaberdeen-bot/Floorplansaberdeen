@@ -38,6 +38,12 @@
       font-weight:800;
       cursor:pointer;
     }
+    .ghostBtn{
+      padding:10px 12px;
+      background:#fff;
+      color:var(--muted);
+    }
+    .ghostBtn:disabled{ opacity:.45; cursor:not-allowed; }
     main{
       padding:16px;
       display:grid;
@@ -196,6 +202,7 @@
         <div class="panelBody">
           <div class="searchRow">
             <input id="search" placeholder="Search company or stand…" />
+            <button id="clearSearchBtn" class="ghostBtn" type="button">Clear</button>
           </div>
         </div>
         <div class="countLine"><span id="count">0</span> / <span id="total">0</span></div>
@@ -229,6 +236,7 @@
 
     const tbody = el("tbody");
     const searchEl = el("search");
+    const clearSearchBtn = el("clearSearchBtn");
     const countEl = el("count");
     const totalEl = el("total");
 
@@ -273,7 +281,18 @@
     }
 
     clearBtn.addEventListener("click", clearSelection);
-    searchEl.addEventListener("input", renderList);
+    searchEl.addEventListener("input", () => {
+      renderList();
+      clearSearchBtn.disabled = !searchEl.value;
+    });
+
+    clearSearchBtn.disabled = true;
+    clearSearchBtn.addEventListener("click", () => {
+      searchEl.value = "";
+      clearSearchBtn.disabled = true;
+      renderList();
+      searchEl.focus();
+    });
 
     window.addEventListener("resize", ()=>{
       if (!core || !core.selectedStandId) return;
@@ -283,6 +302,7 @@
 
     (async ()=>{
       core = new window.FloorplanCore({
+        allowBackendOverride: false,
         svgHost, planWrap, planStack, calloutSvg,
         lozenge, lozStand, lozCompany,
         onSelect: (row)=>{

@@ -30,7 +30,8 @@
   }
 
   function getBackendUrl(opts){
-    const saved = localStorage.getItem(opts.backendKey);
+    const allow = (opts.allowBackendOverride !== false);
+    const saved = allow ? localStorage.getItem(opts.backendKey) : null;
     const base = (saved && saved.startsWith("http")) ? saved : opts.defaultBackend;
     return normalizeBackendUrl(base);
   }
@@ -226,7 +227,12 @@
 
     enablePlanClick({enabled=true, disableOnMobile=true}={}){
       if (!this.svgRoot) return;
-      const isMobile = () => window.matchMedia && window.matchMedia("(max-width: 640px)").matches;
+      // "Phone" detection: disable plan tapping for small screens OR coarse pointers.
+      // This keeps desktop click enabled while preventing accidental taps on phones.
+      const isMobile = () => {
+        const mm = (q) => (window.matchMedia ? window.matchMedia(q).matches : false);
+        return mm("(max-width: 760px)") || mm("(pointer: coarse)");
+      };
       const shouldDisable = () => disableOnMobile && isMobile();
 
       const handler = (ev)=>{
