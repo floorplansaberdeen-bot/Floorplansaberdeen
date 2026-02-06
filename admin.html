@@ -1051,14 +1051,9 @@
     companyEl.value = "";
     saveCurrent();
   });
-    });
-  }
 
   searchEl.addEventListener("input", renderTable);
   filterEl.addEventListener("change", renderTable);
-
-  eventNameEl.addEventListener("input", scheduleSaveEventName);
-
   pauseBtn.addEventListener("click", () => {
     autoSync = !autoSync;
     pauseBtn.textContent = autoSync ? "Pause sync" : "Resume sync";
