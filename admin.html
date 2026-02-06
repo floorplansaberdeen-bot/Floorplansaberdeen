@@ -273,6 +273,7 @@
       <div style="display:flex; gap:10px; align-items:center;">
         <div style="font-weight:900;">Event name</div>
         <input id="eventName" placeholder="New Event" />
+        <button id="setEventBtn" class="primary" title="Save event name">Set</button>
       </div>
       <button id="pauseBtn">Pause sync</button>
       <button id="exportBtn">Export CSV</button>
@@ -419,6 +420,7 @@
   const syncedAt = el("syncedAt");
 
   const eventNameEl = el("eventName");
+  const setEventBtn = el("setEventBtn");
   const pauseBtn = el("pauseBtn");
   const exportBtn = el("exportBtn");
   const importBtn = el("importBtn");
@@ -533,7 +535,39 @@
       .replace(/[^A-Z0-9]/g,"");
   }
 
-  function buildStandMap() {
+  
+function hitTestStandAtClient(clientX, clientY){
+  if (!svgRoot) return null;
+  const svg = svgRoot;
+  const pt = svg.createSVGPoint();
+  pt.x = clientX; pt.y = clientY;
+  const ctm = svg.getScreenCTM();
+  if (!ctm) return null;
+  const sp = pt.matrixTransform(ctm.inverse());
+
+  // Try geometry hit-test
+  for (const [key, elem] of standMap.entries()){
+    const geoms = [];
+    if (elem instanceof SVGGeometryElement) geoms.push(elem);
+    else geoms.push(...Array.from(elem.querySelectorAll("path,rect,polygon,polyline,circle,ellipse")));
+    for (const g of geoms){
+      try{
+        if (typeof g.isPointInFill === "function" && g.isPointInFill(sp)) return key;
+        if (typeof g.isPointInStroke === "function" && g.isPointInStroke(sp)) return key;
+      }catch(e){}
+    }
+  }
+  // Fallback bbox
+  for (const [key, elem] of standMap.entries()){
+    let bb=null;
+    try{ bb = (elem.getBBox ? elem.getBBox() : null); }catch(e){ bb=null; }
+    if (!bb) continue;
+    if (sp.x >= bb.x && sp.x <= bb.x+bb.width && sp.y >= bb.y && sp.y <= bb.y+bb.height) return key;
+  }
+  return null;
+}
+
+function buildStandMap() {
     standMap.clear();
     if (!svgRoot) return;
     svgRoot.querySelectorAll("[id]").forEach(node => {
@@ -806,6 +840,50 @@
     if (name && eventNameEl) eventNameEl.value = String(name);
   }
 
+  async function saveEventName(){
+    if (!eventNameEl) return;
+    const name = String(eventNameEl.value || "").trim();
+    if (!name) { alert("Please enter an event name."); return; }
+
+    // Must be user-triggered (Set button) so prompt works on iOS Safari
+    ensureAdminPassword();
+
+    const backend = getBackendUrl();
+    let resp = null;
+    try{
+      resp = await fetchJson(`${backend}/settings`, {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ eventName: name, adminPassword })
+      });
+    }catch(e){
+      showToast(true);
+      alert("Could not save event name (backend unreachable).");
+      return;
+    }
+
+    if (resp && resp.ok === false){
+      const msg = String(resp.error || "Event name save failed.");
+      if (/invalid admin password/i.test(msg)){
+        clearAdminPassword();
+        alert("Incorrect admin password. Please try again.");
+      } else {
+        alert(msg);
+      }
+      return;
+    }
+
+    // Re-read settings to confirm (source of truth)
+    await loadSettings();
+    const after = String(eventNameEl.value || "").trim();
+    if (after !== name){
+      alert('Event name did not update on the backend (it reverted to: "' + after + '").');
+    } else {
+      syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+    }
+  }
+
+
   let settingsSaveTimer = null;
   function scheduleSaveEventName(){
     if (!eventNameEl) return;
@@ -832,9 +910,6 @@
     const txt = await res.text();
     svgHost.innerHTML = txt;
     svgRoot = svgHost.querySelector("svg");
-    // Let clicks pass through SVG labels/overlays (fixes A2 and similar)
-    svgRoot.querySelectorAll("text,image").forEach(n => { n.style.pointerEvents = "none"; });
-
     if (!svgRoot) throw new Error("SVG invalid");
 
     // Hide any stray huge circle at 0,0 (artifact)
@@ -868,21 +943,25 @@
       try{ n.style.pointerEvents = "all"; }catch(e){}
     });
 
-    svgRoot.addEventListener("click", (ev) => {
-      // On phones, use the list only (no plan tapping)
-      if (window.matchMedia && window.matchMedia('(max-width: 640px)').matches) return;
+    
+svgRoot.addEventListener("click", (ev) => {
+  // First: try direct id in composed path / ancestors
+  const path = (typeof ev.composedPath === "function") ? ev.composedPath() : null;
+  const candidates = path && path.length ? path : [ev.target];
 
-      let node = ev.target;
-      // Walk up through parents and find the first id that matches a known stand
-      for (let i=0; i<30 && node && node !== svgRoot; i++){
-        if (node.id){
-          const key = normalizeDomId(node.id);
-          const found = rows.find(r => normalizeDomId(r.standId) === key);
-          if (found) { selectStand(found.standId); return; }
-        }
-        node = node.parentNode;
-      }
-    }, { passive:true });
+  for (const c of candidates){
+    if (!c || !c.id) continue;
+    const key = normalizeDomId(c.id);
+    const found = rows.find(r => normalizeDomId(r.standId) === key);
+    if (found){ selectStand(found.standId); return; }
+  }
+
+  // Second: robust hit test (fixes A2)
+  const hitKey = hitTestStandAtClient(ev.clientX, ev.clientY);
+  if (!hitKey) return;
+  const found = rows.find(r => normalizeDomId(r.standId) === hitKey);
+  if (found) selectStand(found.standId);
+}, { passive:true });
   }
 
   async function loadData() {
@@ -990,6 +1069,12 @@
 
   // Events
   saveBtn.addEventListener("click", saveCurrent);
+  if (setEventBtn){
+    setEventBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      saveEventName();
+    });
+  }
   // Press Enter in the Company field to save
   companyEl.addEventListener("keydown", (e) => {
     if (e.key === "Enter"){
@@ -1005,9 +1090,6 @@
 
   searchEl.addEventListener("input", renderTable);
   filterEl.addEventListener("change", renderTable);
-
-  eventNameEl.addEventListener("input", scheduleSaveEventName);
-
   pauseBtn.addEventListener("click", () => {
     autoSync = !autoSync;
     pauseBtn.textContent = autoSync ? "Pause sync" : "Resume sync";
@@ -1064,7 +1146,7 @@
       if (!autoSync) return;
       if (isEditing()) return; // don't refresh while typing/choosing
       if (saveInFlight) return; // don't refresh while saving
-      try { await loadData(); } catch(e){ showToast(true); }
+      try { await loadData(); await loadSettings(); } catch(e){ showToast(true); }
     }, 8000);
   }
   function stopPolling(){
@@ -1079,6 +1161,7 @@
       await loadSettings();
       await loadSvg();
       layoutMobile();
+      await loadSettings();
     }catch(e){
       showToast(true);
       console.error(e);

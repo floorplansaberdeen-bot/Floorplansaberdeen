@@ -225,7 +225,40 @@
       this.onSelect(row, {fromPlan});
     }
 
-    enablePlanClick({enabled=true, disableOnMobile=true}={}){
+hitTestStandAtClient(clientX, clientY){
+  if (!this.svgRoot) return null;
+  const svg = this.svgRoot;
+  // Convert client -> SVG coordinates
+  const pt = svg.createSVGPoint();
+  pt.x = clientX; pt.y = clientY;
+  const ctm = svg.getScreenCTM();
+  if (!ctm) return null;
+  const inv = ctm.inverse();
+  const sp = pt.matrixTransform(inv);
+
+  // Test geometry elements using isPointInFill/isPointInStroke if available
+  for (const [key, elem] of this.standMap.entries()){
+    const geoms = [];
+    if (elem instanceof SVGGeometryElement) geoms.push(elem);
+    else geoms.push(...Array.from(elem.querySelectorAll("path,rect,polygon,polyline,circle,ellipse")));
+    for (const g of geoms){
+      try{
+        if (typeof g.isPointInFill === "function" && g.isPointInFill(sp)) return key;
+        if (typeof g.isPointInStroke === "function" && g.isPointInStroke(sp)) return key;
+      }catch(e){ /* ignore */ }
+    }
+  }
+  // Fallback: bbox hit
+  for (const [key, elem] of this.standMap.entries()){
+    let bb=null;
+    try{ bb = (elem.getBBox ? elem.getBBox() : null); }catch(e){ bb=null; }
+    if (!bb) continue;
+    if (sp.x >= bb.x && sp.x <= bb.x+bb.width && sp.y >= bb.y && sp.y <= bb.y+bb.height) return key;
+  }
+  return null;
+}
+
+enablePlanClick({enabled=true, disableOnMobile=true}={}){
       if (!this.svgRoot) return;
       // "Phone" detection: disable plan tapping for small screens OR coarse pointers.
       // This keeps desktop click enabled while preventing accidental taps on phones.
@@ -236,18 +269,28 @@
       const shouldDisable = () => disableOnMobile && isMobile();
 
       const handler = (ev)=>{
-        if (!enabled) return;
-        if (shouldDisable()) return;
-        let node = ev.target;
-        for (let i=0;i<8 && node;i++){
-          if (node.id) break;
-          node = node.parentElement;
-        }
-        if (!node || !node.id) return;
-        const key = normalizeDomId(node.id);
-        const found = this.rows.find(r => normalizeDomId(r.standId) === key);
-        if (found) this.selectStand(found.standId, {fromPlan:true});
-      };
+  if (!enabled) return;
+  if (shouldDisable()) return;
+
+  // First: walk composedPath / ancestors for an element with an id
+  const path = (typeof ev.composedPath === "function") ? ev.composedPath() : null;
+  const candidates = path && path.length ? path : [ev.target];
+
+  let foundKey = null;
+  for (const c of candidates){
+    if (!c || !c.id) continue;
+    const key = normalizeDomId(c.id);
+    if (!key) continue;
+    const found = this.rows.find(r => normalizeDomId(r.standId) === key);
+    if (found){ this.selectStand(found.standId, {fromPlan:true}); return; }
+  }
+
+  // Second: robust hit-test inside SVG geometry (fixes stands covered by text/overlays e.g. A2)
+  const hitKey = this.hitTestStandAtClient(ev.clientX, ev.clientY);
+  if (!hitKey) return;
+  const found = this.rows.find(r => normalizeDomId(r.standId) === hitKey);
+  if (found) this.selectStand(found.standId, {fromPlan:true});
+};
 
       // Remove previous by cloning? We'll just add once; safe in our pages.
       this.svgRoot.addEventListener("click", handler, { passive:true });
