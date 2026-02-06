@@ -1008,16 +1008,6 @@
     companyEl.value = "";
     saveCurrent();
   });
-
-
-  // Event name sync: saved to backend /settings (shared across devices)
-  if (eventNameEl){
-    eventNameEl.addEventListener("blur", () => { saveEventName(); });
-    eventNameEl.addEventListener("keydown", (e) => {
-      if (e.key === "Enter"){
-        e.preventDefault();
-        saveEventName();
-      }
     });
   }
 
