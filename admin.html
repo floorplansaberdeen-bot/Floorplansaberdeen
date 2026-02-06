@@ -56,6 +56,13 @@
     button.primary:hover{ filter: brightness(0.95); }
     button.primary:active{ filter: brightness(0.9); }
     button.danger{ border-color:#ffd0d0; background:#fff5f5; }
+    button.danger.solid{
+      background:#e63b3b;
+      border-color:#e63b3b;
+      color:#fff;
+    }
+    button.danger.solid:hover{ filter: brightness(0.95); }
+    button.danger.solid:active{ filter: brightness(0.9); }
     button:disabled{ opacity:.45; cursor:not-allowed; }
 
     main{
@@ -298,7 +305,7 @@
 
         <div class="btnRow">
           <button id="saveBtn" class="primary">Save</button>
-          <button id="markAvailBtn" class="danger">Mark Available</button>
+          <button id="markAvailBtn" class="danger solid">Mark Available</button>
         </div>
 
         <div class="hint" style="padding:10px 0 0;">Click a stand on the plan or in the list to edit.</div>
