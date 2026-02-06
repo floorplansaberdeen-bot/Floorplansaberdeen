@@ -380,6 +380,8 @@
   let autoSync = true;
   let syncTimer = null;
   let saveInFlight = false;
+  const pendingWrites = new Map(); // standId -> {payload, expires}
+  let refreshHoldUntil = 0;
 
   // Pause auto-refresh while the user is editing fields (prevents resets mid-typing)
   function isEditing(){
@@ -794,12 +796,30 @@
       if (window.matchMedia && window.matchMedia('(max-width: 640px)').matches) return;
 
       let node = ev.target;
-      // Walk up through parents and find the first id that matches a known stand
-      for (let i=0; i<30 && node && node !== svgRoot; i++){
+
+      // Walk up through parents and find the first identifier that matches a known stand
+      for (let i=0; i<40 && node && node !== svgRoot; i++){
+        // 1) id
         if (node.id){
           const key = normalizeDomId(node.id);
           const found = rows.find(r => normalizeDomId(r.standId) === key);
           if (found) { selectStand(found.standId); return; }
+        }
+        // 2) data-stand (some SVG exports)
+        if (node.getAttribute){
+          const ds = node.getAttribute("data-stand");
+          if (ds){
+            const key = normalizeDomId(ds);
+            const found = rows.find(r => normalizeDomId(r.standId) === key);
+            if (found) { selectStand(found.standId); return; }
+          }
+          // 3) aria-label / title fallback
+          const al = node.getAttribute("aria-label");
+          if (al){
+            const key = normalizeDomId(al);
+            const found = rows.find(r => normalizeDomId(r.standId) === key);
+            if (found) { selectStand(found.standId); return; }
+          }
         }
         node = node.parentNode;
       }
@@ -810,6 +830,14 @@
     const backend = getBackendUrl();
     const data = await fetchJson(`${backend}/stands?ts=${Date.now()}`);
     rows = (Array.isArray(data) ? data : []).map(normRow).filter(r => r.standId);
+    // Apply any recent writes so the UI doesn\'t "revert" while the backend becomes consistent.
+    const now = Date.now();
+    for (const [sid, obj] of pendingWrites.entries()){
+      if (obj.expires <= now){ pendingWrites.delete(sid); continue; }
+      const idx = rows.findIndex(r => r.standId === sid);
+      if (idx >= 0) rows[idx] = obj.payload;
+      else rows.push(obj.payload);
+    }
 
     applyColours();
     renderTable();
@@ -853,6 +881,11 @@
 
     const idx = rows.findIndex(r => r.standId === selectedStandId);
     if (idx >= 0) rows[idx] = payload;
+    else rows.push(payload);
+
+    // Hold this write locally for a short period to avoid "revert" while backend updates.
+    pendingWrites.set(selectedStandId, { payload, expires: Date.now() + 45000 });
+    refreshHoldUntil = Date.now() + 15000;
 
     applyColours();
     renderTable();
@@ -965,6 +998,7 @@
       if (!autoSync) return;
       if (isEditing()) return; // don't refresh while typing/choosing
       if (saveInFlight) return; // don't refresh while saving
+      if (Date.now() < refreshHoldUntil) return; // brief hold after save
       try { await loadData(); } catch(e){ showToast(true); }
     }, 8000);
   }
