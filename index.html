@@ -11,11 +11,10 @@
       --border:#e9e9e9;
       --text:#111;
       --muted:#666;
-      --accent: rgba(213,109,50,0.75); /* stands main colour */
-      --selected:#e63b3b;
+      --avail: rgba(213,109,50,0.75); /* public: all stands orange */
+      --sold:#e63b3b; /* public: selected stand red */
       --shadow: 0 12px 30px rgba(0,0,0,.12);
-      --dot: 10px; /* pointer dot size (match admin) */
-      --line: rgba(0,0,0,.70);
+      --dot: 10px; /* must match admin */
       --safe: env(safe-area-inset-bottom, 0px);
     }
     *{ box-sizing:border-box; }
@@ -24,31 +23,26 @@
       background:var(--bg); color:var(--text);
     }
     header{
-      padding:20px 18px 8px;
-      display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+      padding:14px 16px;
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      border-bottom:1px solid var(--border);
       flex-wrap:wrap;
     }
-    header h1{ margin:0; font-size:44px; line-height:1.05; letter-spacing:-.02em; }
-    header .meta{ margin-top:6px; color:var(--muted); font-size:16px; }
-    header .status{
-      margin-top:6px; font-weight:700;
-      color:#1a8f2a; display:flex; align-items:center; gap:8px;
-    }
-    header .actions{ display:flex; gap:10px; align-items:center; margin-left:auto; }
+    header .title{ font-weight:900; font-size:22px; }
+    header .tools{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
     button{
       border:1px solid var(--border);
       background:#fff;
       padding:10px 14px;
       border-radius:12px;
-      font-weight:700;
+      font-weight:800;
       cursor:pointer;
     }
-    button:disabled{ opacity:.45; cursor:not-allowed; }
     main{
-      padding:0 18px 18px;
+      padding:16px;
       display:grid;
-      grid-template-columns: 1fr 420px;
-      gap:18px;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap:16px;
       align-items:start;
     }
     .card{
@@ -57,7 +51,15 @@
       border-radius:16px;
       box-shadow: 0 1px 0 rgba(0,0,0,.02);
     }
-    .planCard{ padding:14px; }
+    .cardHead{
+      padding:10px 12px;
+      font-weight:900;
+      border-bottom:1px solid var(--border);
+    }
+    .planCard{ overflow:hidden; }
+    .planBody{ padding:12px; }
+
+    /* Plan + label bay + overlay share one stack so label never overlaps plan */
     .planStack{ position:relative; border-radius:14px; overflow:hidden; background:#fff; }
     .planWrap{
       position:relative;
@@ -66,547 +68,253 @@
       background:#fff;
       min-height:420px;
     }
-    /* The SVG inserted is inside .svgHost */
-    .svgHost{
-      width:100%;
-      height:auto;
-      display:block;
+    .svgHost{ width:100%; height:auto; display:block; }
+    .labelBay{
+      background:#fff;
+      border-top:1px solid var(--border);
+      padding:12px;
+      min-height:72px;
     }
-    .calloutSvg{ position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; }
-    .labelBay{ background:#fff; border-top:1px solid var(--border); padding:12px; min-height:72px; }
-    .lozenge{ display:inline-block; background:#fff; border-radius:999px; padding:12px 16px; box-shadow: var(--shadow); border:1px solid rgba(0,0,0,.08); max-width: 320px; }
-    .lozStand{ font-size:34px; font-weight:900; line-height:1.1; }
-    .lozCompany{ margin-top:4px; font-size:18px; font-weight:800; opacity:.9; }
-
-    .label{
-      position:absolute;
-      background:var(--selected);
-      color:#fff;
-      border-radius:16px;
-      padding:14px 18px;
-      box-shadow: var(--shadow);
-      min-width: 220px;
-      max-width: 320px;
-      text-align:center;
-      pointer-events:none;
-      transform: translate(-50%, -50%);
-    }
-    .label .stand{ font-size:38px; font-weight:900; letter-spacing:.02em; }
-    .label .company{ margin-top:6px; font-size:18px; font-weight:800; opacity:.95; }
-    .line{
-      position:absolute;
-      background:var(--line);
-      transform-origin: 0 0;
-      height:3px;
-      border-radius:3px;
-      pointer-events:none;
-    }
-    .dot{
-      position:absolute;
-      width:var(--dot); height:var(--dot);
+    .lozenge{
+      display:inline-block;
+      background:#fff;
       border-radius:999px;
-      background:rgba(0,0,0,.72);
-      transform: translate(-50%, -50%);
+      padding:12px 16px;
+      box-shadow: var(--shadow);
+      border:1px solid rgba(0,0,0,.08);
+      max-width: 340px;
+    }
+    .lozStand{ font-size:28px; font-weight:900; line-height:1.1; }
+    .lozCompany{ margin-top:4px; font-size:16px; font-weight:800; opacity:.9; }
+
+    .calloutSvg{
+      position:absolute;
+      left:0; top:0;
+      width:100%;
+      height:100%;
       pointer-events:none;
     }
-    .rightCol{ padding:14px; display:flex; flex-direction:column; gap:14px; }
-    .panel{ padding:14px; }
-    .panel h3{ margin:0 0 10px; font-size:16px; }
-    .selectedBig{
-      font-size:46px; font-weight:900; line-height:1;
-      margin:2px 0 6px;
-    }
-    .selectedCompany{ font-size:22px; font-weight:800; margin-bottom:8px; }
-    .help{ color:var(--muted); font-size:13px; line-height:1.35; }
-    .search{
-      width:100%; padding:12px 14px; border-radius:12px;
-      border:1px solid var(--border); font-size:16px;
-    }
-    .list{
+
+    .side{ padding:12px; display:flex; flex-direction:column; gap:12px; }
+    .hint{ color:var(--muted); font-size:13px; padding:10px 12px 12px; }
+
+    .panel{
       border:1px solid var(--border);
       border-radius:14px;
       overflow:hidden;
-      max-height: 520px;
-      overflow:auto;
-      background:#fff;
-      padding-bottom: calc(14px + var(--safe)); /* allow last item above browser bar */
-    }
-    .item{
-      padding:12px 14px;
-      border-top:1px solid #f0f0f0;
-      cursor:pointer;
       background:#fff;
     }
-    .item:first-child{ border-top:none; }
-    .item:hover{ background:#fafafa; }
-    .item.active{ background: #fff2f2; }
-    .item .name{ font-weight:900; }
-    .item .sub{ color:var(--muted); margin-top:2px; }
-    .errBar{
-      margin:0 18px 10px;
-      color:#b00020;
-      font-weight:800;
+    .panelHead{
+      padding:10px 12px;
+      font-weight:900;
+      border-bottom:1px solid var(--border);
+    }
+    .panelBody{ padding:12px; }
+
+    .searchRow{
+      display:flex; gap:10px; align-items:center;
+    }
+    .searchRow input{
+      flex:1; padding:10px 12px; border-radius:12px; border:1px solid var(--border);
+      font-weight:700;
     }
 
-    /* Make plan sticky on phones and reduce whitespace */
+    .countLine{ color:var(--muted); font-weight:800; padding:0 12px 12px; }
+
+    .listWrap{
+      border-top:1px solid var(--border);
+      max-height: 560px;
+      overflow:auto;
+    }
+    table{ width:100%; border-collapse:collapse; font-size:13px; }
+    th, td{ padding:10px 10px; border-top:1px solid #f0f0f0; text-align:left; }
+    th{ background:#fafafa; border-top:none; font-size:12px; color:var(--muted); position:sticky; top:0; z-index:2; }
+    tr.active{ background:#fff7f0; outline:2px solid #f2dfcf; outline-offset:-2px; }
+
     @media (max-width: 980px){
       main{ grid-template-columns: 1fr; }
-      header h1{ font-size:44px; }
+      .listWrap{ max-height: 420px; }
     }
+
+    /* Mobile: plan pinned top, search pinned under plan, list scrollable underneath */
     @media (max-width: 640px){
-      header{ padding:18px 14px 8px; }
-      main{ padding:0 14px 14px; gap:12px; }
-      .planCard{ padding:10px; }
-      .planWrap{ min-height: 300px; }
-      .label{ min-width: 200px; max-width: 260px; padding:12px 14px; border-radius:14px; }
-      .label .stand{ font-size:34px; }
-      .label .company{ font-size:16px; }
-      :root{ --dot: 10px; }
-      /* sticky plan section */
-      .planCard{
-        position: sticky;
-        top: 0;
-        z-index: 20;
-        background: var(--bg);
+      main{ padding:12px; gap:12px; }
+      .planCard{ position: sticky; top: 0; z-index: 30; background: var(--bg); }
+      .side{ padding:0; }
+      .panel{ position: sticky; top: calc(12px + 340px); z-index: 25; } /* below plan */
+      .listWrap{
+        max-height: calc(100vh - 520px);
+        overflow:auto;
+        padding-bottom: calc(18px + var(--safe));
       }
+      /* Reduce empty space under plan on phones */
+      .planWrap{ min-height: 280px; }
     }
   </style>
 </head>
 <body>
   <header>
-    <div>
-      <h1 id="eventTitle">Floorplan</h1>
-      <div class="meta">Updated: <span id="updatedAt">—</span></div>
-      <div class="status" id="readyRow" style="display:none;">Ready ✅</div>
-    </div>
-    <div class="actions">
-      <button id="exportPdfBtn">Export PDF</button>
+    <div class="title">Floorplan</div>
+    <div class="tools">
+      <div style="color:var(--muted); font-weight:800;">Updated: <span id="updatedAt">—</span></div>
       <button id="clearBtn">Clear selection</button>
     </div>
   </header>
 
-  <div class="errBar" id="errBar" style="display:none;"></div>
-
   <main>
     <section class="card planCard">
-      <div class="planStack" id="planStack">
-      <div class="planWrap" id="planWrap">
-        <div id="svgHost" class="svgHost"></div>
-        <div class="dot" id="dot" style="display:none;"></div>
-          <div class="label" id="label" style="display:none;">
-            <div class="stand" id="labelStand">—</div>
-            <div class="company" id="labelCompany" style="display:none;"></div>
+      <div class="cardHead">Plan</div>
+      <div class="planBody">
+        <div class="planStack" id="planStack">
+          <div class="planWrap" id="planWrap">
+            <div id="svgHost" class="svgHost"></div>
           </div>
+          <div class="labelBay" id="labelBay">
+            <div class="lozenge" id="lozenge" style="display:none;">
+              <div class="lozStand" id="lozStand">—</div>
+              <div class="lozCompany" id="lozCompany" style="display:none;"></div>
+            </div>
+          </div>
+          <svg class="calloutSvg" id="calloutSvg" aria-hidden="true"></svg>
         </div>
       </div>
-      <div class="labelBay" id="labelBay">
-        <div class="lozenge" id="lozenge" style="display:none;">
-          <div class="lozStand" id="lozStand">—</div>
-          <div class="lozCompany" id="lozCompany" style="display:none;"></div>
-        </div>
-      </div>
-      <svg class="calloutSvg" id="calloutSvg" aria-hidden="true"></svg>
-    </div>
     </section>
 
-    <aside class="card rightCol">
-      <div class="card panel">
-        <h3>Selected exhibitor</h3>
-        <div class="selectedBig" id="selStand">None</div>
-        <div class="selectedCompany" id="selCompany" style="display:none;"></div>
-        <div class="help">
-          Desktop: click a stand or choose from the list.<br/>
-          Phone: use the list (stand tapping is disabled).
+    <aside class="side">
+      <div class="panel">
+        <div class="panelHead">Selected exhibitor</div>
+        <div class="panelBody">
+          <div style="font-size:44px; font-weight:950; line-height:1;" id="selStand">None</div>
+          <div style="margin-top:8px; color:var(--muted); font-weight:800;" id="selCompany">Desktop: click a stand or choose from the list. Phone: use the list (plan tapping is disabled).</div>
         </div>
       </div>
 
-      <div class="card panel">
-        <h3>Sold exhibitors</h3>
-        <input class="search" id="search" placeholder="Search company or stand…" />
-        <div class="list" id="list"></div>
-      </div>
-
-      <div class="card panel">
-        <h3>Help</h3>
-        <div class="help">Selecting an exhibitor makes their stand red with a label + line.</div>
+      <div class="panel" id="listPanel">
+        <div class="panelHead">Sold exhibitors</div>
+        <div class="panelBody">
+          <div class="searchRow">
+            <input id="search" placeholder="Search company or stand…" />
+          </div>
+        </div>
+        <div class="countLine"><span id="count">0</span> / <span id="total">0</span></div>
+        <div class="listWrap" id="listWrap">
+          <table>
+            <thead>
+              <tr><th style="width:90px;">Stand</th><th>Company</th></tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
       </div>
     </aside>
   </main>
 
-<script>
-(() => {
-  const DEFAULT_BACKEND = "https://floorplansaberdeen.floorplansaberdeen.workers.dev";
-  const BACKEND_KEY = "floorplan_backend_url";
-  const SVG_URL = "./event_plan.svg"; // adjust if you use a different file
+  <script src="./shared.js"></script>
+  <script>
+  (() => {
+    const el = (id)=>document.getElementById(id);
 
-  const el = (id) => document.getElementById(id);
-  const planWrap = el("planWrap");
-  const svgHost = el("svgHost");
-  const planStack = el("planStack");
-  const calloutSvg = el("calloutSvg");
-  const lozenge = el("lozenge");
-  const lozStand = el("lozStand");
-  const lozCompany = el("lozCompany");
-  const selStandEl = el("selStand");
-  const selCompanyEl = el("selCompany");
-  const listEl = el("list");
-  const searchEl = el("search");
-  const errBar = el("errBar");
-  const updatedAtEl = el("updatedAt");
-  const readyRow = el("readyRow");
-  const eventTitle = el("eventTitle");
+    const updatedAt = el("updatedAt");
+    const clearBtn = el("clearBtn");
 
-  const exportBtn = el("exportPdfBtn");
-  const clearBtn = el("clearBtn");
+    const planStack = el("planStack");
+    const planWrap = el("planWrap");
+    const svgHost = el("svgHost");
+    const calloutSvg = el("calloutSvg");
+    const lozenge = el("lozenge");
+    const lozStand = el("lozStand");
+    const lozCompany = el("lozCompany");
 
-  function normalizeBackendUrl(input) {
-  if (!input) return "";
-  let s = String(input).trim();
-  // If someone pastes a full endpoint (e.g. .../stands), strip it back to the base.
-  try {
-    const u = new URL(s);
-    let p = u.pathname.replace(/\/+$/,"");
-    p = p.replace(/\/(api\/stands|stands)$/i, "");
-    p = p.replace(/\/+$/,"");
-    u.pathname = p ? p : "/";
-    u.search = "";
-    u.hash = "";
-    const base = u.origin + (u.pathname === "/" ? "" : u.pathname);
-    return base.replace(/\/+$/,"");
-  } catch (e) {
-    s = s.replace(/\/+$/,"");
-    s = s.replace(/\/(api\/stands|stands)$/i, "");
-    return s.replace(/\/+$/,"");
-  }
-}
+    const tbody = el("tbody");
+    const searchEl = el("search");
+    const countEl = el("count");
+    const totalEl = el("total");
 
-function getBackendUrl() {
-    const saved = localStorage.getItem(BACKEND_KEY);
-    const base = (saved && saved.startsWith("http")) ? saved : DEFAULT_BACKEND;
-    return normalizeBackendUrl(base);
-  }
+    const selStand = el("selStand");
+    const selCompany = el("selCompany");
 
-  async function fetchJson(url, opts = {}) {
-    const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), 12000);
-    try {
-      const res = await fetch(url, { ...opts, signal: controller.signal });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } finally {
-      clearTimeout(t);
+    let core = null;
+    let soldRows = [];
+
+    function renderList(){
+      const q = (searchEl.value || "").trim().toLowerCase();
+      const filtered = soldRows.filter(r=>{
+        if (!q) return true;
+        return r.standId.toLowerCase().includes(q) || (r.company||"").toLowerCase().includes(q);
+      });
+
+      tbody.innerHTML = "";
+      filtered.forEach(r=>{
+        const tr = document.createElement("tr");
+        if (core && core.selectedStandId === r.standId) tr.classList.add("active");
+
+        const td1 = document.createElement("td"); td1.textContent = r.standId;
+        const td2 = document.createElement("td"); td2.textContent = r.company || "";
+        tr.appendChild(td1); tr.appendChild(td2);
+
+        tr.addEventListener("click", ()=> core.selectStand(r.standId, {fromPlan:false}));
+        tbody.appendChild(tr);
+      });
+
+      countEl.textContent = String(filtered.length);
+      totalEl.textContent = String(soldRows.length);
     }
-  }
 
-  function showError(msg) {
-    errBar.style.display = "block";
-    errBar.textContent = msg;
-  }
-  function clearError() {
-    errBar.style.display = "none";
-    errBar.textContent = "";
-  }
-
-  function normStandId(s) {
-    return String(s || "").trim().toUpperCase();
-  }
-  function normRow(row) {
-    const standId = normStandId(row.standId ?? row.stand ?? row.id);
-    const status = String(row.status || "available").toLowerCase();
-    const company = String(row.company || "").trim();
-    return { standId, status, company };
-  }
-
-  // ===== SVG stand mapping =====
-  let svgRoot = null;
-  let standMap = new Map(); // standId -> element
-
-  function normalizeDomId(id) {
-    return String(id || "")
-      .trim()
-      .toUpperCase()
-      .replace(/^STAND[_-]?/,"")
-      .replace(/^ZONE[_-]?/,"")
-      .replace(/^ID[_-]?/,"")
-      .replace(/[^A-Z0-9]/g,"");
-  }
-
-  function buildStandMap() {
-    standMap.clear();
-    if (!svgRoot) return;
-
-    const all = svgRoot.querySelectorAll("[id]");
-    all.forEach(node => {
-      const key = normalizeDomId(node.id);
-      if (!key) return;
-      // Prefer the top-most meaningful shape/group:
-      if (!standMap.has(key)) standMap.set(key, node);
-    });
-
-    // Also support explicit data-stand tags
-    const ds = svgRoot.querySelectorAll("[data-stand]");
-    ds.forEach(node => {
-      const key = normalizeDomId(node.getAttribute("data-stand"));
-      if (key && !standMap.has(key)) standMap.set(key, node);
-    });
-  }
-
-  function elementForStand(standId) {
-    const key = normalizeDomId(standId);
-    return standMap.get(key) || null;
-  }
-
-  function setFillForElement(elem, rgba) {
-    if (!elem) return;
-    // If group, apply to child shapes; else apply directly.
-    const shapes = elem.matches("path,rect,polygon,polyline,ellipse,circle")
-      ? [elem]
-      : Array.from(elem.querySelectorAll("path,rect,polygon,polyline,ellipse,circle"));
-
-    shapes.forEach(s => {
-      // Only fill areas that look like stands: skip tiny dots and outlines
-      const bbox = s.getBBox ? s.getBBox() : null;
-      if (bbox && (bbox.width < 8 || bbox.height < 8)) return;
-      s.style.fill = rgba;
-      s.style.fillOpacity = "1";
-    });
-  }
-
-  function getElementCenterInPage(elem) {
-    // Use bounding box in screen coords
-    const r = elem.getBoundingClientRect();
-    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-  }
-
-  function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
-
-  function placeLabelSmart(standPoint) {
-    const wrapRect = planWrap.getBoundingClientRect();
-
-    // Preferred label positions outside the plan, so it never covers stands:
-    const margin = 26;
-    const labelW = (window.innerWidth <= 640) ? 220 : 260;
-    const labelH = (window.innerWidth <= 640) ? 92 : 104;
-
-    const standXRel = (standPoint.x - wrapRect.left) / wrapRect.width;
-    const onLeft = standXRel > 0.55; // if stand right-ish, put label left
-    const x = onLeft ? (wrapRect.left + margin + labelW/2) : (wrapRect.right - margin - labelW/2);
-
-    // Vertical: align around stand, but keep within wrap and avoid header area
-    const y = clamp(standPoint.y, wrapRect.top + margin + labelH/2, wrapRect.bottom - margin - labelH/2);
-
-    return { x, y, labelW, labelH };
-  }
-
-  
-  function clearCallout(){
-    calloutSvg.innerHTML = "";
-    lozenge.style.display = "none";
-    lozStand.textContent = "—";
-    lozCompany.style.display = "none";
-    lozCompany.textContent = "";
-  }
-
-  function drawCallout(selected){
-    if (!selected || !selected.standId) { clearCallout(); return; }
-    const elem = elementForStand(selected.standId);
-    if (!elem) { clearCallout(); return; }
-
-    lozStand.textContent = selected.standId;
-    if (selected.company){
-      lozCompany.style.display = "block";
-      lozCompany.textContent = selected.company;
-    } else {
-      lozCompany.style.display = "none";
-      lozCompany.textContent = "";
+    function clearSelection(){
+      if (!core) return;
+      core.selectedStandId = null;
+      core.applyColoursPublic();
+      core.clearCallout();
+      selStand.textContent = "None";
+      selCompany.textContent = "Desktop: click a stand or choose from the list. Phone: use the list (plan tapping is disabled).";
+      renderList();
     }
-    lozenge.style.display = "inline-block";
 
-    const standRect = elem.getBoundingClientRect();
-    const standPt = { x: standRect.left + standRect.width/2, y: standRect.top + standRect.height/2 };
+    clearBtn.addEventListener("click", clearSelection);
+    searchEl.addEventListener("input", renderList);
 
-    const lozRect = lozenge.getBoundingClientRect();
-    const lozTop = { x: lozRect.left + lozRect.width/2, y: lozRect.top };
-
-    const stackRect = planStack.getBoundingClientRect();
-    const x1 = lozTop.x - stackRect.left;
-    const y1 = lozTop.y - stackRect.top;
-    const x2 = standPt.x - stackRect.left;
-    const y2 = standPt.y - stackRect.top;
-
-    calloutSvg.setAttribute("viewBox", `0 0 ${stackRect.width} ${stackRect.height}`);
-    calloutSvg.setAttribute("preserveAspectRatio", "none");
-
-    const dotPx = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--dot")) || 10;
-    const r = dotPx / 2;
-
-    calloutSvg.innerHTML = `
-      <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="rgba(0,0,0,.70)" stroke-width="3" stroke-linecap="round"/>
-      <circle cx="${x2}" cy="${y2}" r="${r}" fill="rgba(0,0,0,.72)"/>
-    `;
-  }
-
-
-  // ===== Data + UI =====
-  let rows = [];
-  let selectedStandId = null;
-
-  function renderList() {
-    const q = (searchEl.value || "").trim().toLowerCase();
-    const sold = rows.filter(r => r.status === "sold");
-    const filtered = q
-      ? sold.filter(r =>
-          r.standId.toLowerCase().includes(q) ||
-          (r.company || "").toLowerCase().includes(q)
-        )
-      : sold;
-
-    listEl.innerHTML = "";
-    filtered.forEach(r => {
-      const div = document.createElement("div");
-      div.className = "item" + (r.standId === selectedStandId ? " active" : "");
-      const name = document.createElement("div");
-      name.className = "name";
-      name.textContent = r.company ? r.company : "(No company)";
-      const sub = document.createElement("div");
-      sub.className = "sub";
-      sub.textContent = `Stand ${r.standId}`;
-      div.appendChild(name);
-      div.appendChild(sub);
-      div.addEventListener("click", () => selectStand(r.standId));
-      listEl.appendChild(div);
+    window.addEventListener("resize", ()=>{
+      if (!core || !core.selectedStandId) return;
+      const row = core.rows.find(r=>r.standId === core.selectedStandId);
+      if (row) core.drawCallout(row.standId, row.company || "");
     });
-  }
 
-  function applyColours() {
-    if (!svgRoot) return;
-    // All stands = main colour; selected = red
-    rows.forEach(r => {
-      const elem = elementForStand(r.standId);
-      if (!elem) return;
-      setFillForElement(elem, getComputedStyle(document.documentElement).getPropertyValue("--accent").trim());
-    });
-    if (selectedStandId) {
-      const elem = elementForStand(selectedStandId);
-      if (elem) setFillForElement(elem, getComputedStyle(document.documentElement).getPropertyValue("--selected").trim());
-    }
-  }
+    (async ()=>{
+      core = new window.FloorplanCore({
+        svgHost, planWrap, planStack, calloutSvg,
+        lozenge, lozStand, lozCompany,
+        onSelect: (row)=>{
+          selStand.textContent = row.standId;
+          selCompany.textContent = row.company ? row.company : "(No company name set)";
+          renderList();
+        }
+      });
 
-  function selectStand(standId) {
-    selectedStandId = normStandId(standId);
-    const row = rows.find(r => r.standId === selectedStandId) || { standId: selectedStandId, status:"available", company:"" };
-    applyColours();
-    drawCallout(row);
-    renderList();
-  }
-
-  function clearSelection() {
-    selectedStandId = null;
-    selStandEl.textContent = "None";
-    selCompanyEl.style.display = "none";
-    selCompanyEl.textContent = "";
-    applyColours();
-    clearCallout();
-    renderList();
-  }
-
-  function isPhone() { return window.matchMedia("(max-width: 640px)").matches; }
-
-  function attachStandClicks() {
-    if (!svgRoot) return;
-
-    // Disable stand tapping on phone (requested)
-    if (isPhone()) return;
-
-    svgRoot.addEventListener("click", (ev) => {
-      const t = ev.target;
-      if (!t) return;
-      // climb to an id-bearing ancestor
-      let node = t;
-      for (let i=0; i<6 && node; i++){
-        if (node.id) break;
-        node = node.parentElement;
+      try{
+        await core.loadSvg();
+      }catch(e){
+        updatedAt.textContent = "Error loading SVG";
+        console.error(e);
+        return;
       }
-      if (!node || !node.id) return;
-      const key = normalizeDomId(node.id);
-      if (!key) return;
-      // Only select if this key exists in rows
-      const found = rows.find(r => normalizeDomId(r.standId) === key);
-      if (found) selectStand(found.standId);
-    }, { passive:true });
-  }
 
-  async function loadSvg() {
-    const res = await fetch(SVG_URL);
-    if (!res.ok) throw new Error("Could not load SVG");
-    const txt = await res.text();
-    svgHost.innerHTML = txt;
-
-    svgRoot = svgHost.querySelector("svg");
-    if (!svgRoot) throw new Error("SVG invalid");
-
-    // Remove any stray shapes we might have created in older versions (the “grey quarter circle”)
-    // If someone left a <circle> at 0,0 with huge radius, hide it:
-    svgRoot.querySelectorAll("circle").forEach(c => {
-      const cx = c.getAttribute("cx"), cy = c.getAttribute("cy"), r = c.getAttribute("r");
-      const rr = parseFloat(r || "0");
-      if ((cx === "0" || cx === "0.0") && (cy === "0" || cy === "0.0") && rr >= 20) {
-        c.style.display = "none";
+      try{
+        await core.loadStands();
+        // Public list: sold exhibitors only
+        soldRows = core.rows.filter(r=>r.status === "sold" && (r.company||"").trim().length > 0);
+        renderList();
+        core.applyColoursPublic();
+        updatedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+      }catch(e){
+        updatedAt.textContent = "Error loading data";
+        console.error(e);
+        return;
       }
-    });
 
-    // Make sure SVG scales nicely
-    svgRoot.setAttribute("preserveAspectRatio", "xMidYMid meet");
-    svgRoot.style.width = "100%";
-    svgRoot.style.height = "auto";
-    svgRoot.style.display = "block";
-
-    buildStandMap();
-    attachStandClicks();
-  }
-
-  async function loadData() {
-    const backend = getBackendUrl();
-    const data = await fetchJson(`${backend}/stands`);
-    rows = (Array.isArray(data) ? data : []).map(normRow).filter(r => r.standId);
-    applyColours();
-    renderList();
-    readyRow.style.display = "flex";
-    updatedAtEl.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
-    clearError();
-  }
-
-  // very lightweight "PDF export": print dialog (keeps working across browsers)
-  exportBtn.addEventListener("click", () => window.print());
-  clearBtn.addEventListener("click", clearSelection);
-
-  searchEl.addEventListener("input", renderList);
-  window.addEventListener("resize", () => {
-    // reposition pointer after resize
-    if (selectedStandId) {
-      const row = rows.find(r => r.standId === selectedStandId);
-      if (row) drawCallout(row);
-    }
-  });
-
-  // init
-  (async () => {
-    try {
-      await loadSvg();
-    } catch (e) {
-      showError("Error loading plan SVG.");
-      console.error(e);
-      return;
-    }
-
-    try {
-      await loadData();
-    } catch (e) {
-      showError("Failed to fetch (backend not reachable).");
-      console.error(e);
-    }
+      // Desktop: allow plan click. Mobile: disable plan tapping.
+      core.enablePlanClick({ enabled:true, disableOnMobile:true });
+    })();
   })();
-})();
-</script>
+  </script>
 </body>
 </html>
