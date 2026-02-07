@@ -309,48 +309,51 @@ enablePlanClick({enabled=true, disableOnMobile=true}={}){
       window.addEventListener("resize", applyPe);
       applyPe();
     }
+
+applySearchHighlight(query, rows){
+  const q = String(query || "").trim().toLowerCase();
+
+  // restore previous outlines
+  for (const [elem, prev] of this._searchPrev.entries()){
+    try{
+      elem.style.stroke = prev.stroke;
+      elem.style.strokeWidth = prev.strokeWidth;
+      elem.style.strokeOpacity = prev.strokeOpacity;
+    }catch(_){}
+  }
+  this._searchPrev.clear();
+
+  if (!q || !Array.isArray(rows) || !rows.length) return;
+
+  const hits = rows.filter(r => {
+    const sid = String(r.standId || "").toLowerCase();
+    const comp = String(r.company || "").toLowerCase();
+    return sid.includes(q) || comp.includes(q);
+  });
+
+  hits.forEach(r => {
+    const elem = this.elementForStand(r.standId);
+    if (!elem) return;
+    const shapes = elem.matches("path,rect,polygon,polyline,ellipse,circle")
+      ? [elem]
+      : Array.from(elem.querySelectorAll("path,rect,polygon,polyline,ellipse,circle"));
+
+    shapes.forEach(s => {
+      if (!this._searchPrev.has(s)) {
+        this._searchPrev.set(s, {
+          stroke: s.style.stroke || "",
+          strokeWidth: s.style.strokeWidth || "",
+          strokeOpacity: s.style.strokeOpacity || "",
+        });
+      }
+      s.style.stroke = "rgba(0,0,0,.85)";
+      s.style.strokeWidth = "3";
+      s.style.strokeOpacity = "1";
+    });
+  });
+}
+
   }
 
   window.FloorplanCore = FloorplanCore;
-})();applySearchHighlight(query){
-  // Public: add a subtle outline on stands matching the current search.
-  const q = String(query || "").trim().toLowerCase();
-
-  // Clear previous outlines
-  for (const r of this.rows){
-    const elem = this.elementForStand(r.standId);
-    if (!elem) continue;
-    const shapes = (elem.matches && elem.matches("path,rect,polygon,polyline,ellipse,circle"))
-      ? [elem]
-      : Array.from(elem.querySelectorAll("path,rect,polygon,polyline,ellipse,circle"));
-    for (const s of shapes){
-      s.style.stroke = "";
-      s.style.strokeWidth = "";
-    }
-  }
-
-  if (!q) return;
-
-  const matches = this.rows.filter(r =>
-    r.standId.toLowerCase().includes(q) || String(r.company||"").toLowerCase().includes(q)
-  );
-
-  for (const r of matches){
-    const elem = this.elementForStand(r.standId);
-    if (!elem) continue;
-    const shapes = (elem.matches && elem.matches("path,rect,polygon,polyline,ellipse,circle"))
-      ? [elem]
-      : Array.from(elem.querySelectorAll("path,rect,polygon,polyline,ellipse,circle"));
-
-    for (const s of shapes){
-      try{
-        const bb = s.getBBox ? s.getBBox() : null;
-        if (bb && (bb.width < 8 || bb.height < 8)) continue;
-      }catch(e){}
-      s.style.stroke = "rgba(0,0,0,.55)";
-      s.style.strokeWidth = "3";
-    }
-  }
-}
-
-
+})();
