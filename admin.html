@@ -1227,37 +1227,95 @@ svgRoot.addEventListener("click", (ev) => {
     URL.revokeObjectURL(a.href);
   });
 
-  importBtn.addEventListener("click", () => {
-    // IMPORTANT: file picker must be opened directly from the click gesture (Safari/Chrome strictness),
-    // so we prompt for password AFTER the user selects a file.
-    const inp = document.createElement("input");
-    inp.type = "file";
-    inp.accept = ".csv,text/csv";
-    inp.onchange = async () => {
-      const f = inp.files && inp.files[0];
-      if (!f) return;
+  
+importBtn.addEventListener("click", () => {
+  // Pick file first, then ask for password (so Cancel doesn't still open Finder)
+  const inp = document.createElement("input");
+  inp.type = "file";
+  inp.accept = ".csv,text/csv";
+  inp.onchange = async () => {
+    const f = inp.files && inp.files[0];
+    if (!f) return;
 
-      const _pwd = ensureAdminPassword({ force: true, reason: "Import CSV" });
-      if (!_pwd) { inp.value = ""; return; }
+    const _pwd = ensureAdminPassword({ force:true, reason:"Import CSV" });
+    if (!_pwd) return;
 
+    const backend = getBackendUrl();
+
+    // Stop polling while we apply a batch update (otherwise it will overwrite the imported changes)
+    const wasAuto = autoSync;
+    autoSync = false;
+    stopPolling();
+    pauseBtn.textContent = "Resume sync";
+
+    try{
       const txt = await f.text();
       const lines = txt.split(/\r?\n/).filter(Boolean);
       const out = [];
-      for (let i = 1; i < lines.length; i++) {
+      for (let i=1;i<lines.length;i++){
         const line = lines[i];
         const m = line.match(/^([^,]+),([^,]+),"(.*)"$/);
         if (!m) continue;
-        out.push({ standId: normStandId(m[1]), status: m[2].trim().toLowerCase(), company: m[3].replaceAll('""','"') });
+        out.push({
+          standId: normStandId(m[1]),
+          status: String(m[2]||"").trim().toLowerCase(),
+          company: (m[3]||"").replaceAll('""','"')
+        });
       }
-      rows = out;
-      applyColours();
-      renderTable();
-      // Import changes are local until you click Save on a stand (keeps Sheets as source of truth).
-    };
-    inp.click();
-  });
 
-  resetBtn.addEventListener("click", resetAll);
+      if (!out.length){
+        flashToast("CSV had no rows to import.");
+        return;
+      }
+
+      showProgress("Importing CSV to Google Sheet…", 0, out.length);
+
+      // Apply each row to the backend (Google Sheet is source of truth)
+      for (let i=0;i<out.length;i++){
+        const r = out[i];
+        const payload = {
+          standId: r.standId,
+          status: (r.status === "sold") ? "sold" : "available",
+          company: (r.status === "sold") ? (r.company||"").trim() : "",
+          adminPassword: _pwd
+        };
+
+        await fetchJson(`${backend}/stand`, {
+          method:"POST",
+          headers:{ "Content-Type":"application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        // progress
+        showProgress("Importing CSV to Google Sheet…", i+1, out.length);
+
+        // tiny yield keeps UI responsive on big imports
+        await new Promise(res => setTimeout(res, 30));
+      }
+
+      hideProgress();
+      flashToast("Import complete.");
+
+      // Reload from backend (source of truth)
+      await loadData();
+
+    }catch(e){
+      console.error(e);
+      hideProgress();
+      showToast(true);
+      flashToast("Import failed (check password / backend).");
+    }finally{
+      // Restore polling state to what it was
+      autoSync = wasAuto;
+      pauseBtn.textContent = autoSync ? "Pause sync" : "Resume sync";
+      if (autoSync) startPolling();
+    }
+  };
+  inp.click();
+});
+
+
+resetBtn.addEventListener("click", resetAll);
 
   window.addEventListener("scroll", () => { if (selectedStandId) drawCallout(selectedStandId); }, { passive:true });
   window.addEventListener("resize", () => { if (selectedStandId) drawCallout(selectedStandId); });
