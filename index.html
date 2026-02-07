@@ -278,13 +278,11 @@
       selStand.textContent = "None";
       selCompany.textContent = "Desktop: click a stand or choose from the list. Phone: use the list (plan tapping is disabled).";
       renderList();
+      core.applySearchHighlight(searchEl.value);
     }
 
     clearBtn.addEventListener("click", clearSelection);
-    searchEl.addEventListener("input", () => {
-      renderList();
-      clearSearchBtn.disabled = !searchEl.value;
-    });
+    searchEl.addEventListener("input", () => { renderList(); core.applySearchHighlight(searchEl.value); });
 
     clearSearchBtn.disabled = true;
     clearSearchBtn.addEventListener("click", () => {

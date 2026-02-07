@@ -55,6 +55,7 @@
     }
     button.primary:hover{ filter: brightness(0.95); }
     button.primary:active{ filter: brightness(0.9); }
+    button.secondary{ background:#fff; border-color:#d9d9d9; }
     button.danger{ border-color:#ffd0d0; background:#fff5f5; }
     button.danger.solid{
       background:#e63b3b;
@@ -383,6 +384,10 @@
           <button id="markAvailBtn" class="danger solid">Mark Available</button>
         </div>
 
+        <div class="btnRow" style="margin-top:10px;">
+          <button id="undoBtn" class="secondary" disabled>Undo last change</button>
+        </div>
+
         <div class="hint" style="padding:10px 0 0;">Click a stand on the plan or in the list to edit.</div>
       </div>
 
@@ -425,16 +430,23 @@
     </div>
   </div>
 
-<div class="toast" id="undoToast" style="display:none; z-index:10000;">
-  <div class="msg" id="undoMsg">Saved. Undo?</div>
-  <div class="actions">
-    <button id="undoBtn">Undo</button>
-    <button id="undoDismissBtn">Dismiss</button>
-  </div>
-</div>
-
 <script>
 (() => {
+  // Optional: lock admin behind a URL-only secret. Set ADMIN_URL_KEY to a hard-to-guess string,
+  // then visit: admin.html?k=YOUR_KEY
+  const ADMIN_URL_KEY = "CHANGE_ME";
+  const ADMIN_KEY_PARAM = "k";
+  if (ADMIN_URL_KEY !== "CHANGE_ME") {
+    const u = new URL(location.href);
+    if ((u.searchParams.get(ADMIN_KEY_PARAM) || "") !== ADMIN_URL_KEY) {
+      document.body.innerHTML = `<div style="padding:24px;font-family:ui-sans-serif,system-ui;">
+        <h2 style="margin:0 0 8px;">Floorplan Admin</h2>
+        <div style="color:#666;font-weight:700;">This page is locked. Add <code>?${ADMIN_KEY_PARAM}=…</code> to the URL.</div>
+      </div>`;
+      return;
+    }
+  }
+
   const DEFAULT_BACKEND = "https://floorplansaberdeen.floorplansaberdeen.workers.dev";
   const BACKEND_KEY = "floorplan_backend_url";
   const SVG_URL = new URL("./event_plan.svg", window.location.href).href;
@@ -464,6 +476,7 @@
   const companyEl = el("company");
   const saveBtn = el("saveBtn");
   const markAvailBtn = el("markAvailBtn");
+  const undoBtn = el("undoBtn");
 
   const toast = el("toast");
   const toastMsg = el("toastMsg");
@@ -493,65 +506,20 @@
   let syncTimer = null;
   let adminPassword = sessionStorage.getItem('admin_pwd') || '';
   let saveInFlight = false;
+  let undoInProgress = false;
 
-// ---- Undo stack (session-only) ----
-const undoToast = el("undoToast");
-const undoMsg = el("undoMsg");
-const undoBtn = el("undoBtn");
-const undoDismissBtn = el("undoDismissBtn");
-
-let undoStack = []; // [{standId, prev:{status,company}, next:{status,company}}]
-const UNDO_MAX = 25;
-
-function hideUndoToast(){
-  if (undoToast) undoToast.style.display = "none";
-}
-function showUndoToast(item){
-  if (!undoToast || !undoMsg) return;
-  undoMsg.textContent = `Saved ${item.standId}. Undo?`;
-  undoToast.style.display = "flex";
-}
-
-async function doUndo(){
-  const item = undoStack.pop();
-  if (!item) return;
-  hideUndoToast();
-
-  const pwd = ensureAdminPassword({ force:false, reason:"Undo" });
-  if (!pwd) { 
-    // put it back if cancelled
-    undoStack.push(item);
-    return;
+  // Simple undo stack (standId/status/company). We only undo stand-level changes.
+  const undoStack = [];
+  function updateUndoUi(){
+    if (!undoBtn) return;
+    undoBtn.disabled = undoStack.length === 0 || saveInFlight;
   }
-
-  const backend = getBackendUrl();
-  try{
-    saveInFlight = true;
-    await fetchJson(`${backend}/stand`, {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({
-        standId: item.standId,
-        status: item.prev.status,
-        company: item.prev.status === "sold" ? (item.prev.company || "") : "",
-        adminPassword: pwd
-      })
-    });
-    await loadData(); // authoritative refresh
-    flashToast("Undone.");
-  }catch(e){
-    console.error(e);
-    showToast(true);
-    flashToast("Undo failed.");
-    // push back so user can retry
-    undoStack.push(item);
-  }finally{
-    saveInFlight = false;
+  function pushUndo(prev){
+    if (!prev || !prev.standId) return;
+    undoStack.push({ standId: prev.standId, status: prev.status, company: prev.company || "" });
+    if (undoStack.length > 25) undoStack.shift();
+    updateUndoUi();
   }
-}
-
-if (undoBtn) undoBtn.addEventListener("click", doUndo);
-if (undoDismissBtn) undoDismissBtn.addEventListener("click", hideUndoToast);
 
   // Pause auto-refresh while the user is editing fields (prevents resets mid-typing)
   function isEditing(){
@@ -1033,9 +1001,6 @@ function buildStandMap() {
     settingsSaveTimer = setTimeout(async () => {
       const backend = getBackendUrl();
       const payload = { eventName: eventNameEl.value.trim() };
-
-    const prevRow = rows.find(r => r.standId === selectedStandId);
-    const prevSnapshot = prevRow ? { status: prevRow.status, company: prevRow.company || "" } : { status:"available", company:"" };
       try{
         await fetchJson(`${backend}/settings`, {
           method:"POST",
@@ -1135,6 +1100,13 @@ svgRoot.addEventListener("click", (ev) => {
     await ensureAdminPassword();
     saveInFlight = true;
     if (!selectedStandId) { saveInFlight = false; return; }
+
+    // Record previous value for undo (if we have it locally)
+    const prevRow = rows.find(r => r.standId === selectedStandId);
+    if (!undoInProgress && prevRow){
+      pushUndo({ standId: prevRow.standId, status: prevRow.status, company: prevRow.company || "" });
+    }
+
     const backend = getBackendUrl();
     const payload = {
       standId: selectedStandId,
@@ -1271,6 +1243,20 @@ svgRoot.addEventListener("click", (ev) => {
     statusEl.value = "available";
     companyEl.value = "";
     saveCurrent();
+  });
+
+  undoBtn.addEventListener("click", async () => {
+    const prev = undoStack.pop();
+    updateUndoUi();
+    if (!prev) return;
+    undoInProgress = true;
+    selectedStandId = prev.standId;
+    statusEl.value = prev.status;
+    companyEl.value = prev.company || "";
+    await saveCurrent();
+    undoInProgress = false;
+    // keep selection
+    selectStand(prev.standId);
   });
 
   searchEl.addEventListener("input", renderTable);
