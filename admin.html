@@ -1158,6 +1158,14 @@ svgRoot.addEventListener("click", (ev) => {
       adminPassword: adminPassword
     };
 
+    // Capture previous values for Undo (before we overwrite local state)
+    const prevRow = rows.find(r => r.standId === selectedStandId);
+    if (prevRow) {
+      setLastChange({ standId: selectedStandId, status: prevRow.status, company: prevRow.company || "" });
+    } else {
+      setLastChange(null);
+    }
+
     try{
       const resp = await fetchJson(`${backend}/stand`, {
         method:"POST",
@@ -1183,7 +1191,7 @@ svgRoot.addEventListener("click", (ev) => {
     }
 
     const idx = rows.findIndex(r => r.standId === selectedStandId);
-    if (idx >= 0) rows[idx] = payload;
+    if (idx >= 0) rows[idx] = { standId: selectedStandId, status: payload.status, company: payload.company };
 
     applyColours();
     renderTable();

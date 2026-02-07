@@ -158,11 +158,14 @@
       /* Reduce empty space under plan on phones */
       .planWrap{ min-height: 280px; }
     }
-  </style>
+  
+    .eventName{ font-weight:900; color:var(--muted); margin-top:2px; }
+</style>
 </head>
 <body>
   <header>
     <div class="title">Floorplan</div>
+    <div class="eventName" id="eventName">—</div>
     <div class="tools">
       <div style="color:var(--muted); font-weight:800;">Updated: <span id="updatedAt">—</span></div>
       <button id="clearBtn">Clear selection</button>
@@ -220,6 +223,30 @@
 
   <script src="./shared.js"></script>
   <script>
+  async function fetchJson(url, opts){
+    const res = await fetch(url, opts);
+    const text = await res.text();
+    let data;
+    try { data = text ? JSON.parse(text) : null; } catch { data = null; }
+    if (!res.ok){
+      const msg = (data && data.error) ? data.error : (text || res.statusText);
+      throw new Error(msg);
+    }
+    return data;
+  }
+
+  async function loadSettings(){
+    try{
+      const backend = core.backend();
+      const s = await fetchJson(`${backend}/settings?_=${Date.now()}`);
+      if (s && typeof s.eventName === "string" && eventNameEl){
+        eventNameEl.textContent = s.eventName || "—";
+      }
+    }catch(_){
+      // ignore
+    }
+  }
+
   (() => {
     const el = (id)=>document.getElementById(id);
 
