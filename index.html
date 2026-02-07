@@ -28,7 +28,8 @@
       border-bottom:1px solid var(--border);
       flex-wrap:wrap;
     }
-    header .title{ font-weight:900; font-size:22px; }
+    header .title{ font-weight:900; font-size:22px; flex:0 0 auto; }
+    header .eventName{ flex:1 1 auto; text-align:center; font-weight:900; color:var(--muted); min-width:120px; }
     header .tools{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
     button{
       border:1px solid var(--border);
@@ -158,9 +159,7 @@
       /* Reduce empty space under plan on phones */
       .planWrap{ min-height: 280px; }
     }
-  
-    .eventName{ font-weight:900; color:var(--muted); margin-top:2px; }
-</style>
+  </style>
 </head>
 <body>
   <header>
@@ -223,34 +222,11 @@
 
   <script src="./shared.js"></script>
   <script>
-  async function fetchJson(url, opts){
-    const res = await fetch(url, opts);
-    const text = await res.text();
-    let data;
-    try { data = text ? JSON.parse(text) : null; } catch { data = null; }
-    if (!res.ok){
-      const msg = (data && data.error) ? data.error : (text || res.statusText);
-      throw new Error(msg);
-    }
-    return data;
-  }
-
-  async function loadSettings(){
-    try{
-      const backend = core.backend();
-      const s = await fetchJson(`${backend}/settings?_=${Date.now()}`);
-      if (s && typeof s.eventName === "string" && eventNameEl){
-        eventNameEl.textContent = s.eventName || "—";
-      }
-    }catch(_){
-      // ignore
-    }
-  }
-
   (() => {
     const el = (id)=>document.getElementById(id);
 
     const updatedAt = el("updatedAt");
+	    const eventNameEl = el("eventName");
     const clearBtn = el("clearBtn");
 
     const planStack = el("planStack");
@@ -365,9 +341,23 @@
 
 // --- Polling (public auto-refresh) ---
 let pollTimer = null;
+
+async function pollSettings(){
+  if (!eventNameEl) return;
+  try{
+    const res = await fetch(core.backend() + "/settings?_=" + Date.now(), { cache: "no-store" });
+    const js = await res.json();
+    if (js && typeof js.eventName === "string" && js.eventName.trim()) {
+      eventNameEl.textContent = js.eventName.trim();
+    }
+  }catch(e){
+    // keep existing
+  }
+}
 async function pollOnce(){
   try{
     const prevSelected = core.selectedStandId;
+    await pollSettings();
     await core.loadStands();
     soldRows = core.rows.filter(r=>r.status === "sold" && (r.company||"").trim().length > 0);
     renderList();

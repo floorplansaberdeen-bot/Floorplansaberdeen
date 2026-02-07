@@ -731,9 +731,6 @@ function buildStandMap() {
     if (!pwd) return;
 
     const backend = getBackendUrl();
-    const prevRow = rows.find(r => r.standId === selectedStandId) || { status:"available", company:"" };
-    const prev = { status: prevRow.status, company: prevRow.company || "" };
-
     const payload = {
       standId: lastChange.standId,
       status: lastChange.prev.status,
@@ -1151,20 +1148,24 @@ svgRoot.addEventListener("click", (ev) => {
     saveInFlight = true;
     if (!selectedStandId) { saveInFlight = false; return; }
     const backend = getBackendUrl();
+
+    const standId = selectedStandId;
+    const nextStatus = statusEl.value;
+    const nextCompany = (nextStatus === "sold") ? companyEl.value.trim() : "";
+
+    // Snapshot previous + next values for Undo
+    const prevIdx = rows.findIndex(r => r.standId === standId);
+    const prevSnapshot = (prevIdx >= 0)
+      ? { standId, status: rows[prevIdx].status, company: (rows[prevIdx].company || "") }
+      : { standId, status: "available", company: "" };
+    const nextSnapshot = { standId, status: nextStatus, company: nextCompany };
+
     const payload = {
-      standId: selectedStandId,
-      status: statusEl.value,
-      company: (statusEl.value === "sold") ? companyEl.value.trim() : "",
+      standId,
+      status: nextStatus,
+      company: nextCompany,
       adminPassword: adminPassword
     };
-
-    // Capture previous values for Undo (before we overwrite local state)
-    const prevRow = rows.find(r => r.standId === selectedStandId);
-    if (prevRow) {
-      setLastChange({ standId: selectedStandId, status: prevRow.status, company: prevRow.company || "" });
-    } else {
-      setLastChange(null);
-    }
 
     try{
       const resp = await fetchJson(`${backend}/stand`, {
@@ -1183,6 +1184,9 @@ svgRoot.addEventListener("click", (ev) => {
         }
         return;
       }
+
+      // Record last change for Undo
+      setLastChange(standId, prevSnapshot, nextSnapshot);
 }catch(e){
       showToast(true);
       return;
@@ -1191,7 +1195,7 @@ svgRoot.addEventListener("click", (ev) => {
     }
 
     const idx = rows.findIndex(r => r.standId === selectedStandId);
-    if (idx >= 0) rows[idx] = { standId: selectedStandId, status: payload.status, company: payload.company };
+    if (idx >= 0) rows[idx] = { ...rows[idx], standId, status, company };
 
     applyColours();
     renderTable();
