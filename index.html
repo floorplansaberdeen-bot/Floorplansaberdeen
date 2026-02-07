@@ -268,7 +268,6 @@
 
       countEl.textContent = String(filtered.length);
       totalEl.textContent = String(soldRows.length);
-    if (core) core.applySearchHighlight(searchEl.value, filtered);
     }
 
     function clearSelection(){
@@ -277,12 +276,15 @@
       core.applyColoursPublic();
       core.clearCallout();
       selStand.textContent = "None";
-      core.applySearchHighlight("", []);
       selCompany.textContent = "Desktop: click a stand or choose from the list. Phone: use the list (plan tapping is disabled).";
       renderList();
     }
 
     clearBtn.addEventListener("click", clearSelection);
+    searchEl.addEventListener("input", () => {
+      renderList();
+      clearSearchBtn.disabled = !searchEl.value;
+    });
 
     clearSearchBtn.disabled = true;
     clearSearchBtn.addEventListener("click", () => {
@@ -290,11 +292,6 @@
       clearSearchBtn.disabled = true;
       renderList();
       searchEl.focus();
-    });
-
-    searchEl.addEventListener("input", () => {
-      clearSearchBtn.disabled = !(searchEl.value || "").trim();
-      renderList();
     });
 
     window.addEventListener("resize", ()=>{

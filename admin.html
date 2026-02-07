@@ -55,8 +55,16 @@
     }
     button.primary:hover{ filter: brightness(0.95); }
     button.primary:active{ filter: brightness(0.9); }
-    button.secondary{ background:#fff; border-color:#d9d9d9; }
     button.danger{ border-color:#ffd0d0; background:#fff5f5; }
+
+    button.ghost{
+      border:1px solid var(--border);
+      background:#fafafa;
+      color:#444;
+      font-weight:900;
+    }
+    button.ghost:disabled{ opacity:.45; cursor:not-allowed; }
+
     button.danger.solid{
       background:#e63b3b;
       border-color:#e63b3b;
@@ -385,7 +393,7 @@
         </div>
 
         <div class="btnRow" style="margin-top:10px;">
-          <button id="undoBtn" class="secondary" disabled>Undo last change</button>
+          <button id="undoBtn" class="ghost" disabled>Undo last change</button>
         </div>
 
         <div class="hint" style="padding:10px 0 0;">Click a stand on the plan or in the list to edit.</div>
@@ -432,17 +440,20 @@
 
 <script>
 (() => {
-  // Optional: lock admin behind a URL-only secret. Set ADMIN_URL_KEY to a hard-to-guess string,
-  // then visit: admin.html?k=YOUR_KEY
-  const ADMIN_URL_KEY = "getaway_admin_abdn001";
+
+  // Optional: lock admin behind a URL-only secret.
+  // 1) Set ADMIN_URL_KEY to a hard-to-guess string.
+  // 2) Visit: admin.html?k=YOUR_KEY
+  const ADMIN_URL_KEY = "CHANGE_ME";
   const ADMIN_KEY_PARAM = "k";
   if (ADMIN_URL_KEY !== "CHANGE_ME") {
     const u = new URL(location.href);
     if ((u.searchParams.get(ADMIN_KEY_PARAM) || "") !== ADMIN_URL_KEY) {
-      document.body.innerHTML = `<div style="padding:24px;font-family:ui-sans-serif,system-ui;">
-        <h2 style="margin:0 0 8px;">Floorplan Admin</h2>
-        <div style="color:#666;font-weight:700;">This page is locked. Add <code>?${ADMIN_KEY_PARAM}=…</code> to the URL.</div>
-      </div>`;
+      document.body.innerHTML = `
+        <div style="padding:24px;font-family:ui-sans-serif,system-ui;">
+          <h1 style="margin:0 0 8px 0;">Floorplan Admin</h1>
+          <p style="margin:0 0 10px 0;">This page is locked. Add <code>?k=…</code> to the URL.</p>
+        </div>`;
       return;
     }
   }
@@ -501,25 +512,12 @@
 
   let rows = [];
   let selectedStandId = null;
+  let lastChange = null; // {standId, prev:{status,company}, next:{status,company}, at}
 
   let autoSync = true;
   let syncTimer = null;
   let adminPassword = sessionStorage.getItem('admin_pwd') || '';
   let saveInFlight = false;
-  let undoInProgress = false;
-
-  // Simple undo stack (standId/status/company). We only undo stand-level changes.
-  const undoStack = [];
-  function updateUndoUi(){
-    if (!undoBtn) return;
-    undoBtn.disabled = undoStack.length === 0 || saveInFlight;
-  }
-  function pushUndo(prev){
-    if (!prev || !prev.standId) return;
-    undoStack.push({ standId: prev.standId, status: prev.status, company: prev.company || "" });
-    if (undoStack.length > 25) undoStack.shift();
-    updateUndoUi();
-  }
 
   // Pause auto-refresh while the user is editing fields (prevents resets mid-typing)
   function isEditing(){
@@ -715,7 +713,58 @@ function buildStandMap() {
     lozCompany.textContent = "";
   }
 
-  function drawCallout(standId){
+  
+  function setUndoEnabled(on){
+    if (!undoBtn) return;
+    undoBtn.disabled = !on;
+    undoBtn.style.opacity = on ? "1" : "0.45";
+  }
+  function setLastChange(standId, prev, next){
+    if (!standId || !prev || !next){ lastChange = null; setUndoEnabled(false); return; }
+    lastChange = { standId, prev, next, at: Date.now() };
+    setUndoEnabled(true);
+  }
+
+  async function undoLastChange(){
+    if (!lastChange) return;
+    const pwd = ensureAdminPassword({ reason: "undo the last change" });
+    if (!pwd) return;
+
+    const backend = getBackendUrl();
+    const prevRow = rows.find(r => r.standId === selectedStandId) || { status:"available", company:"" };
+    const prev = { status: prevRow.status, company: prevRow.company || "" };
+
+    const payload = {
+      standId: lastChange.standId,
+      status: lastChange.prev.status,
+      company: lastChange.prev.status === "sold" ? (lastChange.prev.company || "") : ""
+    };
+
+    try{
+      await fetchJson(`${backend}/stand`, {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ ...payload, adminPassword: pwd })
+      });
+    }catch(e){
+      showToast(true);
+      return;
+    }
+
+    // Update local + UI
+    const idx = rows.findIndex(r => r.standId === lastChange.standId);
+    if (idx >= 0) rows[idx] = { ...rows[idx], ...payload };
+    applyColours();
+    renderTable();
+    drawCallout(payload.standId, (payload.status === "sold") ? payload.company : "");
+    if (selectedStandId === payload.standId){
+      statusEl.value = payload.status;
+      companyEl.value = payload.company || "";
+    }
+    setLastChange(null, null, null);
+    syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+  }
+function drawCallout(standId){
     const row = rows.find(r => r.standId === normStandId(standId));
     const elem = row ? elementForStand(row.standId) : elementForStand(standId);
     if (!elem) { clearCallout(); return; }
@@ -1097,16 +1146,10 @@ svgRoot.addEventListener("click", (ev) => {
   }
 
   async function saveCurrent() {
-    await ensureAdminPassword();
+    const pwdOk = ensureAdminPassword({ reason: "save changes" });
+    if (!pwdOk) return;
     saveInFlight = true;
     if (!selectedStandId) { saveInFlight = false; return; }
-
-    // Record previous value for undo (if we have it locally)
-    const prevRow = rows.find(r => r.standId === selectedStandId);
-    if (!undoInProgress && prevRow){
-      pushUndo({ standId: prevRow.standId, status: prevRow.status, company: prevRow.company || "" });
-    }
-
     const backend = getBackendUrl();
     const payload = {
       standId: selectedStandId,
@@ -1245,19 +1288,8 @@ svgRoot.addEventListener("click", (ev) => {
     saveCurrent();
   });
 
-  undoBtn.addEventListener("click", async () => {
-    const prev = undoStack.pop();
-    updateUndoUi();
-    if (!prev) return;
-    undoInProgress = true;
-    selectedStandId = prev.standId;
-    statusEl.value = prev.status;
-    companyEl.value = prev.company || "";
-    await saveCurrent();
-    undoInProgress = false;
-    // keep selection
-    selectStand(prev.standId);
-  });
+  undoBtn && undoBtn.addEventListener("click", undoLastChange);
+  setUndoEnabled(false);
 
   searchEl.addEventListener("input", renderTable);
   filterEl.addEventListener("change", renderTable);
@@ -1295,6 +1327,7 @@ importBtn.addEventListener("click", () => {
 
     const _pwd = ensureAdminPassword({ force:true, reason:"Import CSV" });
     if (!_pwd) return;
+    setLastChange(null, null, null);
 
     const backend = getBackendUrl();
 

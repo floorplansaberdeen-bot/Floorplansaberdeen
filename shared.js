@@ -218,13 +218,7 @@
     selectStand(standId, {fromPlan=false}={}){
       this.selectedStandId = normStandId(standId);
       const row = this.rows.find(r=>r.standId === this.selectedStandId);
-      // If the selected stand is no longer present in the current dataset
-      // (e.g. public page showing sold-only), clear any stale callout.
-      if (!row){
-        this.clearCallout();
-        if (this.onSelect) this.onSelect(null, {fromPlan});
-        return;
-      }
+      if (!row) return;
 
       this.applyColoursPublic();
       this.drawCallout(row.standId, (row.status === "sold") ? (row.company||"") : "");
@@ -309,50 +303,6 @@ enablePlanClick({enabled=true, disableOnMobile=true}={}){
       window.addEventListener("resize", applyPe);
       applyPe();
     }
-
-applySearchHighlight(query, rows){
-  const q = String(query || "").trim().toLowerCase();
-
-  // restore previous outlines
-  for (const [elem, prev] of this._searchPrev.entries()){
-    try{
-      elem.style.stroke = prev.stroke;
-      elem.style.strokeWidth = prev.strokeWidth;
-      elem.style.strokeOpacity = prev.strokeOpacity;
-    }catch(_){}
-  }
-  this._searchPrev.clear();
-
-  if (!q || !Array.isArray(rows) || !rows.length) return;
-
-  const hits = rows.filter(r => {
-    const sid = String(r.standId || "").toLowerCase();
-    const comp = String(r.company || "").toLowerCase();
-    return sid.includes(q) || comp.includes(q);
-  });
-
-  hits.forEach(r => {
-    const elem = this.elementForStand(r.standId);
-    if (!elem) return;
-    const shapes = elem.matches("path,rect,polygon,polyline,ellipse,circle")
-      ? [elem]
-      : Array.from(elem.querySelectorAll("path,rect,polygon,polyline,ellipse,circle"));
-
-    shapes.forEach(s => {
-      if (!this._searchPrev.has(s)) {
-        this._searchPrev.set(s, {
-          stroke: s.style.stroke || "",
-          strokeWidth: s.style.strokeWidth || "",
-          strokeOpacity: s.style.strokeOpacity || "",
-        });
-      }
-      s.style.stroke = "rgba(0,0,0,.85)";
-      s.style.strokeWidth = "3";
-      s.style.strokeOpacity = "1";
-    });
-  });
-}
-
   }
 
   window.FloorplanCore = FloorplanCore;
