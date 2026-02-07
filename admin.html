@@ -425,6 +425,14 @@
     </div>
   </div>
 
+<div class="toast" id="undoToast" style="display:none; z-index:10000;">
+  <div class="msg" id="undoMsg">Saved. Undo?</div>
+  <div class="actions">
+    <button id="undoBtn">Undo</button>
+    <button id="undoDismissBtn">Dismiss</button>
+  </div>
+</div>
+
 <script>
 (() => {
   const DEFAULT_BACKEND = "https://floorplansaberdeen.floorplansaberdeen.workers.dev";
@@ -485,6 +493,65 @@
   let syncTimer = null;
   let adminPassword = sessionStorage.getItem('admin_pwd') || '';
   let saveInFlight = false;
+
+// ---- Undo stack (session-only) ----
+const undoToast = el("undoToast");
+const undoMsg = el("undoMsg");
+const undoBtn = el("undoBtn");
+const undoDismissBtn = el("undoDismissBtn");
+
+let undoStack = []; // [{standId, prev:{status,company}, next:{status,company}}]
+const UNDO_MAX = 25;
+
+function hideUndoToast(){
+  if (undoToast) undoToast.style.display = "none";
+}
+function showUndoToast(item){
+  if (!undoToast || !undoMsg) return;
+  undoMsg.textContent = `Saved ${item.standId}. Undo?`;
+  undoToast.style.display = "flex";
+}
+
+async function doUndo(){
+  const item = undoStack.pop();
+  if (!item) return;
+  hideUndoToast();
+
+  const pwd = ensureAdminPassword({ force:false, reason:"Undo" });
+  if (!pwd) { 
+    // put it back if cancelled
+    undoStack.push(item);
+    return;
+  }
+
+  const backend = getBackendUrl();
+  try{
+    saveInFlight = true;
+    await fetchJson(`${backend}/stand`, {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({
+        standId: item.standId,
+        status: item.prev.status,
+        company: item.prev.status === "sold" ? (item.prev.company || "") : "",
+        adminPassword: pwd
+      })
+    });
+    await loadData(); // authoritative refresh
+    flashToast("Undone.");
+  }catch(e){
+    console.error(e);
+    showToast(true);
+    flashToast("Undo failed.");
+    // push back so user can retry
+    undoStack.push(item);
+  }finally{
+    saveInFlight = false;
+  }
+}
+
+if (undoBtn) undoBtn.addEventListener("click", doUndo);
+if (undoDismissBtn) undoDismissBtn.addEventListener("click", hideUndoToast);
 
   // Pause auto-refresh while the user is editing fields (prevents resets mid-typing)
   function isEditing(){
@@ -966,6 +1033,9 @@ function buildStandMap() {
     settingsSaveTimer = setTimeout(async () => {
       const backend = getBackendUrl();
       const payload = { eventName: eventNameEl.value.trim() };
+
+    const prevRow = rows.find(r => r.standId === selectedStandId);
+    const prevSnapshot = prevRow ? { status: prevRow.status, company: prevRow.company || "" } : { status:"available", company:"" };
       try{
         await fetchJson(`${backend}/settings`, {
           method:"POST",
