@@ -98,6 +98,10 @@
       this.lozStand = this.opts.lozStand;
       this.lozCompany = this.opts.lozCompany;
 
+      // Don't let the callout overlay intercept clicks on the plan
+      if (this.calloutSvg) this.calloutSvg.style.pointerEvents = 'none';
+      if (this.lozenge) this.lozenge.style.pointerEvents = 'none';
+
       // callbacks
       this.onSelect = this.opts.onSelect || function(){};
       this.onSvgReady = this.opts.onSvgReady || function(){};
