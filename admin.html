@@ -1227,20 +1227,23 @@ svgRoot.addEventListener("click", (ev) => {
     URL.revokeObjectURL(a.href);
   });
 
-  importBtn.addEventListener("click", async () => {
-    const _pwd = ensureAdminPassword({force:true, reason:"Import CSV"});
-    if (!_pwd) return;
-
+  importBtn.addEventListener("click", () => {
+    // IMPORTANT: file picker must be opened directly from the click gesture (Safari/Chrome strictness),
+    // so we prompt for password AFTER the user selects a file.
     const inp = document.createElement("input");
-    inp.type="file";
-    inp.accept=".csv,text/csv";
+    inp.type = "file";
+    inp.accept = ".csv,text/csv";
     inp.onchange = async () => {
       const f = inp.files && inp.files[0];
       if (!f) return;
+
+      const _pwd = ensureAdminPassword({ force: true, reason: "Import CSV" });
+      if (!_pwd) { inp.value = ""; return; }
+
       const txt = await f.text();
       const lines = txt.split(/\r?\n/).filter(Boolean);
       const out = [];
-      for (let i=1;i<lines.length;i++){
+      for (let i = 1; i < lines.length; i++) {
         const line = lines[i];
         const m = line.match(/^([^,]+),([^,]+),"(.*)"$/);
         if (!m) continue;
@@ -1249,9 +1252,7 @@ svgRoot.addEventListener("click", (ev) => {
       rows = out;
       applyColours();
       renderTable();
-      clearCallout();
-      selectedStandId = null;
-      standIdEl.value = "";
+      // Import changes are local until you click Save on a stand (keeps Sheets as source of truth).
     };
     inp.click();
   });
