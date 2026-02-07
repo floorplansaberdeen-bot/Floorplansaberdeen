@@ -264,8 +264,7 @@
     }
 
   .progressOverlay{
-  position:fixed;
-  inset:0;
+  position:fixed; inset:0;
   background: rgba(255,255,255,.75);
   backdrop-filter: blur(2px);
   display:none;
@@ -459,6 +458,12 @@
   const markAvailBtn = el("markAvailBtn");
 
   const toast = el("toast");
+  const toastMsg = el("toastMsg");
+  const toastActions = toast ? toast.querySelector(".actions") : null;
+  const progressOverlay = el("progressOverlay");
+  const progressTitle = el("progressTitle");
+  const progressMsg = el("progressMsg");
+  const progressBarFill = el("progressBarFill");
   const setBackendBtn = el("setBackendBtn");
   const hideToastBtn = el("hideToastBtn");
   const syncedAt = el("syncedAt");
@@ -521,11 +526,21 @@ function showProgress(title, msg, frac){
   if (progressBarFill) progressBarFill.style.width = `${Math.round(f*100)}%`;
   progressOverlay.style.display = "flex";
 }
-
 function hideProgress(){
   if (!progressOverlay) return;
   progressOverlay.style.display = "none";
   if (progressBarFill) progressBarFill.style.width = "0%";
+}
+
+function flashToast(message){
+  if (!toast) return;
+  if (toastMsg) toastMsg.textContent = message || "";
+  if (toastActions) toastActions.style.display = "none";
+  toast.style.display = "flex";
+  setTimeout(() => {
+    toast.style.display = "none";
+    if (toastActions) toastActions.style.display = "";
+  }, 1800);
 }
 
 function showToast(show) {
@@ -554,26 +569,19 @@ function showToast(show) {
     }
   }
   async function ensureAdminPassword(opts = {}){
-  const force = !!opts.force; // true = always ask even if cached
-  if (!force && adminPassword && adminPassword.trim()) return true;
+  const force = !!opts.force; // if true, always ask again
+  if (!force && adminPassword && adminPassword.trim()) return adminPassword;
 
   const entered = prompt("Admin password required:", "");
-  if (entered === null) return false; // cancelled
+  if (entered === null) return null; // cancelled
 
   const v = String(entered || "").trim();
-  if (!v) return false;
+  if (!v) return null;
 
   adminPassword = v;
   sessionStorage.setItem("admin_pwd", adminPassword);
-  return true;
+  return adminPassword;
 }
-      const v = String(entered || "").trim();
-      if (!v){ alert("Password required."); continue; }
-      adminPassword = v;
-      sessionStorage.setItem("admin_pwd", adminPassword);
-      return adminPassword;
-    }
-  }
 
   function clearAdminPassword(){
     adminPassword = "";
@@ -873,43 +881,28 @@ function buildStandMap() {
   try{
     settings = await fetchJson(`${backend}/settings`);
   }catch(e){
-    return true; // allow if settings unavailable
+    // If settings route fails, allow access (but admin actions may still fail)
+    return true;
   }
+
   const pwd = (settings && (settings.adminPassword || settings.password || settings.admin_pass || settings.admin_password)) || "";
   const required = String(pwd || "").trim();
   if (!required) return true;
 
+  // If we already have a password cached for this session, accept it
   if (adminPassword && adminPassword.trim()) return true;
 
   const entered = prompt("Admin password required:", "");
-  if (entered === null) return false;
+  if (entered === null) return false; // cancelled
 
-  adminPassword = String(entered || "").trim();
-  if (!adminPassword) return false;
+  const v = String(entered || "").trim();
+  if (!v) return false;
 
+  // Store entered password for subsequent actions (actual validation happens on save/reset/etc)
+  adminPassword = v;
   sessionStorage.setItem("admin_pwd", adminPassword);
   return true;
-}catch(e){
-      // If settings route fails, allow access (but admin actions may still fail)
-      return;
-    }
-    const pwd = (settings && (settings.adminPassword || settings.password || settings.admin_pass || settings.admin_password)) || "";
-    const required = String(pwd || "").trim();
-    if (!required) return;
-    const key = "admin_authed";
-    if (sessionStorage.getItem(key) === "1") return;
-
-    while (true){
-      const entered = prompt("Admin password required:", "");
-      if (entered === null) continue;
-      if (String(entered) === required){
-        sessionStorage.setItem(key, "1");
-        return;
-      }
-      alert("Incorrect password.");
-    }
-  }
-
+}
   async function loadSettings(){
     const backend = getBackendUrl();
     let settings = null;
@@ -1112,43 +1105,70 @@ svgRoot.addEventListener("click", (ev) => {
     drawCallout(selectedStandId);
 
     // Pull fresh data back from backend (authoritative) to prevent reverts
-    try{ hideProgress();
-            await loadData(); }catch(e){}
+    try{ await loadData(); }catch(e){}
     syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
   }
 
   async function resetAll() {
-    if (!rows.length) return;
-    const ok = confirm("Reset ALL stands to Available? This will overwrite sold stands.");
-    if (!ok) return;
+  if (!rows.length) return;
 
-    resetBtn.disabled = true;
-    const backend = getBackendUrl();
+  const pwd = ensureAdminPassword({force:true});
+  if (!pwd) return;
 
-    // simple sequential to avoid hammering worker
-    for (let i=0;i<rows.length;i++){
-      const r = rows[i];
-      const payload = { standId: r.standId, status:"available", company:"" };
-      try{
-        const resp = await fetchJson(`${backend}/stand`, {
-          method:"POST",
-          headers:{ "Content-Type":"application/json" },
-          body: JSON.stringify(payload)
-        });
-      }catch(e){
-        showToast(true);
-        break;
+  const ok = confirm("Reset SVG stands to Available? This will overwrite sold stands on the plan.");
+  if (!ok) return;
+
+  resetBtn.disabled = true;
+  const backend = getBackendUrl();
+
+  // Only reset stands that exist in the SVG
+  const targets = rows.filter(r => !!elementForStand(r.standId));
+  const total = targets.length;
+
+  try{
+    for (let i=0;i<total;i++){
+      const r = targets[i];
+      showProgress("Resetting stands…", `Updating ${i+1} of ${total} (${r.standId})`, (i+1)/total);
+
+      const payload = { standId: r.standId, status:"available", company:"", adminPassword: pwd };
+      const resp = await fetchJson(`${backend}/stand`, {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (resp && resp.ok === false){
+        hideProgress();
+        alert(String(resp.error || "Reset failed."));
+        resetBtn.disabled = false;
+        return;
       }
-      rows[i] = payload;
+
+      // update local copy
+      const idx = rows.findIndex(x => x.standId === r.standId);
+      if (idx >= 0) rows[idx] = { standId: r.standId, status:"available", company:"" };
     }
+
+    hideProgress();
     resetBtn.disabled = false;
+
     applyColours();
     renderTable();
     clearCallout();
     selectedStandId = null;
     standIdEl.value = "";
+    statusEl.value = "available";
+    companyEl.value = "";
     syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+
+    flashToast("Reset complete ✅");
+  }catch(e){
+    hideProgress();
+    resetBtn.disabled = false;
+    showToast(true);
+    console.error(e);
   }
+}
 
   // Events
   saveBtn.addEventListener("click", saveCurrent);
@@ -1180,6 +1200,7 @@ svgRoot.addEventListener("click", (ev) => {
   });
 
   exportBtn.addEventListener("click", () => {
+    if (!ensureAdminPassword({force:true})) return;
     const lines = ["standId,status,company"].concat(rows.map(r => {
       const c = (r.company||"").replaceAll('"','""');
       return `${r.standId},${r.status},"${c}"`;
@@ -1193,6 +1214,7 @@ svgRoot.addEventListener("click", (ev) => {
   });
 
   importBtn.addEventListener("click", async () => {
+    if (!ensureAdminPassword({force:true})) return;
     const inp = document.createElement("input");
     inp.type="file";
     inp.accept=".csv,text/csv";
@@ -1241,7 +1263,7 @@ svgRoot.addEventListener("click", (ev) => {
   (async () => {
     try{
       const ok = await requireAdminPassword();
-      if (!ok) { alert('Admin password is required.'); return; }
+      if (!ok) { setStatus('Password required.'); return; }
       await loadSettings();
       await loadSvg();
       layoutMobile();
