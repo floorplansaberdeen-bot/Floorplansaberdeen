@@ -568,11 +568,11 @@ function showToast(show) {
       clearTimeout(t);
     }
   }
-  async function ensureAdminPassword(opts = {}){
+  function ensureAdminPassword(opts = {}){
   const force = !!opts.force; // if true, always ask again
   if (!force && adminPassword && adminPassword.trim()) return adminPassword;
 
-  const entered = prompt("Admin password required:", "");
+  const entered = prompt(`Admin password${opts && opts.reason ? " ("+opts.reason+")" : ""}:`, "");
   if (entered === null) return null; // cancelled
 
   const v = String(entered || "").trim();
@@ -892,7 +892,7 @@ function buildStandMap() {
   // If we already have a password cached for this session, accept it
   if (adminPassword && adminPassword.trim()) return true;
 
-  const entered = prompt("Admin password required:", "");
+  const entered = prompt(`Admin password${opts && opts.reason ? " ("+opts.reason+")" : ""}:`, "");
   if (entered === null) return false; // cancelled
 
   const v = String(entered || "").trim();
@@ -1112,8 +1112,13 @@ svgRoot.addEventListener("click", (ev) => {
   async function resetAll() {
   if (!rows.length) return;
 
-  const pwd = ensureAdminPassword({force:true});
+  const pwd = ensureAdminPassword({force:true, reason:"Reset all"});
   if (!pwd) return;
+
+  // Pause auto-sync while resetting to avoid clashes
+  const wasAutoSync = autoSync;
+  autoSync = false;
+  stopPolling();
 
   const ok = confirm("Reset SVG stands to Available? This will overwrite sold stands on the plan.");
   if (!ok) return;
@@ -1144,6 +1149,9 @@ svgRoot.addEventListener("click", (ev) => {
         return;
       }
 
+            // small delay to avoid Apps Script rate limits
+      await new Promise(r => setTimeout(r, 120));
+
       // update local copy
       const idx = rows.findIndex(x => x.standId === r.standId);
       if (idx >= 0) rows[idx] = { standId: r.standId, status:"available", company:"" };
@@ -1162,11 +1170,15 @@ svgRoot.addEventListener("click", (ev) => {
     syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
 
     flashToast("Reset complete ✅");
+    autoSync = wasAutoSync;
+    if (autoSync) startPolling();
   }catch(e){
     hideProgress();
     resetBtn.disabled = false;
     showToast(true);
     console.error(e);
+    autoSync = wasAutoSync;
+    if (autoSync) startPolling();
   }
 }
 
@@ -1200,7 +1212,9 @@ svgRoot.addEventListener("click", (ev) => {
   });
 
   exportBtn.addEventListener("click", () => {
-    if (!ensureAdminPassword({force:true})) return;
+    const _pwd = ensureAdminPassword({force:true, reason:"Export CSV"});
+    if (!_pwd) return;
+
     const lines = ["standId,status,company"].concat(rows.map(r => {
       const c = (r.company||"").replaceAll('"','""');
       return `${r.standId},${r.status},"${c}"`;
@@ -1214,7 +1228,9 @@ svgRoot.addEventListener("click", (ev) => {
   });
 
   importBtn.addEventListener("click", async () => {
-    if (!ensureAdminPassword({force:true})) return;
+    const _pwd = ensureAdminPassword({force:true, reason:"Import CSV"});
+    if (!_pwd) return;
+
     const inp = document.createElement("input");
     inp.type="file";
     inp.accept=".csv,text/csv";
