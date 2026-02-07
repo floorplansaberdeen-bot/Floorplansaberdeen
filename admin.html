@@ -512,7 +512,6 @@
 
   let rows = [];
   let selectedStandId = null;
-  let lastChange = null; // {standId, prev:{status,company}, next:{status,company}, at}
 
   let autoSync = true;
   let syncTimer = null;
@@ -601,17 +600,21 @@ function showToast(show) {
       clearTimeout(t);
     }
   }
-  function ensureAdminPassword(opts = {}){
+  function ensureAdminPassword(opts = {}) {
   const force = !!opts.force; // if true, always ask again
-  if (!force && adminPassword && adminPassword.trim()) return adminPassword;
+  const reason = String(opts.reason || "save changes");
+  const alreadyOk = adminPassword && adminPassword.trim();
 
-  const entered = prompt(`Admin password${opts && opts.reason ? " ("+opts.reason+")" : ""}:`, "");
+  // If we haven't prompted yet on this page load, require a prompt once
+  if (!force && hasPromptedPassword && alreadyOk) return adminPassword;
+
+  const entered = prompt(`Admin password required to ${reason}:`, (alreadyOk ? adminPassword : rememberedPassword) || "");
   if (entered === null) return null; // cancelled
+  const pwd = String(entered || "").trim();
+  if (!pwd) return null;
 
-  const v = String(entered || "").trim();
-  if (!v) return null;
-
-  adminPassword = v;
+  adminPassword = pwd;
+  hasPromptedPassword = true;
   sessionStorage.setItem("admin_pwd", adminPassword);
   return adminPassword;
 }
@@ -714,275 +717,84 @@ function buildStandMap() {
   }
 
   
-  function setUndoEnabled(on){
-    if (!undoBtn) return;
-    undoBtn.disabled = !on;
-    undoBtn.style.opacity = on ? "1" : "0.45";
+  function setUndoEnabled(enabled) {
+  if (!undoBtn) return;
+  undoBtn.disabled = !enabled;
+  undoBtn.style.opacity = enabled ? "1" : "0.45";
+}
+
+function updateUndoUI() {
+  const n = undoStack.length;
+  setUndoEnabled(n > 0);
+  if (undoBtn) {
+    undoBtn.textContent = n > 0 ? `Undo (${n})` : "Undo";
+    undoBtn.title = n > 0 ? `Undo the last change (stack: ${n})` : "Undo the last change";
   }
-  function setLastChange(standId, prev, next){
-    if (!standId || !prev || !next){ lastChange = null; setUndoEnabled(false); return; }
-    lastChange = { standId, prev, next, at: Date.now() };
-    setUndoEnabled(true);
+}
+
+function pushUndo(standId, prevSnapshot, nextSnapshot) {
+  if (!standId || !prevSnapshot || !nextSnapshot) return;
+  undoStack.unshift({ standId, prev: prevSnapshot, next: nextSnapshot, at: Date.now() });
+  if (undoStack.length > UNDO_MAX) undoStack = undoStack.slice(0, UNDO_MAX);
+  updateUndoUI();
+}
+
+async function undoLastChange() {
+  if (!undoStack.length) return;
+
+  const change = undoStack.shift();
+  updateUndoUI();
+
+  const pwd = ensureAdminPassword({ reason: "undo the last change" });
+  if (!pwd) {
+    // restore change if user cancelled
+    undoStack.unshift(change);
+    updateUndoUI();
+    toast("Undo cancelled.", "info");
+    return;
   }
 
-  async function undoLastChange(){
-    if (!lastChange) return;
-    const pwd = ensureAdminPassword({ reason: "undo the last change" });
-    if (!pwd) return;
+  try {
+    toast("Undoing…", "info");
 
-    const backend = getBackendUrl();
-    const payload = {
-      standId: lastChange.standId,
-      status: lastChange.prev.status,
-      company: lastChange.prev.status === "sold" ? (lastChange.prev.company || "") : ""
-    };
+    const res = await apiPost("/stand", {
+      standId: change.standId,
+      status: change.prev.status,
+      company: change.prev.company,
+      adminPassword: pwd,
+    });
 
-    try{
-      await fetchJson(`${backend}/stand`, {
-        method:"POST",
-        headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({ ...payload, adminPassword: pwd })
-      });
-    }catch(e){
-      showToast(true);
+    if (!res.ok) {
+      undoStack.unshift(change);
+      updateUndoUI();
+      toast(res.error || "Undo failed.", "error");
       return;
     }
 
-    // Update local + UI
-    const idx = rows.findIndex(r => r.standId === lastChange.standId);
-    if (idx >= 0) rows[idx] = { ...rows[idx], ...payload };
-    applyColours();
-    renderTable();
-    drawCallout(payload.standId, (payload.status === "sold") ? payload.company : "");
-    if (selectedStandId === payload.standId){
-      statusEl.value = payload.status;
-      companyEl.value = payload.company || "";
+    // Update local data to prev state
+    const idx = stands.findIndex(s => String(s.standId).trim() === String(change.standId).trim());
+    if (idx !== -1) {
+      stands[idx] = { ...stands[idx], status: change.prev.status, company: change.prev.company };
     }
-    setLastChange(null, null, null);
-    syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
-  }
-function drawCallout(standId){
-    const row = rows.find(r => r.standId === normStandId(standId));
-    const elem = row ? elementForStand(row.standId) : elementForStand(standId);
-    if (!elem) { clearCallout(); return; }
 
-    // Update lozenge content
-    lozStand.textContent = row ? row.standId : standId;
-    const company = (row && row.status === "sold") ? (row.company || "") : "";
-    if (company){
-      lozCompany.style.display = "block";
-      lozCompany.textContent = company;
-    } else {
-      lozCompany.style.display = "none";
-      lozCompany.textContent = "";
+    // If currently selected stand is the one we undid, reflect it
+    if ((selectedStandId || "") === change.standId) {
+      statusEl.value = change.prev.status;
+      companyEl.value = change.prev.company || "";
+      updateCompanyFieldVisibility();
     }
-    lozenge.style.display = "inline-block";
-    planStack.classList.remove("noSel");
 
-    // Force layout so getBoundingClientRect is accurate
-    void lozenge.offsetWidth;
+    // Re-render list + recolor SVG
+    renderStandList();
+    colorizeSvgFromStands();
 
-    requestAnimationFrame(() => {
-      const standRect = elem.getBoundingClientRect();
-      const standPt = { x: standRect.left + standRect.width/2, y: standRect.top + standRect.height/2 };
-
-      const lozRect = lozenge.getBoundingClientRect();
-      const lozTop = { x: lozRect.left + lozRect.width/2, y: lozRect.top };
-
-      const stackRect = planStack.getBoundingClientRect();
-      const x1 = lozTop.x - stackRect.left;
-      const y1 = lozTop.y - stackRect.top;
-      const x2 = standPt.x - stackRect.left;
-      const y2 = standPt.y - stackRect.top;
-
-      calloutSvg.setAttribute("viewBox", `0 0 ${stackRect.width} ${stackRect.height}`);
-      calloutSvg.setAttribute("preserveAspectRatio", "none");
-      calloutSvg.setAttribute("width", String(stackRect.width));
-      calloutSvg.setAttribute("height", String(stackRect.height));
-      calloutSvg.style.display = "block";
-
-      const dotPx = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--dot")) || 10;
-      const r = dotPx / 2;
-
-      const NS = "http://www.w3.org/2000/svg";
-      while (calloutSvg.firstChild) calloutSvg.removeChild(calloutSvg.firstChild);
-
-      const line = document.createElementNS(NS, "line");
-      line.setAttribute("x1", String(x1));
-      line.setAttribute("y1", String(y1));
-      line.setAttribute("x2", String(x2));
-      line.setAttribute("y2", String(y2));
-      line.setAttribute("stroke", getComputedStyle(document.documentElement).getPropertyValue("--line").trim() || "rgba(0,0,0,.70)");
-      line.setAttribute("stroke-width", "3");
-      line.setAttribute("stroke-linecap", "round");
-
-      const dot = document.createElementNS(NS, "circle");
-      dot.setAttribute("cx", String(x2));
-      dot.setAttribute("cy", String(y2));
-      dot.setAttribute("r", String(r));
-      dot.setAttribute("fill", "rgba(0,0,0,.72)");
-
-      calloutSvg.appendChild(line);
-      calloutSvg.appendChild(dot);
-    });
+    toast("Undo complete.", "success");
+    setSyncedNow();
+  } catch (e) {
+    undoStack.unshift(change);
+    updateUndoUI();
+    toast("Undo failed: " + (e && e.message ? e.message : e), "error");
   }
-
-  function applyColours() {
-    const sold = getComputedStyle(document.documentElement).getPropertyValue("--sold").trim();
-    const avail = getComputedStyle(document.documentElement).getPropertyValue("--avail").trim();
-    rows.forEach(r => {
-      const elem = elementForStand(r.standId);
-      if (!elem) return;
-      setFillForElement(elem, r.status === "sold" ? sold : avail);
-    });
-  }
-
-  function renderTable() {
-    const q = (searchEl.value || "").trim().toLowerCase();
-    const f = filterEl.value;
-
-    const filtered = rows.filter(r => {
-      if (f !== "all" && r.status !== f) return false;
-      if (!q) return true;
-      return r.standId.toLowerCase().includes(q) || (r.company||"").toLowerCase().includes(q);
-    });
-
-    tbody.innerHTML = "";
-    filtered.forEach(r => {
-      const tr = document.createElement("tr");
-      if (r.standId === selectedStandId) tr.classList.add("active");
-
-      const td1 = document.createElement("td");
-      td1.textContent = r.standId;
-
-      const td2 = document.createElement("td");
-      const badge = document.createElement("span");
-      badge.className = "badge " + (r.status === "sold" ? "bSold" : "bAvail");
-      badge.textContent = r.status === "sold" ? "Sold" : "Available";
-      td2.appendChild(badge);
-
-      const td3 = document.createElement("td");
-      td3.textContent = r.company || "";
-
-      tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
-      tr.addEventListener("click", () => selectStand(r.standId));
-      tbody.appendChild(tr);
-    });
-
-    countEl.textContent = String(filtered.length);
-    totalEl.textContent = String(rows.length);
-  }
-
-  function selectStand(standId) {
-    selectedStandId = normStandId(standId);
-    const row = rows.find(r => r.standId === selectedStandId);
-    if (!row) return;
-
-    standIdEl.value = row.standId;
-    statusEl.value = row.status;
-    companyEl.value = row.company || "";
-
-    drawCallout(row.standId);
-    renderTable();
-    updateZoom(row.standId);
-  }
-
-  function forceBlackAndWhite(svg){
-    // Remove any embedded images (logos) so the zoom is clean
-    svg.querySelectorAll("image").forEach(img => img.remove());
-
-    const shapesSel = "path,rect,polygon,polyline,ellipse,circle,line";
-    svg.querySelectorAll("*").forEach(n => {
-      if (n.hasAttribute("style")) n.removeAttribute("style");
-
-      // Keep text readable: black fill, no stroke
-      if (n.tagName && n.tagName.toLowerCase() === "text"){
-        n.setAttribute("fill","black");
-        n.removeAttribute("stroke");
-        n.removeAttribute("stroke-width");
-        return;
-      }
-
-      // Only force B/W on actual drawable shapes
-      if (n.matches && n.matches(shapesSel)){
-        n.setAttribute("fill","none");
-        n.setAttribute("stroke","black");
-        n.setAttribute("stroke-width","1");
-      }
-    });
-  }
-
-  function updateZoom(standId) {
-    zoomSvgHost.innerHTML = "";
-    zoomRing.style.display = "none";
-    if (!standId || !svgRoot) return;
-
-    const clone = svgRoot.cloneNode(true);
-    forceBlackAndWhite(clone);
-    zoomSvgHost.appendChild(clone);
-
-    let resolved = clone.querySelector("#"+CSS.escape(standId));
-    if (!resolved){
-      const key = normalizeDomId(standId);
-      resolved = Array.from(clone.querySelectorAll("[id]")).find(n => normalizeDomId(n.id) === key);
-    }
-    if (!resolved || !resolved.getBBox) return;
-
-    const bbox = resolved.getBBox();
-    const pad = Math.max(40, Math.max(bbox.width, bbox.height) * 0.9);
-    const vx = bbox.x - pad;
-    const vy = bbox.y - pad;
-    const vw = bbox.width + pad*2;
-    const vh = bbox.height + pad*2;
-
-    clone.setAttribute("viewBox", `${vx} ${vy} ${vw} ${vh}`);
-    clone.setAttribute("preserveAspectRatio","xMidYMid meet");
-    clone.style.width = "100%";
-    clone.style.height = "auto";
-    clone.style.display = "block";
-
-    requestAnimationFrame(() => {
-      const r = resolved.getBoundingClientRect();
-      const zw = zoomWrap.getBoundingClientRect();
-      const cx = (r.left + r.right)/2 - zw.left;
-      const cy = (r.top + r.bottom)/2 - zw.top;
-      const radius = Math.max(18, Math.min(60, Math.max(r.width, r.height) * 0.9));
-
-      zoomRing.style.display = "block";
-      zoomRing.style.width = `${radius*2}px`;
-      zoomRing.style.height = `${radius*2}px`;
-      zoomRing.style.left = `${cx - radius}px`;
-      zoomRing.style.top = `${cy - radius}px`;
-    });
-  }
-
-  async function requireAdminPassword(){
-  const backend = getBackendUrl();
-  let settings = null;
-  try{
-    settings = await fetchJson(`${backend}/settings`);
-  }catch(e){
-    // If settings route fails, allow access (but admin actions may still fail)
-    return true;
-  }
-
-  const pwd = (settings && (settings.adminPassword || settings.password || settings.admin_pass || settings.admin_password)) || "";
-  const required = String(pwd || "").trim();
-  if (!required) return true;
-
-  // If we already have a password cached for this session, accept it
-  if (adminPassword && adminPassword.trim()) return true;
-
-  const entered = prompt(`Admin password${opts && opts.reason ? " ("+opts.reason+")" : ""}:`, "");
-  if (entered === null) return false; // cancelled
-
-  const v = String(entered || "").trim();
-  if (!v) return false;
-
-  // Store entered password for subsequent actions (actual validation happens on save/reset/etc)
-  adminPassword = v;
-  sessionStorage.setItem("admin_pwd", adminPassword);
-  return true;
 }
   async function loadSettings(){
     const backend = getBackendUrl();
@@ -1186,7 +998,7 @@ svgRoot.addEventListener("click", (ev) => {
       }
 
       // Record last change for Undo
-      setLastChange(standId, prevSnapshot, nextSnapshot);
+      pushUndo(standId, prevSnapshot, nextSnapshot);
 }catch(e){
       showToast(true);
       return;
@@ -1301,7 +1113,9 @@ svgRoot.addEventListener("click", (ev) => {
   });
 
   undoBtn && undoBtn.addEventListener("click", undoLastChange);
-  setUndoEnabled(false);
+  
+    updateUndoUI();
+setUndoEnabled(false);
 
   searchEl.addEventListener("input", renderTable);
   filterEl.addEventListener("change", renderTable);
@@ -1339,7 +1153,7 @@ importBtn.addEventListener("click", () => {
 
     const _pwd = ensureAdminPassword({ force:true, reason:"Import CSV" });
     if (!_pwd) return;
-    setLastChange(null, null, null);
+    undoStack = []; updateUndoUI();
 
     const backend = getBackendUrl();
 
