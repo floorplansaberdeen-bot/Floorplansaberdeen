@@ -448,5 +448,12 @@ resetBtn.addEventListener("click", resetAll);
 
     tableWrap.style.maxHeight = available + 'px';
   }
+// =======================
+// UNDO SAFETY FALLBACK
+// =======================
+function undoLast() {
+  console.warn("Undo not implemented yet");
+  alert("Undo is not available yet.");
+}
 
 
