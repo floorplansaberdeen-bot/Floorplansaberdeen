@@ -8,6 +8,7 @@
     const planStack = el("planStack");
     const planWrap = el("planWrap");
     const svgHost = el("svgHost");
+    const svgFallback = document.getElementById("svgFallback");
     const calloutSvg = el("calloutSvg");
     const lozenge = el("lozenge");
     const lozStand = el("lozStand");
@@ -92,8 +93,11 @@
       });
 
       try{
+        try{
         await core.loadSvg();
+        if (svgFallback) svgFallback.style.display = "none";
       }catch(e){
+        if (svgFallback) svgFallback.style.display = "block";
         updatedAt.textContent = "Error loading SVG";
         console.error(e);
         return;

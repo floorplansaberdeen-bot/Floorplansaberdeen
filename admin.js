@@ -3,7 +3,7 @@
   // Optional: lock admin behind a URL-only secret.
   // Set ADMIN_URL_KEY to a hard-to-guess string, then visit: admin.html?k=YOUR_KEY
   // If you leave it as "CHANGE_ME", the lock is disabled.
-  const ADMIN_URL_KEY = "getaway_admin_abdn001";
+  const ADMIN_URL_KEY = "CHANGE_ME";
   const ADMIN_KEY_PARAM = "k";
   if (ADMIN_URL_KEY !== "CHANGE_ME") {
     const u = new URL(location.href);
@@ -32,6 +32,7 @@
 
   const planWrap = el("planWrap");
   const svgHost = el("svgHost");
+    const svgFallback = document.getElementById("svgFallback");
   const zoomWrap = el("zoomWrap");
   const zoomSvgHost = el("zoomSvgHost");
   const zoomRing = el("zoomRing");
@@ -164,7 +165,7 @@
 
   function updateUndoUi() {
     const n = undoStack.length;
-    undoBtn.textContent = `Undo (${n})`;
+    undoBtn.textContent = `Undo (${undoStack.length})`;
     undoBtn.disabled = n === 0;
     undoBtn.style.opacity = n === 0 ? "0.45" : "1";
   }
