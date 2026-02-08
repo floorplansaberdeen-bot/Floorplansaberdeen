@@ -15,6 +15,11 @@
         </div>`;
       return;
     }
+    window.undoLast = function () {
+  console.warn("Undo not implemented yet");
+  alert("Undo is not available yet.");
+};
+
   }
   const DEFAULT_BACKEND = "https://floorplansaberdeen.floorplansaberdeen.workers.dev";
   const BACKEND_KEY = "floorplan_backend_url";
