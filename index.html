@@ -220,7 +220,10 @@
     </aside>
   </main>
 
-  <script src="./shared.js">
+  <!-- Load shared helpers used by both pages -->
+  <script src="./shared.js"></script>
+
+  <script>
   (() => {
     const el = (id)=>document.getElementById(id);
 
@@ -402,7 +405,6 @@ startPolling();
     })();
   })();
   </script>
-  <script>
   (() => {
     const el = (id)=>document.getElementById(id);
 
