@@ -1,330 +1,239 @@
-
-/* shared.js - Floorplan shared core (Public uses this; Admin can adopt later)
-   No frameworks. Works on GitHub Pages.
+/* shared.js — shared helpers for Floorplan (public + admin)
+   No frameworks. Designed for GitHub Pages.
 */
-(function(){
+(function () {
+  "use strict";
+
   const DEFAULTS = {
     defaultBackend: "https://floorplansaberdeen.floorplansaberdeen.workers.dev",
     backendKey: "floorplan_backend_url",
+    eventNameKey: "floorplan_event_name",
     svgUrl: "./event_plan.svg",
-    dotCssVar: "--dot",
   };
 
-  
-function withCacheBust(url){
-  try{
-    const u = new URL(url, location.href);
-    const v = new URL(location.href).searchParams.get("v");
-    if (v && !u.searchParams.get("v")) u.searchParams.set("v", v);
-    return u.href;
-  }catch(e){
-    // Fallback for relative URLs
-    const v = new URL(location.href).searchParams.get("v");
-    if (v && url && url.indexOf("?") === -1) return url + "?v=" + encodeURIComponent(v);
-    return url;
+  function qs(sel, root = document) {
+    return root.querySelector(sel);
   }
-}
+  function qsa(sel, root = document) {
+    return Array.from(root.querySelectorAll(sel));
+  }
 
-function normalizeBackendUrl(input){
-    if (!input) return "";
-    let s = String(input).trim();
-    try{
-      const u = new URL(s);
-      let p = u.pathname.replace(/\/+$/,"");
-      p = p.replace(/\/(api\/stands|stands)$/i, "");
-      p = p.replace(/\/+$/,"");
-      u.pathname = p ? p : "/";
-      u.search = ""; u.hash = "";
-      const base = u.origin + (u.pathname === "/" ? "" : u.pathname);
-      return base.replace(/\/+$/,"");
-    }catch(e){
-      s = s.replace(/\/+$/,"");
-      s = s.replace(/\/(api\/stands|stands)$/i, "");
-      return s.replace(/\/+$/,"");
+  function normalizeStandId(input) {
+    return String(input || "")
+      .trim()
+      .toUpperCase()
+      .replace(/\s+/g, "")
+      .replace(/^STAND[_-]/, "")
+      .replace(/^ZONE[_-]/, "")
+      .replace(/[^A-Z0-9]/g, "");
+  }
+
+  function normalizeStatus(input) {
+    const s = String(input || "").trim().toLowerCase();
+    if (s === "sold" || s === "marked sold" || s === "markedsold") return "sold";
+    return "available";
+  }
+
+  function getBackendUrl() {
+    try {
+      const saved = localStorage.getItem(DEFAULTS.backendKey);
+      if (saved && saved.trim()) return saved.trim();
+    } catch (_) {}
+    return DEFAULTS.defaultBackend;
+  }
+
+  function setBackendUrl(url) {
+    localStorage.setItem(DEFAULTS.backendKey, String(url || "").trim());
+  }
+
+  function getEventName() {
+    try {
+      const n = localStorage.getItem(DEFAULTS.eventNameKey);
+      return (n && n.trim()) || "";
+    } catch (_) {
+      return "";
     }
   }
 
-  function getBackendUrl(opts){
-    const allow = (opts.allowBackendOverride !== false);
-    const saved = allow ? localStorage.getItem(opts.backendKey) : null;
-    const base = (saved && saved.startsWith("http")) ? saved : opts.defaultBackend;
-    return normalizeBackendUrl(base);
+  function setEventName(name) {
+    try {
+      localStorage.setItem(DEFAULTS.eventNameKey, String(name || "").trim());
+    } catch (_) {}
   }
 
-  async function fetchJson(url, opts={}){
-    const controller = new AbortController();
-    const t = setTimeout(()=>controller.abort(), 12000);
-    try{
-      const res = await fetch(url, { ...opts, signal: controller.signal });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
+  async function fetchJson(url, opts = {}) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), opts.timeoutMs || 12000);
+
+    const headers = Object.assign(
+      { "Content-Type": "application/json" },
+      opts.headers || {}
+    );
+
+    try {
+      const res = await fetch(url, {
+        method: opts.method || "GET",
+        headers,
+        body: opts.body,
+        signal: ctrl.signal,
+        cache: "no-store",
+      });
+      const ct = (res.headers.get("content-type") || "").toLowerCase();
+      const text = await res.text();
+
+      let data = null;
+      if (text && ct.includes("application/json")) {
+        try {
+          data = JSON.parse(text);
+        } catch (_) {
+          data = null;
+        }
+      } else if (text && text.trim().startsWith("{")) {
+        try {
+          data = JSON.parse(text);
+        } catch (_) {
+          data = null;
+        }
+      }
+
+      if (!res.ok) {
+        const msg =
+          (data && (data.error || data.message)) ||
+          text ||
+          `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+
+      return data != null ? data : text;
     } finally {
       clearTimeout(t);
     }
   }
 
-  function normStandId(s){ return String(s||"").trim().toUpperCase(); }
-  function normRow(row){
-    return {
-      standId: normStandId(row.standId ?? row.stand ?? row.id),
-      status: String(row.status || "available").toLowerCase(),
-      company: String(row.company || "").trim()
-    };
+  async function loadSvgInline(svgUrl, hostEl) {
+    const res = await fetch(svgUrl, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to load SVG");
+    const svgText = await res.text();
+    hostEl.innerHTML = svgText;
+
+    // Find the injected <svg> element
+    const svg = qs("svg", hostEl);
+    if (!svg) throw new Error("SVG element not found after injection");
+
+    // Make responsive
+    svg.style.width = "100%";
+    svg.style.height = "auto";
+    svg.style.display = "block";
+    svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+
+    return svg;
   }
 
-  function normalizeDomId(id){
-    return String(id || "")
-      .trim()
-      .toUpperCase()
-      .replace(/^STAND[_-]?/,"")
-      .replace(/^ZONE[_-]?/,"")
-      .replace(/^ID[_-]?/,"")
-      .replace(/[^A-Z0-9]/g,"");
+  function findStandElement(svgEl, standId) {
+    const id = normalizeStandId(standId);
+    if (!id || !svgEl) return null;
+
+    // Try common patterns
+    const candidates = [
+      `#${CSS.escape(id)}`,
+      `#${CSS.escape("stand_" + id)}`,
+      `#${CSS.escape("stand-" + id)}`,
+      `[data-stand="${CSS.escape(id)}"]`,
+      `[data-stand-id="${CSS.escape(id)}"]`,
+    ];
+
+    for (const sel of candidates) {
+      const el = svgEl.querySelector(sel);
+      if (el) return el;
+    }
+
+    // Last resort: look for any element whose id ends with the stand id
+    const any = qsa("[id]", svgEl).find((e) =>
+      normalizeStandId(e.id).endsWith(id)
+    );
+    return any || null;
   }
 
-  function setFillForElement(elem, rgba){
-    if (!elem) return;
-    const shapes = elem.matches("path,rect,polygon,polyline,ellipse,circle")
-      ? [elem]
-      : Array.from(elem.querySelectorAll("path,rect,polygon,polyline,ellipse,circle"));
-    shapes.forEach(s=>{
-      const bbox = s.getBBox ? s.getBBox() : null;
-      if (bbox && (bbox.width < 8 || bbox.height < 8)) return;
-      s.style.fill = rgba;
-      s.style.fillOpacity = "1";
+  function setStandVisual(el, status, isSelected) {
+    if (!el) return;
+
+    // We set styles on the element itself; if it's a group, style children too.
+    const targets =
+      el.tagName.toLowerCase() === "g" ? qsa("*", el) : [el];
+
+    const sold = normalizeStatus(status) === "sold";
+
+    targets.forEach((t) => {
+      if (
+        !["path", "rect", "polygon", "polyline", "ellipse", "circle"].includes(
+          t.tagName.toLowerCase()
+        )
+      )
+        return;
+
+      // fill is controlled but we keep outlines visible
+      t.style.fill = sold ? "rgb(239,68,68)" : "rgb(241,159,104)"; // red / peach-ish
+      t.style.fillOpacity = "1";
+      t.style.stroke = isSelected ? "rgb(17,24,39)" : "rgba(17,24,39,0.6)";
+      t.style.strokeWidth = isSelected ? "3" : "1.2";
     });
   }
 
-  class FloorplanCore{
-    constructor(options){
-      this.opts = Object.assign({}, DEFAULTS, options||{});
-      this.svgRoot = null;
-      this.zoomSvgRoot = null;
-      this.standMap = new Map();
-      this.rows = [];
-      this.selectedStandId = null;
-      this.selectionNonce = 0; // increments on each user selection
-
-      // DOM
-      this.svgHost = this.opts.svgHost;
-      this.planWrap = this.opts.planWrap;
-      this.planStack = this.opts.planStack;
-      this.calloutSvg = this.opts.calloutSvg;
-      this.lozenge = this.opts.lozenge;
-      this.lozStand = this.opts.lozStand;
-      this.lozCompany = this.opts.lozCompany;
-
-      // Don't let the callout overlay intercept clicks on the plan
-      if (this.calloutSvg) this.calloutSvg.style.pointerEvents = 'none';
-      if (this.lozenge) this.lozenge.style.pointerEvents = 'none';
-
-      // callbacks
-      this.onSelect = this.opts.onSelect || function(){};
-      this.onSvgReady = this.opts.onSvgReady || function(){};
-    }
-
-    backend(){ return getBackendUrl(this.opts); }
-
-    buildStandMap(){
-      this.standMap.clear();
-      if (!this.svgRoot) return;
-      this.svgRoot.querySelectorAll("[id]").forEach(node=>{
-        const key = normalizeDomId(node.id);
-        if (key && !this.standMap.has(key)) this.standMap.set(key, node);
-      });
-      this.svgRoot.querySelectorAll("[data-stand]").forEach(node=>{
-        const key = normalizeDomId(node.getAttribute("data-stand"));
-        if (key && !this.standMap.has(key)) this.standMap.set(key, node);
-      });
-    }
-
-    elementForStand(standId){
-      return this.standMap.get(normalizeDomId(standId)) || null;
-    }
-
-    clearCallout(){
-      if (this.calloutSvg) this.calloutSvg.innerHTML = "";
-      if (this.lozenge) this.lozenge.style.display = "none";
-      if (this.lozStand) this.lozStand.textContent = "—";
-      if (this.lozCompany){
-        this.lozCompany.style.display = "none";
-        this.lozCompany.textContent = "";
-      }
-    }
-
-    drawCallout(standId, company){
-      if (!this.calloutSvg || !this.planStack) return;
-      const elem = this.elementForStand(standId);
-      if (!elem) { this.clearCallout(); return; }
-
-      // update lozenge
-      if (this.lozStand) this.lozStand.textContent = standId;
-      if (this.lozCompany){
-        if (company){
-          this.lozCompany.style.display = "block";
-          this.lozCompany.textContent = company;
-        } else {
-          this.lozCompany.style.display = "none";
-          this.lozCompany.textContent = "";
-        }
-      }
-      if (this.lozenge) this.lozenge.style.display = "inline-block";
-
-      const standRect = elem.getBoundingClientRect();
-      const standPt = { x: standRect.left + standRect.width/2, y: standRect.top + standRect.height/2 };
-
-      const lozRect = this.lozenge.getBoundingClientRect();
-      const lozTop = { x: lozRect.left + lozRect.width/2, y: lozRect.top };
-
-      const stackRect = this.planStack.getBoundingClientRect();
-      const x1 = lozTop.x - stackRect.left;
-      const y1 = lozTop.y - stackRect.top;
-      const x2 = standPt.x - stackRect.left;
-      const y2 = standPt.y - stackRect.top;
-
-      this.calloutSvg.setAttribute("viewBox", `0 0 ${stackRect.width} ${stackRect.height}`);
-      this.calloutSvg.setAttribute("preserveAspectRatio", "none");
-
-      const dotPx = parseFloat(getComputedStyle(document.documentElement).getPropertyValue(this.opts.dotCssVar)) || 10;
-      const r = dotPx/2;
-
-      this.calloutSvg.innerHTML = `
-        <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="rgba(0,0,0,.70)" stroke-width="3" stroke-linecap="round"/>
-        <circle cx="${x2}" cy="${y2}" r="${r}" fill="rgba(0,0,0,.72)"/>
-      `;
-    }
-
-    applyColoursPublic(){
-      const orange = getComputedStyle(document.documentElement).getPropertyValue("--avail").trim() || "rgba(213,109,50,0.75)";
-      const red = getComputedStyle(document.documentElement).getPropertyValue("--sold").trim() || "#e63b3b";
-
-      this.rows.forEach(r=>{
-        const elem = this.elementForStand(r.standId);
-        if (!elem) return;
-        setFillForElement(elem, (this.selectedStandId && r.standId === this.selectedStandId) ? red : orange);
-      });
-    }
-
-    async loadSvg(){
-      const res = await fetch(this.opts.svgUrl, { cache: "no-store" });
-      if (!res.ok) throw new Error("Could not load SVG");
-      const txt = await res.text();
-      this.svgHost.innerHTML = txt;
-      this.svgRoot = this.svgHost.querySelector("svg");
-      if (!this.svgRoot) throw new Error("SVG invalid");
-
-      // hide any stray huge circle at 0,0
-      this.svgRoot.querySelectorAll("circle").forEach(c=>{
-        const cx=c.getAttribute("cx"), cy=c.getAttribute("cy"), r=parseFloat(c.getAttribute("r")||"0");
-        if ((cx==="0"||cx==="0.0") && (cy==="0"||cy==="0.0") && r>=20) c.style.display="none";
-      });
-
-      this.svgRoot.setAttribute("preserveAspectRatio","xMidYMid meet");
-      this.svgRoot.style.width="100%";
-      this.svgRoot.style.height="auto";
-      this.svgRoot.style.display="block";
-
-      this.buildStandMap();
-      this.onSvgReady(this.svgRoot);
-      return this.svgRoot;
-    }
-
-    async loadStands(){
-      const data = await fetchJson(`${this.backend()}/stands`);
-      this.rows = (Array.isArray(data) ? data : []).map(normRow).filter(r=>r.standId);
-      return this.rows;
-    }
-
-    selectStand(standId, {fromPlan=false}={}){
-      this.selectedStandId = normStandId(standId);
-      this.selectionNonce++; // user selection version
-      const row = this.rows.find(r=>r.standId === this.selectedStandId);
-      if (!row) return;
-
-      this.applyColoursPublic();
-      this.drawCallout(row.standId, (row.status === "sold") ? (row.company||"") : "");
-      this.onSelect(row, {fromPlan});
-    }
-
-hitTestStandAtClient(clientX, clientY){
-  if (!this.svgRoot) return null;
-  const svg = this.svgRoot;
-  // Convert client -> SVG coordinates
-  const pt = svg.createSVGPoint();
-  pt.x = clientX; pt.y = clientY;
-  const ctm = svg.getScreenCTM();
-  if (!ctm) return null;
-  const inv = ctm.inverse();
-  const sp = pt.matrixTransform(inv);
-
-  // Test geometry elements using isPointInFill/isPointInStroke if available
-  for (const [key, elem] of this.standMap.entries()){
-    const geoms = [];
-    if (elem instanceof SVGGeometryElement) geoms.push(elem);
-    else geoms.push(...Array.from(elem.querySelectorAll("path,rect,polygon,polyline,circle,ellipse")));
-    for (const g of geoms){
-      try{
-        if (typeof g.isPointInFill === "function" && g.isPointInFill(sp)) return key;
-        if (typeof g.isPointInStroke === "function" && g.isPointInStroke(sp)) return key;
-      }catch(e){ /* ignore */ }
-    }
-  }
-  // Fallback: bbox hit
-  for (const [key, elem] of this.standMap.entries()){
-    let bb=null;
-    try{ bb = (elem.getBBox ? elem.getBBox() : null); }catch(e){ bb=null; }
-    if (!bb) continue;
-    if (sp.x >= bb.x && sp.x <= bb.x+bb.width && sp.y >= bb.y && sp.y <= bb.y+bb.height) return key;
-  }
-  return null;
-}
-
-enablePlanClick({enabled=true, disableOnMobile=true}={}){
-      if (!this.svgRoot) return;
-      // "Phone" detection: disable plan tapping for small screens OR coarse pointers.
-      // This keeps desktop click enabled while preventing accidental taps on phones.
-      const isMobile = () => {
-        const mm = (q) => (window.matchMedia ? window.matchMedia(q).matches : false);
-        return mm("(max-width: 760px)") || mm("(pointer: coarse)");
-      };
-      const shouldDisable = () => disableOnMobile && isMobile();
-
-      const handler = (ev)=>{
-  if (!enabled) return;
-  if (shouldDisable()) return;
-
-  // First: walk composedPath / ancestors for an element with an id
-  const path = (typeof ev.composedPath === "function") ? ev.composedPath() : null;
-  const candidates = path && path.length ? path : [ev.target];
-
-  let foundKey = null;
-  for (const c of candidates){
-    if (!c || !c.id) continue;
-    const key = normalizeDomId(c.id);
-    if (!key) continue;
-    const found = this.rows.find(r => normalizeDomId(r.standId) === key);
-    if (found){ this.selectStand(found.standId, {fromPlan:true}); return; }
+  function getSvgPointFromClient(svgEl, clientX, clientY) {
+    const pt = svgEl.createSVGPoint();
+    pt.x = clientX;
+    pt.y = clientY;
+    const ctm = svgEl.getScreenCTM();
+    if (!ctm) return { x: 0, y: 0 };
+    const inv = ctm.inverse();
+    const p = pt.matrixTransform(inv);
+    return { x: p.x, y: p.y };
   }
 
-  // Second: robust hit-test inside SVG geometry (fixes stands covered by text/overlays e.g. A2)
-  const hitKey = this.hitTestStandAtClient(ev.clientX, ev.clientY);
-  if (!hitKey) return;
-  const found = this.rows.find(r => normalizeDomId(r.standId) === hitKey);
-  if (found) this.selectStand(found.standId, {fromPlan:true});
-};
-
-      // Remove previous by cloning? We'll just add once; safe in our pages.
-      this.svgRoot.addEventListener("click", handler, { passive:true });
-
-      // Also hard-disable pointer events on mobile if requested
-      const applyPe = ()=>{
-        if (shouldDisable()) this.svgRoot.style.pointerEvents = "none";
-        else this.svgRoot.style.pointerEvents = "auto";
-      };
-      window.addEventListener("resize", applyPe);
-      applyPe();
-    }
+  function clearSvgChildren(svgEl) {
+    while (svgEl.firstChild) svgEl.removeChild(svgEl.firstChild);
   }
 
-  window.FloorplanCore = FloorplanCore;
+  function drawCalloutLine(calloutSvg, fromPx, toPx) {
+    if (!calloutSvg) return;
+    clearSvgChildren(calloutSvg);
+
+    // Ensure overlay is sized to its box
+    const box = calloutSvg.getBoundingClientRect();
+    calloutSvg.setAttribute("viewBox", `0 0 ${box.width} ${box.height}`);
+
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("x1", String(fromPx.x));
+    line.setAttribute("y1", String(fromPx.y));
+    line.setAttribute("x2", String(toPx.x));
+    line.setAttribute("y2", String(toPx.y));
+    line.setAttribute("stroke", "rgba(17,24,39,0.85)");
+    line.setAttribute("stroke-width", "3");
+    line.setAttribute("stroke-linecap", "round");
+    calloutSvg.appendChild(line);
+  }
+
+  function toast(msg) {
+    // Minimal helper; pages may implement their own UI
+    console.warn(msg);
+  }
+
+  window.FloorplanShared = {
+    DEFAULTS,
+    qs,
+    qsa,
+    normalizeStandId,
+    normalizeStatus,
+    getBackendUrl,
+    setBackendUrl,
+    getEventName,
+    setEventName,
+    fetchJson,
+    loadSvgInline,
+    findStandElement,
+    setStandVisual,
+    getSvgPointFromClient,
+    drawCalloutLine,
+    toast,
+  };
 })();
