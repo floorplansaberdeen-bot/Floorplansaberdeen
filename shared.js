@@ -88,6 +88,7 @@
       this.standMap = new Map();
       this.rows = [];
       this.selectedStandId = null;
+      this.selectionNonce = 0; // increments on each user selection
 
       // DOM
       this.svgHost = this.opts.svgHost;
@@ -221,6 +222,7 @@
 
     selectStand(standId, {fromPlan=false}={}){
       this.selectedStandId = normStandId(standId);
+      this.selectionNonce++; // user selection version
       const row = this.rows.find(r=>r.standId === this.selectedStandId);
       if (!row) return;
 
