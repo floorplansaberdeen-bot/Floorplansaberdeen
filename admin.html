@@ -299,6 +299,14 @@
   transition: width .15s ease;
 }
   #undoBtn:disabled{opacity:.5;cursor:not-allowed;}
+
+    /* SVG visibility fixes */
+    #planWrap { min-height: 420px; }
+    #svgHost { min-height: 360px; }
+    #svgHost svg { width: 100%; height: 100%; display: block; }
+    /* Ensure SVGs don't collapse inside flex/grid */
+    #svgHost, #planWrap { overflow: hidden; }
+    
 </style>
 </head>
 <body>
@@ -430,7 +438,7 @@
   </div>
 
 
-   <script src="./shared.js?v=2" defer></script>
-<script src="./admin.js?v=2" defer></script>
+    <script src="./shared.js?v=1" defer></script>
+<script src="./admin.js?v=1" defer></script>
 </body>
 </html>

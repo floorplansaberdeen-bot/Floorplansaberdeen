@@ -10,7 +10,22 @@
     dotCssVar: "--dot",
   };
 
-  function normalizeBackendUrl(input){
+  
+function withCacheBust(url){
+  try{
+    const u = new URL(url, location.href);
+    const v = new URL(location.href).searchParams.get("v");
+    if (v && !u.searchParams.get("v")) u.searchParams.set("v", v);
+    return u.href;
+  }catch(e){
+    // Fallback for relative URLs
+    const v = new URL(location.href).searchParams.get("v");
+    if (v && url && url.indexOf("?") === -1) return url + "?v=" + encodeURIComponent(v);
+    return url;
+  }
+}
+
+function normalizeBackendUrl(input){
     if (!input) return "";
     let s = String(input).trim();
     try{
