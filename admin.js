@@ -1,38 +1,29 @@
-
 (() => {
-  // Optional: lock admin behind a URL-only secret.
-  // Set ADMIN_URL_KEY to a hard-to-guess string, then visit: admin.html?k=YOUR_KEY
+
+  // Optional: lock admin behind a URL-only secret. Set ADMIN_URL_KEY to a hard-to-guess string,
+  // then visit: admin.html?k=YOUR_KEY
   // If you leave it as "CHANGE_ME", the lock is disabled.
   const ADMIN_URL_KEY = "CHANGE_ME";
   const ADMIN_KEY_PARAM = "k";
   if (ADMIN_URL_KEY !== "CHANGE_ME") {
-    const u = new URL(location.href);
+    const u = new URL(window.location.href);
     if ((u.searchParams.get(ADMIN_KEY_PARAM) || "") !== ADMIN_URL_KEY) {
       document.body.innerHTML = `
         <div style="padding:24px;font-family:ui-sans-serif,system-ui;max-width:720px;margin:0 auto;">
-          <h1 style="margin:0 0 8px 0;">Floorplan Admin</h1>
-          <p style="margin:0 0 16px 0;">This page is locked. Add <code>?k=…</code> to the URL.</p>
+          <h1 style="margin:0 0 8px;">Floorplan Admin</h1>
+          <p style="margin:0 0 16px;">This page is locked. Add <code>?k=…</code> to the URL.</p>
         </div>`;
       return;
     }
   }
   const DEFAULT_BACKEND = "https://floorplansaberdeen.floorplansaberdeen.workers.dev";
   const BACKEND_KEY = "floorplan_backend_url";
-  // SVG file location.
-  // Default: ./event_plan.svg
-  // You can override via: admin.html?svg=yourfile.svg
-  const SVG_URL = (() => {
-    const u = new URL(window.location.href);
-    const qp = (u.searchParams.get("svg") || "").trim();
-    if (qp) return new URL("./" + qp.replace(/^\.\//, ""), u).href;
-    return new URL("./event_plan.svg", u).href;
-  })();
+  const SVG_URL = new URL("./event_plan.svg", window.location.href).href;
 
   const el = (id) => document.getElementById(id);
 
   const planWrap = el("planWrap");
   const svgHost = el("svgHost");
-    const svgFallback = document.getElementById("svgFallback");
   const zoomWrap = el("zoomWrap");
   const zoomSvgHost = el("zoomSvgHost");
   const zoomRing = el("zoomRing");
@@ -54,120 +45,732 @@
   const companyEl = el("company");
   const saveBtn = el("saveBtn");
   const markAvailBtn = el("markAvailBtn");
-  const undoBtn = el("undoBtn");
-  // ---- Undo stack (stores previous stand snapshots). Max 25.
-  let undoStack = loadUndoStack();
-  updateUndoUi();
 
-  async function saveCurrent(options = {}) {
-    const standId = String(selectedStandId || "").trim();
-    if (!standId) return;
+    const undoBtn = el("undoBtn");
+const toast = el("toast");
+  const toastMsg = el("toastMsg");
+  const toastActions = toast ? toast.querySelector(".actions") : null;
+  const progressOverlay = el("progressOverlay");
+  const progressTitle = el("progressTitle");
+  const progressMsg = el("progressMsg");
+  const progressBarFill = el("progressBarFill");
+  const setBackendBtn = el("setBackendBtn");
+  const hideToastBtn = el("hideToastBtn");
+  const syncedAt = el("syncedAt");
 
-    const desiredStatus = normalizeStatus(statusEl.value);
-    const desiredCompany = desiredStatus === "sold" ? String(companyEl.value || "").trim() : "";
+  const eventNameEl = el("eventName");
+  const setEventBtn = el("setEventBtn");
+  const pauseBtn = el("pauseBtn");
+  const exportBtn = el("exportBtn");
+  const importBtn = el("importBtn");
+  const resetBtn = el("resetBtn");
 
-    await applyUpdateStand(standId, desiredStatus, desiredCompany, { skipUndo: !!options.skipUndo });
-  }
+  let svgRoot = null;
+  let standMap = new Map();
 
-  async function markAvailableSelected() {
-    const standId = String(selectedStandId || "").trim();
-    if (!standId) return;
-
-    statusEl.value = "available";
-    companyEl.value = "";
-    await applyUpdateStand(standId, "available", "", { skipUndo: false });
-  }
-
-  async function applyUpdateStand(standId, status, company, { skipUndo } = {}) {
-    // Prompt for password once before the first write action in this session.
-    const adminPassword = await ensureAdminPassword("To save changes, enter the admin password.");
-    if (!adminPassword) return; // user cancelled
-
-    const idx = rows.findIndex(r => String(r.standId || "").trim() === standId);
-    if (idx === -1) return toast("Stand not found: " + standId, "error");
-
-    const prev = { standId: rows[idx].standId, status: rows[idx].status, company: rows[idx].company };
-
-    const payload = { standId, status, company, adminPassword };
-
-    // Optimistic UI update
-    rows[idx] = { standId, status, company };
-    paintSvg();
-    refreshList();
-    drawCallout(standId);
-
-    try {
-      await postJson(getBackendUrl() + "/stand", payload);
-
-      if (!skipUndo) pushUndo(prev);
-
-      toast("Saved", "success");
-
-      // Refresh from source-of-truth after write
-      await loadData(true);
-    } catch (err) {
-      // Revert optimistic update
-      rows[idx] = prev;
-      paintSvg();
-      refreshList();
-      drawCallout(standId);
-
-      toast(err?.message ? String(err.message) : "Save failed", "error");
-    }
-  }
-
-  // Wire buttons
-  saveBtn.addEventListener("click", () => saveCurrent());
-  markAvailBtn.addEventListener("click", () => markAvailableSelected());
-
-  // Enter in company field triggers save
-  companyEl.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      saveCurrent();
-    }
-  });
-
-  // Undo button
-  undoBtn.addEventListener("click", async () => {
-    const snap = undoStack.shift();
-    saveUndoStack();
-    updateUndoUi();
-    if (!snap) return;
-
-    selectStand(snap.standId);
-    statusEl.value = snap.status;
-    companyEl.value = snap.company || "";
-    await applyUpdateStand(snap.standId, snap.status, snap.company || "", { skipUndo: true });
-  });
-
-  function pushUndo(prevSnapshot) {
-    if (!prevSnapshot || !prevSnapshot.standId) return;
-    undoStack.unshift(prevSnapshot);
-    if (undoStack.length > 25) undoStack.length = 25;
-    saveUndoStack();
-    updateUndoUi();
-  }
-
-  function loadUndoStack() {
-    try {
-      const raw = sessionStorage.getItem("floorplan_admin_undo") || "[]";
-      const arr = JSON.parse(raw);
-      return Array.isArray(arr) ? arr.slice(0, 25) : [];
-    } catch {
-      return [];
-    }
-  }
-
-  function saveUndoStack() {
-    try { sessionStorage.setItem("floorplan_admin_undo", JSON.stringify(undoStack.slice(0, 25))); } catch {}
-  }
-
-  function updateUndoUi() {
+  let rows = [];
+  
+  // Undo stack (stores previous stand snapshots). Max 25.
+  const UNDO_MAX = 25;
+  let undoStack = [];
+  function updateUndoUI(){
+    if (!undoBtn) return;
     const n = undoStack.length;
-    undoBtn.textContent = `Undo (${undoStack.length})`;
+    undoBtn.textContent = `Undo (${n})`;
     undoBtn.disabled = n === 0;
-    undoBtn.style.opacity = n === 0 ? "0.45" : "1";
+    undoBtn.classList.toggle("disabled", n === 0);
+  }
+let selectedStandId = null;
+
+  let autoSync = true;
+  let syncTimer = null;
+  let adminPassword = sessionStorage.getItem('admin_pwd') || '';
+  let saveInFlight = false;
+
+  async function applyUpdateStand(standId, status, company, opts={}){
+    const backend = getBackendUrl();
+    const idx = rows.findIndex(r => r.standId === standId);
+    if (idx === -1) throw new Error("Stand not found: " + standId);
+
+    const prev = { standId, status: rows[idx].status, company: rows[idx].company };
+
+    // Optional password gate (once per session)
+    const pwOk = await ensureAdminPassword("To save changes, enter the admin password.");
+    if (!pwOk) return { cancelled:true };
+
+    const payload = { standId, status, company };
+    try {
+      await fetchJson(backend + "/api/stands/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+    } catch (err) {
+      toast("Save failed: " + (err?.message || err), "error");
+      throw err;
+    }
+
+    // Push undo snapshot unless told not to
+    if (!opts.skipUndo) {
+      const changed = prev.status !== status || (prev.company || "") !== (company || "");
+      if (changed) {
+        undoStack.push(prev);
+        if (undoStack.length > UNDO_MAX) undoStack = undoStack.slice(-UNDO_MAX);
+        updateUndoUI();
+      }
+    }
+
+    // Update local copy
+    rows[idx].status = status;
+    rows[idx].company = company;
+
+    renderTable();
+    applyStandColors();
+        updateUndoUI();
+if (core) {
+      core.applyColours(rows);
+      core.drawCallout(standId);
+    }
+
+    // Re-select to keep form in sync
+    selectStandById(standId);
+    try { localStorage.setItem("floorplan_last_selected", standId); } catch {}
+
+    return { ok:true };
+  }
+
+  // Pause auto-refresh while the user is editing fields (prevents resets mid-typing)
+  function isEditing(){
+    const ae = document.activeElement;
+    return ae === companyEl || ae === statusEl || ae === eventNameEl;
+  }
+
+  function normalizeBackendUrl(input) {
+    if (!input) return "";
+    let s = String(input).trim();
+    try {
+      const u = new URL(s);
+      let p = u.pathname.replace(/\/+$/,"");
+      p = p.replace(/\/(api\/stands|stands)$/i, "");
+      p = p.replace(/\/+$/,"");
+      u.pathname = p ? p : "/";
+      u.search = "";
+      u.hash = "";
+      const base = u.origin + (u.pathname === "/" ? "" : u.pathname);
+      return base.replace(/\/+$/,"");
+    } catch (e) {
+      s = s.replace(/\/+$/,"");
+      s = s.replace(/\/(api\/stands|stands)$/i, "");
+      return s.replace(/\/+$/,"");
+    }
+  }
+
+  function getBackendUrl() {
+    const saved = localStorage.getItem(BACKEND_KEY);
+    const base = (saved && saved.startsWith("http")) ? saved : DEFAULT_BACKEND;
+    return normalizeBackendUrl(base);
+  }
+
+function showProgress(title, msg, frac){
+  if (!progressOverlay) return;
+  if (progressTitle) progressTitle.textContent = title || "Updating…";
+  if (progressMsg) progressMsg.textContent = msg || "Please keep this tab open.";
+  const f = Math.max(0, Math.min(1, Number(frac || 0)));
+  if (progressBarFill) progressBarFill.style.width = `${Math.round(f*100)}%`;
+  progressOverlay.style.display = "flex";
+}
+function hideProgress(){
+  if (!progressOverlay) return;
+  progressOverlay.style.display = "none";
+  if (progressBarFill) progressBarFill.style.width = "0%";
+}
+
+function flashToast(message){
+  if (!toast) return;
+  if (toastMsg) toastMsg.textContent = message || "";
+  if (toastActions) toastActions.style.display = "none";
+  toast.style.display = "flex";
+  setTimeout(() => {
+    toast.style.display = "none";
+    if (toastActions) toastActions.style.display = "";
+  }, 1800);
+}
+
+function showToast(show) {
+    toast.style.display = show ? "flex" : "none";
+  }
+
+  setBackendBtn.addEventListener("click", () => {
+    const current = getBackendUrl();
+    const v = prompt("Paste your backend URL (Cloudflare Worker or Google Apps Script Web App):", current);
+    if (v && v.trim().startsWith("http")) {
+      localStorage.setItem(BACKEND_KEY, v.trim().replace(/\/+$/,""));
+      location.reload();
+    }
+  });
+  hideToastBtn.addEventListener("click", () => showToast(false));
+
+  async function fetchJson(url, opts = {}) {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 12000);
+    try {
+      const res = await fetch(url, { ...opts, signal: controller.signal, cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } finally {
+      clearTimeout(t);
+    }
+  }
+  function ensureAdminPassword(opts = {}){
+  const force = !!opts.force; // if true, always ask again
+  if (!force && adminPassword && adminPassword.trim()) return adminPassword;
+
+  const entered = prompt(`Admin password${opts && opts.reason ? " ("+opts.reason+")" : ""}:`, "");
+  if (entered === null) return null; // cancelled
+
+  const v = String(entered || "").trim();
+  if (!v) return null;
+
+  adminPassword = v;
+  sessionStorage.setItem("admin_pwd", adminPassword);
+  return adminPassword;
+}
+
+  function clearAdminPassword(){
+    adminPassword = "";
+    sessionStorage.removeItem("admin_pwd");
+  }
+
+
+  function normStandId(s){ return String(s||"").trim().toUpperCase(); }
+  function normRow(row) {
+    return {
+      standId: normStandId(row.standId ?? row.stand ?? row.id),
+      status: String(row.status || "available").toLowerCase(),
+      company: String(row.company || "").trim()
+    };
+  }
+
+  function normalizeDomId(id) {
+    return String(id || "")
+      .trim()
+      .toUpperCase()
+      .replace(/^STAND[_-]?/,"")
+      .replace(/^ZONE[_-]?/,"")
+      .replace(/^ID[_-]?/,"")
+      .replace(/[^A-Z0-9]/g,"");
+  }
+
+  
+function hitTestStandAtClient(clientX, clientY){
+  if (!svgRoot) return null;
+  const svg = svgRoot;
+  const pt = svg.createSVGPoint();
+  pt.x = clientX; pt.y = clientY;
+  const ctm = svg.getScreenCTM();
+  if (!ctm) return null;
+  const sp = pt.matrixTransform(ctm.inverse());
+
+  // Try geometry hit-test
+  for (const [key, elem] of standMap.entries()){
+    const geoms = [];
+    if (elem instanceof SVGGeometryElement) geoms.push(elem);
+    else geoms.push(...Array.from(elem.querySelectorAll("path,rect,polygon,polyline,circle,ellipse")));
+    for (const g of geoms){
+      try{
+        if (typeof g.isPointInFill === "function" && g.isPointInFill(sp)) return key;
+        if (typeof g.isPointInStroke === "function" && g.isPointInStroke(sp)) return key;
+      }catch(e){}
+    }
+  }
+  // Fallback bbox
+  for (const [key, elem] of standMap.entries()){
+    let bb=null;
+    try{ bb = (elem.getBBox ? elem.getBBox() : null); }catch(e){ bb=null; }
+    if (!bb) continue;
+    if (sp.x >= bb.x && sp.x <= bb.x+bb.width && sp.y >= bb.y && sp.y <= bb.y+bb.height) return key;
+  }
+  return null;
+}
+
+function buildStandMap() {
+    standMap.clear();
+    if (!svgRoot) return;
+    svgRoot.querySelectorAll("[id]").forEach(node => {
+      const key = normalizeDomId(node.id);
+      if (key && !standMap.has(key)) standMap.set(key, node);
+    });
+    svgRoot.querySelectorAll("[data-stand]").forEach(node => {
+      const key = normalizeDomId(node.getAttribute("data-stand"));
+      if (key && !standMap.has(key)) standMap.set(key, node);
+    });
+  }
+
+  function elementForStand(standId){
+    return standMap.get(normalizeDomId(standId)) || null;
+  }
+
+  function setFillForElement(elem, rgba) {
+    if (!elem) return;
+    const shapes = elem.matches("path,rect,polygon,polyline,ellipse,circle")
+      ? [elem]
+      : Array.from(elem.querySelectorAll("path,rect,polygon,polyline,ellipse,circle"));
+
+    shapes.forEach(s => {
+      const bbox = s.getBBox ? s.getBBox() : null;
+      if (bbox && (bbox.width < 8 || bbox.height < 8)) return;
+      s.style.fill = rgba;
+      s.style.fillOpacity = "1";
+    });
+  }
+
+  function clearCallout(){
+    while (calloutSvg.firstChild) calloutSvg.removeChild(calloutSvg.firstChild);
+    calloutSvg.style.display = "none";
+    lozenge.style.display = "none";
+    lozStand.textContent = "—";
+    lozCompany.style.display = "none";
+    lozCompany.textContent = "";
+  }
+
+  function drawCallout(standId){
+    const row = rows.find(r => r.standId === normStandId(standId));
+    const elem = row ? elementForStand(row.standId) : elementForStand(standId);
+    if (!elem) { clearCallout(); return; }
+
+    // Update lozenge content
+    lozStand.textContent = row ? row.standId : standId;
+    const company = (row && row.status === "sold") ? (row.company || "") : "";
+    if (company){
+      lozCompany.style.display = "block";
+      lozCompany.textContent = company;
+    } else {
+      lozCompany.style.display = "none";
+      lozCompany.textContent = "";
+    }
+    lozenge.style.display = "inline-block";
+    planStack.classList.remove("noSel");
+
+    // Force layout so getBoundingClientRect is accurate
+    void lozenge.offsetWidth;
+
+    requestAnimationFrame(() => {
+      const standRect = elem.getBoundingClientRect();
+      const standPt = { x: standRect.left + standRect.width/2, y: standRect.top + standRect.height/2 };
+
+      const lozRect = lozenge.getBoundingClientRect();
+      const lozTop = { x: lozRect.left + lozRect.width/2, y: lozRect.top };
+
+      const stackRect = planStack.getBoundingClientRect();
+      const x1 = lozTop.x - stackRect.left;
+      const y1 = lozTop.y - stackRect.top;
+      const x2 = standPt.x - stackRect.left;
+      const y2 = standPt.y - stackRect.top;
+
+      calloutSvg.setAttribute("viewBox", `0 0 ${stackRect.width} ${stackRect.height}`);
+      calloutSvg.setAttribute("preserveAspectRatio", "none");
+      calloutSvg.setAttribute("width", String(stackRect.width));
+      calloutSvg.setAttribute("height", String(stackRect.height));
+      calloutSvg.style.display = "block";
+
+      const dotPx = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--dot")) || 10;
+      const r = dotPx / 2;
+
+      const NS = "http://www.w3.org/2000/svg";
+      while (calloutSvg.firstChild) calloutSvg.removeChild(calloutSvg.firstChild);
+
+      const line = document.createElementNS(NS, "line");
+      line.setAttribute("x1", String(x1));
+      line.setAttribute("y1", String(y1));
+      line.setAttribute("x2", String(x2));
+      line.setAttribute("y2", String(y2));
+      line.setAttribute("stroke", getComputedStyle(document.documentElement).getPropertyValue("--line").trim() || "rgba(0,0,0,.70)");
+      line.setAttribute("stroke-width", "3");
+      line.setAttribute("stroke-linecap", "round");
+
+      const dot = document.createElementNS(NS, "circle");
+      dot.setAttribute("cx", String(x2));
+      dot.setAttribute("cy", String(y2));
+      dot.setAttribute("r", String(r));
+      dot.setAttribute("fill", "rgba(0,0,0,.72)");
+
+      calloutSvg.appendChild(line);
+      calloutSvg.appendChild(dot);
+    });
+  }
+
+  function applyColours() {
+    const sold = getComputedStyle(document.documentElement).getPropertyValue("--sold").trim();
+    const avail = getComputedStyle(document.documentElement).getPropertyValue("--avail").trim();
+    rows.forEach(r => {
+      const elem = elementForStand(r.standId);
+      if (!elem) return;
+      setFillForElement(elem, r.status === "sold" ? sold : avail);
+    });
+  }
+
+  function renderTable() {
+    const q = (searchEl.value || "").trim().toLowerCase();
+    const f = filterEl.value;
+
+    const filtered = rows.filter(r => {
+      if (f !== "all" && r.status !== f) return false;
+      if (!q) return true;
+      return r.standId.toLowerCase().includes(q) || (r.company||"").toLowerCase().includes(q);
+    });
+
+    tbody.innerHTML = "";
+    filtered.forEach(r => {
+      const tr = document.createElement("tr");
+      if (r.standId === selectedStandId) tr.classList.add("active");
+
+      const td1 = document.createElement("td");
+      td1.textContent = r.standId;
+
+      const td2 = document.createElement("td");
+      const badge = document.createElement("span");
+      badge.className = "badge " + (r.status === "sold" ? "bSold" : "bAvail");
+      badge.textContent = r.status === "sold" ? "Sold" : "Available";
+      td2.appendChild(badge);
+
+      const td3 = document.createElement("td");
+      td3.textContent = r.company || "";
+
+      tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
+      tr.addEventListener("click", () => selectStand(r.standId));
+      tbody.appendChild(tr);
+    });
+
+    countEl.textContent = String(filtered.length);
+    totalEl.textContent = String(rows.length);
+  }
+
+  function selectStand(standId) {
+    selectedStandId = normStandId(standId);
+    const row = rows.find(r => r.standId === selectedStandId);
+    if (!row) return;
+
+    standIdEl.value = row.standId;
+    statusEl.value = row.status;
+    companyEl.value = row.company || "";
+
+    drawCallout(row.standId);
+    renderTable();
+    updateZoom(row.standId);
+  }
+
+  function forceBlackAndWhite(svg){
+    // Remove any embedded images (logos) so the zoom is clean
+    svg.querySelectorAll("image").forEach(img => img.remove());
+
+    const shapesSel = "path,rect,polygon,polyline,ellipse,circle,line";
+    svg.querySelectorAll("*").forEach(n => {
+      if (n.hasAttribute("style")) n.removeAttribute("style");
+
+      // Keep text readable: black fill, no stroke
+      if (n.tagName && n.tagName.toLowerCase() === "text"){
+        n.setAttribute("fill","black");
+        n.removeAttribute("stroke");
+        n.removeAttribute("stroke-width");
+        return;
+      }
+
+      // Only force B/W on actual drawable shapes
+      if (n.matches && n.matches(shapesSel)){
+        n.setAttribute("fill","none");
+        n.setAttribute("stroke","black");
+        n.setAttribute("stroke-width","1");
+      }
+    });
+  }
+
+  function updateZoom(standId) {
+    zoomSvgHost.innerHTML = "";
+    zoomRing.style.display = "none";
+    if (!standId || !svgRoot) return;
+
+    const clone = svgRoot.cloneNode(true);
+    forceBlackAndWhite(clone);
+    zoomSvgHost.appendChild(clone);
+
+    let resolved = clone.querySelector("#"+CSS.escape(standId));
+    if (!resolved){
+      const key = normalizeDomId(standId);
+      resolved = Array.from(clone.querySelectorAll("[id]")).find(n => normalizeDomId(n.id) === key);
+    }
+    if (!resolved || !resolved.getBBox) return;
+
+    const bbox = resolved.getBBox();
+    const pad = Math.max(40, Math.max(bbox.width, bbox.height) * 0.9);
+    const vx = bbox.x - pad;
+    const vy = bbox.y - pad;
+    const vw = bbox.width + pad*2;
+    const vh = bbox.height + pad*2;
+
+    clone.setAttribute("viewBox", `${vx} ${vy} ${vw} ${vh}`);
+    clone.setAttribute("preserveAspectRatio","xMidYMid meet");
+    clone.style.width = "100%";
+    clone.style.height = "auto";
+    clone.style.display = "block";
+
+    requestAnimationFrame(() => {
+      const r = resolved.getBoundingClientRect();
+      const zw = zoomWrap.getBoundingClientRect();
+      const cx = (r.left + r.right)/2 - zw.left;
+      const cy = (r.top + r.bottom)/2 - zw.top;
+      const radius = Math.max(18, Math.min(60, Math.max(r.width, r.height) * 0.9));
+
+      zoomRing.style.display = "block";
+      zoomRing.style.width = `${radius*2}px`;
+      zoomRing.style.height = `${radius*2}px`;
+      zoomRing.style.left = `${cx - radius}px`;
+      zoomRing.style.top = `${cy - radius}px`;
+    });
+  }
+
+  async function requireAdminPassword(){
+  const backend = getBackendUrl();
+  let settings = null;
+  try{
+    settings = await fetchJson(`${backend}/settings`);
+  }catch(e){
+    // If settings route fails, allow access (but admin actions may still fail)
+    return true;
+  }
+
+  const pwd = (settings && (settings.adminPassword || settings.password || settings.admin_pass || settings.admin_password)) || "";
+  const required = String(pwd || "").trim();
+  if (!required) return true;
+
+  // If we already have a password cached for this session, accept it
+  if (adminPassword && adminPassword.trim()) return true;
+
+  const entered = prompt(`Admin password${opts && opts.reason ? " ("+opts.reason+")" : ""}:`, "");
+  if (entered === null) return false; // cancelled
+
+  const v = String(entered || "").trim();
+  if (!v) return false;
+
+  // Store entered password for subsequent actions (actual validation happens on save/reset/etc)
+  adminPassword = v;
+  sessionStorage.setItem("admin_pwd", adminPassword);
+  return true;
+}
+  async function loadSettings(){
+    const backend = getBackendUrl();
+    let settings = null;
+    try{
+      settings = await fetchJson(`${backend}/settings`);
+    }catch(e){
+      return;
+    }
+    const name = (settings && (settings.eventName || settings.name || settings.event || settings.title)) || "";
+    if (name && eventNameEl) eventNameEl.value = String(name);
+  }
+  async function undoLast(){
+    if (undoStack.length === 0) return;
+    const last = undoStack.pop();
+    updateUndoUI();
+    // Apply previous snapshot back to backend and UI
+    await applyUpdateStand(last.standId, last.status, last.company, { skipUndo:true, reason:"Undo" });
+    // Re-select to refresh form
+    selectStandById(last.standId);
+  }
+
+
+
+  async function saveEventName(){
+    if (!eventNameEl) return;
+    const name = String(eventNameEl.value || "").trim();
+    if (!name) { alert("Please enter an event name."); return; }
+
+    // Must be user-triggered (Set button) so prompt works on iOS Safari
+    ensureAdminPassword();
+
+    const backend = getBackendUrl();
+    let resp = null;
+    try{
+      resp = await fetchJson(`${backend}/settings`, {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ eventName: name, adminPassword })
+      });
+    }catch(e){
+      showToast(true);
+      alert("Could not save event name (backend unreachable).");
+      return;
+    }
+
+    if (resp && resp.ok === false){
+      const msg = String(resp.error || "Event name save failed.");
+      if (/invalid admin password/i.test(msg)){
+        clearAdminPassword();
+        alert("Incorrect admin password. Please try again.");
+      } else {
+        alert(msg);
+      }
+      return;
+    }
+
+    // Re-read settings to confirm (source of truth)
+    await loadSettings();
+    const after = String(eventNameEl.value || "").trim();
+    if (after !== name){
+      alert('Event name did not update on the backend (it reverted to: "' + after + '").');
+    } else {
+      syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+    }
+  }
+
+
+  let settingsSaveTimer = null;
+  function scheduleSaveEventName(){
+    if (!eventNameEl) return;
+    if (settingsSaveTimer) clearTimeout(settingsSaveTimer);
+    settingsSaveTimer = setTimeout(async () => {
+      const backend = getBackendUrl();
+      const payload = { eventName: eventNameEl.value.trim() };
+      try{
+        await fetchJson(`${backend}/settings`, {
+          method:"POST",
+          headers:{ "Content-Type":"application/json" },
+          body: JSON.stringify(payload)
+        });
+        syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+      }catch(e){
+        showToast(true);
+      }
+    }, 600);
+  }
+
+  async function loadSvg() {
+    const res = await fetch(SVG_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error("Could not load SVG");
+    const txt = await res.text();
+    svgHost.innerHTML = txt;
+    svgRoot = svgHost.querySelector("svg");
+    if (!svgRoot) throw new Error("SVG invalid");
+
+    // Hide any stray huge circle at 0,0 (artifact)
+    svgRoot.querySelectorAll("circle").forEach(c => {
+      const cx = c.getAttribute("cx"), cy = c.getAttribute("cy"), r = parseFloat(c.getAttribute("r") || "0");
+      if ((cx === "0" || cx === "0.0") && (cy === "0" || cy === "0.0") && r >= 20) {
+        c.style.display = "none";
+      }
+    });
+
+    svgRoot.setAttribute("preserveAspectRatio","xMidYMid meet");
+    svgRoot.style.width = "100%";
+    svgRoot.style.height = "auto";
+    svgRoot.style.display = "block";
+
+    // If stand numbers/text are on a separate layer, they can block clicks.
+    // Make text/images ignore pointer events so clicks reach the stand shapes.
+    svgRoot.querySelectorAll("text,image").forEach(n => {
+      try{ n.style.pointerEvents = "none"; }catch(e){}
+    });
+
+    buildStandMap();
+    // Visual hint: stands are clickable on desktop
+    standMap.forEach((node) => { try{ node.style.cursor = "pointer"; }catch(e){} });
+
+    // click-to-select
+    svgRoot.style.pointerEvents = "auto";
+    svgRoot.style.pointerEvents = "auto";
+    // Ensure shapes receive pointer events (some SVGs disable this)
+    svgRoot.querySelectorAll("path,rect,polygon,polyline,ellipse,circle,g").forEach(n => {
+      try{ n.style.pointerEvents = "all"; }catch(e){}
+    });
+
+    
+svgRoot.addEventListener("click", (ev) => {
+  // First: try direct id in composed path / ancestors
+  const path = (typeof ev.composedPath === "function") ? ev.composedPath() : null;
+  const candidates = path && path.length ? path : [ev.target];
+
+  for (const c of candidates){
+    if (!c || !c.id) continue;
+    const key = normalizeDomId(c.id);
+    const found = rows.find(r => normalizeDomId(r.standId) === key);
+    if (found){ selectStand(found.standId); return; }
+  }
+
+  // Second: robust hit test (fixes A2)
+  const hitKey = hitTestStandAtClient(ev.clientX, ev.clientY);
+  if (!hitKey) return;
+  const found = rows.find(r => normalizeDomId(r.standId) === hitKey);
+  if (found) selectStand(found.standId);
+}, { passive:true });
+  }
+
+  async function loadData() {
+    const backend = getBackendUrl();
+    const data = await fetchJson(`${backend}/stands?ts=${Date.now()}`);
+    rows = (Array.isArray(data) ? data : []).map(normRow).filter(r => r.standId);
+
+    applyColours();
+    renderTable();
+
+    syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+    showToast(false);
+
+    // keep selection after refresh
+    if (selectedStandId) {
+      const row = rows.find(r => r.standId === selectedStandId);
+      if (row) {
+        statusEl.value = row.status;
+        companyEl.value = row.company || "";
+        drawCallout(row.standId);
+      }
+    }
+  }
+
+  async function saveCurrent() {
+    await ensureAdminPassword();
+    saveInFlight = true;
+    if (!selectedStandId) { saveInFlight = false; return; }
+    const backend = getBackendUrl();
+    const payload = {
+      standId: selectedStandId,
+      status: statusEl.value,
+      company: (statusEl.value === "sold") ? companyEl.value.trim() : "",
+      adminPassword: adminPassword
+    };
+
+    try{
+      const resp = await fetchJson(`${backend}/stand`, {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify(payload)
+      });
+    
+      if (resp && resp.ok === false){
+        const msg = String(resp.error || "Save failed.");
+        if (/invalid admin password/i.test(msg)){
+          clearAdminPassword();
+          alert("Incorrect admin password. Please try again.");
+        } else {
+          alert(msg);
+        }
+        return;
+      }
+}catch(e){
+      showToast(true);
+      return;
+    }finally{
+      saveInFlight = false;
+    }
+
+    const idx = rows.findIndex(r => r.standId === selectedStandId);
+    if (idx >= 0) rows[idx] = payload;
+
+    applyColours();
+    renderTable();
+    drawCallout(selectedStandId);
+
+    // Pull fresh data back from backend (authoritative) to prevent reverts
+    try{ await loadData(); }catch(e){}
+    syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
   }
 
   async function resetAll() {
@@ -223,8 +826,7 @@
 
     applyColours();
     renderTable();
-    updateUndoUI();
-clearCallout();
+    clearCallout();
     selectedStandId = null;
     standIdEl.value = "";
     statusEl.value = "available";
@@ -265,8 +867,7 @@ clearCallout();
     saveCurrent();
   });
 
-  if (undoBtn) undoBtn.addEventListener("click", undoLast);
-searchEl.addEventListener("input", renderTable);
+  searchEl.addEventListener("input", renderTable);
   filterEl.addEventListener("change", renderTable);
   pauseBtn.addEventListener("click", () => {
     autoSync = !autoSync;
@@ -407,9 +1008,9 @@ resetBtn.addEventListener("click", resetAll);
       layoutMobile();
       await loadSettings();
     }catch(e){
-      // Don't abort the whole page if SVG fails (still allow list + editing)
       showToast(true);
       console.error(e);
+      return;
     }
     try{
       if (!isEditing()) await loadData();
@@ -448,5 +1049,3 @@ resetBtn.addEventListener("click", resetAll);
 
     tableWrap.style.maxHeight = available + 'px';
   }
-
-
