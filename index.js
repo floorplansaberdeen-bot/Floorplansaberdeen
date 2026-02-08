@@ -142,7 +142,8 @@
   }
 
   async function loadDataAndRender() {
-    const backend = S.getBackendUrl();
+   const backend = FloorplanShared.getBackendUrl();
+
 
     // Try meta (safe if backend supports it)
     let meta = null;
