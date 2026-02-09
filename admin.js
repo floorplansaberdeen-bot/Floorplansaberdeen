@@ -283,8 +283,7 @@
     if (!standId || !svgRoot) return;
 
     const clone = svgRoot.cloneNode(true);
-    forceBlackAndWhite(clone);
-    zoomSvgHost.appendChild(clone);
+        zoomSvgHost.appendChild(clone);
 
     // Find element in clone by exact ID
     const target = clone.querySelector("#"+CSS.escape(standId));
