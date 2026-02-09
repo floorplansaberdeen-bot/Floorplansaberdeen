@@ -300,10 +300,11 @@
     if (!resolved || !resolved.getBBox) return;
 
     const bbox = resolved.getBBox();
-    // Use a *tight* viewBox (small padding) so the stand label text becomes readable.
-    // The previous build used a huge pad, effectively zooming OUT.
+    // Zoom window framing:
+    // Keep labels readable, but don't zoom *too* tight. A larger padding shows
+    // more context around the selected stand while still keeping the text crisp.
     const maxSide = Math.max(bbox.width, bbox.height);
-    const pad = Math.max(10, maxSide * 0.15);
+    const pad = Math.max(60, maxSide * 0.75);
     const vx = bbox.x - pad;
     const vy = bbox.y - pad;
     const vw = bbox.width + pad*2;
