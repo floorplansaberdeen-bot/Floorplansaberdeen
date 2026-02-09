@@ -151,15 +151,25 @@
   };
 
   S.findClickedStandId = (evTarget, rows) => {
+    // Walk up from the clicked SVG node, trying to resolve a real standId.
+    // Important: ignore CAD-export ids like LWPOLYLINE117 by only accepting:
+    //  - an id that exists in the loaded rows, OR
+    //  - an id that *looks like* a standId (e.g. A2, AA1, SB14, AD10)
+    const looksLikeStand = (s) => /^[A-Z]{1,3}\d{1,3}$/.test(String(s || ""));
     let node = evTarget;
-    for (let i=0;i<7 && node;i++){
-      const id = node.id || node.getAttribute?.("data-stand") || node.getAttribute?.("data-stand-id") || "";
-      const guess = S.normId(id);
+    for (let i = 0; i < 10 && node; i++) {
+      const raw =
+        node.id ||
+        node.getAttribute?.("data-stand") ||
+        node.getAttribute?.("data-stand-id") ||
+        "";
+      const guess = S.normId(raw);
       if (guess) {
-        const found = rows.find(r => S.normId(r.standId) === guess);
+        const found = rows && rows.find ? rows.find(r => S.normId(r.standId) === guess) : null;
         if (found) return found.standId;
-        // if SVG contains stand not in data, still allow selecting
-        return guess;
+        // Only accept unknown ids if they match the standId pattern.
+        if (looksLikeStand(guess)) return guess;
+        // Otherwise keep walking up to find a parent group with the real stand id.
       }
       node = node.parentElement;
     }
