@@ -1,243 +1,160 @@
-/* index.js — Public page logic */
-(function () {
+/* index.js — Public page (backend critical + polling)
+   Rules:
+   - All stands orange
+   - Selected stand red
+   - No green anywhere
+   - Desktop: can click plan or list
+   - Mobile: plan tapping disabled (list only)
+*/
+(() => {
   "use strict";
+  const F = window.Floorplan;
+  const SVG_URL = "./event_plan.svg";
 
-  const S = window.FloorplanShared;
-  if (!S) {
-    console.error("shared.js missing");
-    return;
-  }
+  const el = F.$;
+  const svgHost = el("svgHost");
+  const planStack = el("planStack");
+  const calloutSvg = el("calloutSvg");
+  const lozenge = el("lozenge");
+  const lozStand = el("lozStand");
+  const lozCompany = el("lozCompany");
 
-  // Elements (must exist in index.html)
-  const planStack = document.getElementById("planStack");
-  const svgHost = document.getElementById("svgHost");
-  const calloutSvg = document.getElementById("calloutSvg");
-  const lozenge = document.getElementById("lozenge");
-  const lozStand = document.getElementById("lozStand");
-  const lozCompany = document.getElementById("lozCompany");
+  const tbody = el("tbody");
+  const searchEl = el("search");
+  const clearSearchBtn = el("clearSearchBtn");
+  const countEl = el("count");
+  const totalEl = el("total");
+  const updatedAtEl = el("updatedAt");
+  const eventTitle = el("eventTitle");
 
-  const tbody = document.getElementById("tbody");
-  const searchEl = document.getElementById("search");
-  const clearSearchBtn = document.getElementById("clearSearchBtn");
-
-  const countEl = document.getElementById("count");
-  const totalEl = document.getElementById("total");
-
-  const updatedAtEl = document.getElementById("updatedAt");
-  const eventNameEl = document.getElementById("eventName");
-
-  const clearBtn = document.getElementById("clearBtn");
-
-  let coreSvg = null;
+  let svgRoot = null;
+  let standMap = new Map();
   let rows = [];
-  let selectedStandId = "";
-  let selectedCompany = "";
+  let selectedStandId = null;
+  let pollTimer = null;
 
-  function setHeaderMeta(meta) {
-    // Event name
-    const localName = S.getEventName();
-    const name = (meta && meta.eventName) || localName || "";
-    if (eventNameEl) eventNameEl.textContent = name || "—";
+  const isMobile = () => window.matchMedia("(max-width: 640px)").matches;
 
-    // Updated at
-    const updated =
-      (meta && (meta.updatedAt || meta.updated_at)) || "";
-    if (updatedAtEl) updatedAtEl.textContent = updated || "—";
+  function normRow(row){
+    return {
+      standId: String(row.standId ?? row.stand ?? row.id ?? "").trim().toUpperCase(),
+      status: String(row.status || "available").toLowerCase(),
+      company: String(row.company || "").trim()
+    };
   }
 
-  function renderList() {
-    if (!tbody) return;
+  async function loadSvg() {
+    const svg = await F.loadSvgInline(SVG_URL, svgHost);
+    svgRoot = svg;
+    standMap = F.buildStandMap(svgRoot);
 
-    const q = String(searchEl?.value || "")
-      .trim()
-      .toLowerCase();
+    svgRoot.addEventListener("click", (ev) => {
+      if (isMobile()) return; // disabled on phone
+      const standId = F.findClickedStandId(ev.target, rows);
+      if (standId) selectStand(standId, "plan");
+    }, { passive:true });
+  }
 
-    const filtered = rows.filter((r) => {
-      const stand = (r.stand || "").toLowerCase();
-      const company = (r.company || "").toLowerCase();
-      return !q || stand.includes(q) || company.includes(q);
+  function renderTable(){
+    const q = (searchEl?.value || "").trim().toLowerCase();
+    // Public list: sold stands only with company (visitors), but keep stand if sold with blank company.
+    const soldOnly = rows.filter(r => r.status === "sold");
+    const filtered = soldOnly.filter(r => {
+      if (!q) return true;
+      return r.standId.toLowerCase().includes(q) || (r.company||"").toLowerCase().includes(q);
     });
 
     tbody.innerHTML = "";
-
-    filtered.forEach((r) => {
+    filtered.forEach(r => {
       const tr = document.createElement("tr");
-      tr.dataset.stand = r.stand;
+      if (selectedStandId && r.standId === selectedStandId) tr.classList.add("active");
 
-      if (selectedStandId && r.stand === selectedStandId) {
-        tr.classList.add("active");
-      }
+      const td1 = document.createElement("td"); td1.textContent = r.standId;
+      const td2 = document.createElement("td"); td2.textContent = r.company || "";
 
-      const td1 = document.createElement("td");
-      td1.textContent = r.stand;
-
-      const td2 = document.createElement("td");
-      td2.textContent = r.company || "";
-
-      tr.appendChild(td1);
-      tr.appendChild(td2);
-
-      tr.addEventListener("click", () => {
-        selectStand(r.stand, r.company || "");
-      });
-
+      tr.appendChild(td1); tr.appendChild(td2);
+      tr.addEventListener("click", () => selectStand(r.standId, "list"));
       tbody.appendChild(tr);
     });
 
     if (countEl) countEl.textContent = String(filtered.length);
-    if (totalEl) totalEl.textContent = String(rows.length);
+    if (totalEl) totalEl.textContent = String(soldOnly.length);
   }
 
-  function updatePlanColors() {
-    if (!coreSvg) return;
-    rows.forEach((r) => {
-      const el = S.findStandElement(coreSvg, r.stand);
-      S.setStandVisual(el, r.status, r.stand === selectedStandId);
-    });
+  function updateColours(){
+    F.applyColoursPublic(rows, standMap, getComputedStyle(document.documentElement), selectedStandId);
   }
 
-  function updateCallout() {
-    if (!planStack || !calloutSvg || !lozenge) return;
-
+  function updateCallout(){
     if (!selectedStandId) {
-      lozenge.style.display = "none";
-      S.drawCalloutLine(calloutSvg, { x: 0, y: 0 }, { x: 0, y: 0 });
+      F.clearCallout(calloutSvg, lozenge, lozStand, lozCompany);
       return;
     }
-
-    lozenge.style.display = "block";
-    lozStand.textContent = selectedStandId;
-    lozCompany.textContent = selectedCompany || "";
-    lozCompany.style.display = selectedCompany ? "block" : "none";
-
-    // Compute positions in planStack local pixel coords
-    const stackRect = planStack.getBoundingClientRect();
-
-    // Stand point from SVG bounding box in screen coords
-    const standEl = S.findStandElement(coreSvg, selectedStandId);
-    if (!standEl) return;
-    const bb = standEl.getBoundingClientRect();
-    const standPx = {
-      x: bb.left + bb.width / 2 - stackRect.left,
-      y: bb.top + bb.height / 2 - stackRect.top,
-    };
-
-    // Target point: top-center of lozenge
-    const lozRect = lozenge.getBoundingClientRect();
-    const lozPx = {
-      x: lozRect.left + lozRect.width / 2 - stackRect.left,
-      y: lozRect.top - stackRect.top, // top edge
-    };
-
-    S.drawCalloutLine(calloutSvg, standPx, lozPx);
+    const row = rows.find(r => r.standId === selectedStandId);
+    const standEl = F.elementForStand(standMap, selectedStandId);
+    const company = (row && row.status === "sold") ? (row.company||"") : "";
+    F.drawCallout({ standElem: standEl, standId: selectedStandId, company, planStack, calloutSvg, lozenge, lozStand, lozCompany });
   }
 
-  function selectStand(standId, company) {
-    selectedStandId = S.normalizeStandId(standId);
-    selectedCompany = company || "";
+  function selectStand(standId, source){
+    const id = String(standId||"").trim().toUpperCase();
+    selectedStandId = id;
 
-    renderList();
-    updatePlanColors();
+    renderTable();
+    updateColours();
     updateCallout();
   }
 
-  async function loadDataAndRender() {
-   const backend = FloorplanShared.getBackendUrl();
+  async function loadData() {
+    const backend = F.getBackendUrl();
+    const data = await F.fetchJson(`${backend}/stands`);
+    rows = (Array.isArray(data) ? data : []).map(normRow).filter(r => r.standId);
 
-
-    // Try meta (safe if backend supports it)
-    let meta = null;
-    try {
-      meta = await S.fetchJson(`${backend}/api/meta`);
-    } catch (_) {
-      meta = null;
+    // keep selection if still exists
+    if (selectedStandId && !rows.some(r => r.standId === selectedStandId)) {
+      selectedStandId = null;
     }
-    setHeaderMeta(meta);
 
-    // Load stands
-    const data = await S.fetchJson(`${backend}/api/stands`);
-    const list = Array.isArray(data) ? data : (data && data.rows) || [];
-    rows = list.map((r) => ({
-      stand: S.normalizeStandId(r.stand || r.standId || r.id),
-      status: S.normalizeStatus(r.status),
-      company: String(r.company || ""),
-    }));
-
-    // Remove empties
-    rows = rows.filter((r) => r.stand);
-
-    // Keep stable sorting
-    rows.sort((a, b) => a.stand.localeCompare(b.stand, undefined, { numeric: true }));
-
-    renderList();
-    updatePlanColors();
+    renderTable();
+    updateColours();
     updateCallout();
+
+    if (updatedAtEl) updatedAtEl.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
   }
 
-  async function init() {
-    if (!svgHost) return;
+  function startPolling(){
+    stopPolling();
+    pollTimer = setInterval(async () => {
+      try { await loadData(); } catch(e){ /* silent */ }
+    }, 8000);
+  }
+  function stopPolling(){
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = null;
+  }
 
+  // Search
+  searchEl?.addEventListener("input", renderTable);
+  clearSearchBtn?.addEventListener("click", () => { searchEl.value=""; renderTable(); });
+
+  // Keep callout correct on resize/scroll
+  const redraw = () => updateCallout();
+  window.addEventListener("resize", redraw);
+  window.addEventListener("scroll", redraw, true);
+
+  // init
+  (async () => {
     try {
-      coreSvg = await S.loadSvgInline(S.DEFAULTS.svgUrl, svgHost);
+      await loadSvg();
     } catch (e) {
       console.error(e);
-      S.toast("SVG failed to load");
       return;
     }
-
-    // Click on plan selects stand (desktop only works best)
-    if (coreSvg) {
-      coreSvg.addEventListener("click", (ev) => {
-        const target = ev.target;
-        if (!target) return;
-
-        // Walk up to find an element that looks like a stand
-        let el = target;
-        for (let i = 0; i < 6 && el; i++) {
-          const id = el.getAttribute && el.getAttribute("id");
-          const ds = el.getAttribute && (el.getAttribute("data-stand") || el.getAttribute("data-stand-id"));
-          const guess = S.normalizeStandId(ds || id || "");
-          if (guess) {
-            // Lookup company in rows if available
-            const row = rows.find((r) => r.stand === guess);
-            selectStand(guess, row ? row.company : "");
-            return;
-          }
-          el = el.parentNode;
-        }
-      });
-    }
-
-    // Search
-    if (searchEl) searchEl.addEventListener("input", renderList);
-    if (clearSearchBtn)
-      clearSearchBtn.addEventListener("click", () => {
-        if (searchEl) searchEl.value = "";
-        renderList();
-      });
-
-    // Clear selection
-    if (clearBtn)
-      clearBtn.addEventListener("click", () => {
-        selectedStandId = "";
-        selectedCompany = "";
-        renderList();
-        updatePlanColors();
-        updateCallout();
-      });
-
-    // Keep callout line correct on resize/scroll
-    window.addEventListener("resize", updateCallout);
-    window.addEventListener("scroll", updateCallout, true);
-
-    // Load data
     try {
-      await loadDataAndRender();
+      await loadData();
+      startPolling();
     } catch (e) {
       console.error(e);
-      S.toast("Could not load data from backend");
     }
-  }
-
-  document.addEventListener("DOMContentLoaded", init);
+  })();
 })();

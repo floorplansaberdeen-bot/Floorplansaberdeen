@@ -1,194 +1,178 @@
-/* admin.js — Admin page logic (includes URL key lock, password prompt, undo stack up to 25) */
-(function () {
+/* admin.js — Clean, stable admin (backend critical)
+   - GET /stands, GET /settings, POST /stand, POST /settings
+   - password comes from backend /settings (if provided) OR prompts each session before first write
+*/
+(() => {
   "use strict";
+  const F = window.Floorplan;
 
-  const S = window.FloorplanShared;
-  if (!S) {
-    console.error("shared.js missing");
-    return;
+  // OPTIONAL: URL-only secret lock (set to "" to disable)
+  const ADMIN_URL_KEY = "CHANGE_ME"; // set to same secret you use in URL: admin.html?k=SECRET
+  const URL_PARAM = "k";
+
+  const SVG_URL = "./event_plan.svg";
+  const SESSION_AUThed = "floorplan_admin_authed_pwd";
+
+  const el = F.$;
+  const svgHost = el("svgHost");
+  const planStack = el("planStack");
+  const calloutSvg = el("calloutSvg");
+  const lozenge = el("lozenge");
+  const lozStand = el("lozStand");
+  const lozCompany = el("lozCompany");
+
+  const tbody = el("tbody");
+  const searchEl = el("search");
+  const filterEl = el("filter");
+  const countEl = el("count");
+  const totalEl = el("total");
+
+  const standIdEl = el("standId");
+  const statusEl = el("status");
+  const companyEl = el("company");
+
+  const saveBtn = el("saveBtn");
+  const markAvailBtn = el("markAvailBtn");
+
+  const eventNameEl = el("eventName");
+  const setEventBtn = el("setEventBtn");
+
+  const pauseBtn = el("pauseBtn");
+  const exportBtn = el("exportBtn");
+  const importBtn = el("importBtn");
+  const resetBtn = el("resetBtn");
+
+  const toast = el("toast");
+  const toastMsg = el("toastMsg");
+  const setBackendBtn = el("setBackendBtn");
+  const hideToastBtn = el("hideToastBtn");
+  const syncedAt = el("syncedAt");
+
+  let svgRoot = null;
+  let standMap = new Map();
+  let rows = [];
+  let selectedStandId = null;
+  let autoSync = true;
+  let syncTimer = null;
+  let settings = null;
+  let isEditing = false;
+
+  function showToast(show, msg) {
+    if (toastMsg && msg) toastMsg.textContent = msg;
+    if (toast) toast.style.display = show ? "flex" : "none";
   }
 
-  // ========= SECURITY SETTINGS (YOU EDIT THESE) =========
-  // 1) URL-only secret. If left as "CHANGE_ME", lock is disabled.
-  //    If you set a real value, you must open:
-  //    admin.html?k=YOUR_KEY
-  const ADMIN_URL_KEY = "CHANGE_ME";
-
-  // 2) Password prompt before the FIRST change (per browser tab session).
-  //    Change this to something only you know.
-  const ADMIN_PASSWORD = "CHANGE_ME_PASSWORD";
-  // =====================================================
-
-  const ADMIN_KEY_PARAM = "k";
-  const AUTH_SESSION_KEY = "floorplan_admin_authed";
-
-  // HTML elements expected in admin.html
-  const planStack = document.getElementById("planStack");
-  const svgHost = document.getElementById("svgHost");
-  const svgFallback = document.getElementById("svgFallback");
-  const calloutSvg = document.getElementById("calloutSvg");
-
-  const zoomSvgHost = document.getElementById("zoomSvgHost");
-
-  const syncedAtEl = document.getElementById("syncedAt");
-  const eventNameInput = document.getElementById("eventName");
-  const setEventBtn = document.getElementById("setEventBtn");
-
-  const pauseBtn = document.getElementById("pauseBtn");
-  const exportBtn = document.getElementById("exportBtn");
-  const importBtn = document.getElementById("importBtn");
-  const resetBtn = document.getElementById("resetBtn");
-
-  const selectedStandIdEl = document.getElementById("selectedStandId");
-  const statusEl = document.getElementById("status");
-  const companyEl = document.getElementById("company");
-
-  const saveBtn = document.getElementById("saveBtn");
-  const markAvailBtn = document.getElementById("markAvailBtn");
-
-  const undoBtn = document.getElementById("undoBtn"); // button text should show count
-  const searchEl = document.getElementById("search");
-  const filterEl = document.getElementById("filter");
-  const tbody = document.getElementById("tbody");
-  const countEl = document.getElementById("count");
-  const totalEl = document.getElementById("total");
-
-  // Undo stack (max 25)
-  const UNDO_MAX = 25;
-  const UNDO_KEY = "floorplan_undo_stack_v1";
-
-  let coreSvg = null;
-  let rows = [];
-  let selectedStandId = "";
-  let paused = false;
-
-  // --------- URL KEY LOCK ----------
-  function enforceUrlKeyLock() {
-    if (ADMIN_URL_KEY === "CHANGE_ME") return; // disabled
-    const u = new URL(window.location.href);
-    const got = (u.searchParams.get(ADMIN_KEY_PARAM) || "").trim();
+  function enforceUrlLock() {
+    if (!ADMIN_URL_KEY || ADMIN_URL_KEY === "CHANGE_ME") return;
+    const u = new URL(location.href);
+    const got = (u.searchParams.get(URL_PARAM) || "").trim();
     if (got !== ADMIN_URL_KEY) {
       document.body.innerHTML = `
-        <div style="padding:24px;font-family:ui-sans-serif,system-ui;max-width:760px;margin:0 auto;">
-          <h1 style="margin:0 0 8px;">Floorplan Admin</h1>
-          <p style="margin:0 0 12px;">This page is locked. Add <code>?k=…</code> to the URL.</p>
-        </div>
-      `;
+        <div style="padding:24px;font-family:ui-sans-serif,system-ui;max-width:720px;margin:0 auto;">
+          <div style="font-weight:900;font-size:20px;margin-bottom:8px;">Floorplan Admin</div>
+          <div>This page is locked. Add <code>?k=…</code> to the URL.</div>
+        </div>`;
       throw new Error("Admin locked");
     }
   }
 
-  // --------- PASSWORD PROMPT ----------
-  async function ensurePasswordOnce() {
-    // If password left as default, don’t block you
-    if (ADMIN_PASSWORD === "CHANGE_ME_PASSWORD") return true;
+  function fmtTime() {
+    return new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+  }
 
+  async function loadSettings() {
+    const backend = F.getBackendUrl();
     try {
-      if (sessionStorage.getItem(AUTH_SESSION_KEY) === "1") return true;
-    } catch (_) {}
+      settings = await F.fetchJson(`${backend}/settings`);
+      if (eventNameEl) eventNameEl.value = (settings && settings.eventName) ? String(settings.eventName) : "";
+    } catch (e) {
+      settings = null;
+      // keep going (stands may still load)
+    }
+  }
 
-    const pw = prompt("To save changes, enter the admin password:");
-    if (!pw) return false;
-    if (pw !== ADMIN_PASSWORD) {
+  function getAdminPasswordFromSettings() {
+    if (!settings) return "";
+    const pwd =
+      settings.adminPassword ||
+      settings.password ||
+      settings.admin_pass ||
+      settings.admin_password ||
+      "";
+    return String(pwd || "").trim();
+  }
+
+  async function ensurePasswordOnce() {
+    const required = getAdminPasswordFromSettings();
+    if (!required) return true; // no password configured upstream
+    if (sessionStorage.getItem(SESSION_AUThed) === "1") return true;
+
+    const entered = prompt("Admin password required:", "");
+    if (entered === null) return false;
+    if (String(entered) !== required) {
       alert("Incorrect password.");
       return false;
     }
-    try {
-      sessionStorage.setItem(AUTH_SESSION_KEY, "1");
-    } catch (_) {}
+    sessionStorage.setItem(SESSION_AUThed, "1");
     return true;
   }
 
-  // --------- UNDO HELPERS ----------
-  function loadUndoStack() {
-    try {
-      const raw = localStorage.getItem(UNDO_KEY);
-      const arr = raw ? JSON.parse(raw) : [];
-      return Array.isArray(arr) ? arr : [];
-    } catch (_) {
-      return [];
-    }
+  async function loadSvg() {
+    const svg = await F.loadSvgInline(SVG_URL, svgHost);
+    svgRoot = svg;
+    standMap = F.buildStandMap(svgRoot);
+
+    svgRoot.addEventListener("click", (ev) => {
+      const standId = F.findClickedStandId(ev.target, rows);
+      if (standId) selectStand(standId);
+    }, { passive:true });
   }
 
-  function saveUndoStack(stack) {
-    try {
-      localStorage.setItem(UNDO_KEY, JSON.stringify(stack));
-    } catch (_) {}
+  function normRow(row){
+    return {
+      standId: String(row.standId ?? row.stand ?? row.id ?? "").trim().toUpperCase(),
+      status: String(row.status || "available").toLowerCase(),
+      company: String(row.company || "").trim()
+    };
   }
 
-  function pushUndo(entry) {
-    const stack = loadUndoStack();
-    stack.unshift(entry);
-    while (stack.length > UNDO_MAX) stack.pop();
-    saveUndoStack(stack);
-    updateUndoUi();
+  async function loadData() {
+    const backend = F.getBackendUrl();
+    const data = await F.fetchJson(`${backend}/stands`);
+    rows = (Array.isArray(data) ? data : []).map(normRow).filter(r => r.standId);
+    F.applyColoursAdmin(rows, standMap, getComputedStyle(document.documentElement));
+    renderTable();
+    if (syncedAt) syncedAt.textContent = fmtTime();
+    showToast(false);
   }
 
-  function popUndo() {
-    const stack = loadUndoStack();
-    const entry = stack.shift();
-    saveUndoStack(stack);
-    updateUndoUi();
-    return entry || null;
-  }
+  function renderTable(){
+    const q = (searchEl?.value || "").trim().toLowerCase();
+    const f = (filterEl?.value || "all").toLowerCase();
 
-  function updateUndoUi() {
-    if (!undoBtn) return;
-    const n = loadUndoStack().length;
-    undoBtn.textContent = `Undo (${n})`;
-    undoBtn.disabled = n === 0;
-  }
-
-  // --------- RENDERING ----------
-  function setSyncedAt(val) {
-    if (syncedAtEl) syncedAtEl.textContent = val || "—";
-  }
-
-  function renderTable() {
-    if (!tbody) return;
-
-    const q = String(searchEl?.value || "")
-      .trim()
-      .toLowerCase();
-
-    const filter = String(filterEl?.value || "all").toLowerCase();
-
-    let filtered = rows.slice();
-
-    if (filter === "sold") filtered = filtered.filter((r) => r.status === "sold");
-    if (filter === "available")
-      filtered = filtered.filter((r) => r.status !== "sold");
-
-    if (q) {
-      filtered = filtered.filter((r) => {
-        const s = (r.stand || "").toLowerCase();
-        const c = (r.company || "").toLowerCase();
-        return s.includes(q) || c.includes(q);
-      });
-    }
+    const filtered = rows.filter(r => {
+      if (f !== "all" && r.status !== f) return false;
+      if (!q) return true;
+      return r.standId.toLowerCase().includes(q) || (r.company||"").toLowerCase().includes(q);
+    });
 
     tbody.innerHTML = "";
-    filtered.forEach((r) => {
+    filtered.forEach(r => {
       const tr = document.createElement("tr");
-      tr.dataset.stand = r.stand;
-      if (selectedStandId && r.stand === selectedStandId) tr.classList.add("active");
+      if (selectedStandId && r.standId === selectedStandId) tr.classList.add("active");
 
-      const td1 = document.createElement("td");
-      td1.textContent = r.stand;
+      const td1 = document.createElement("td"); td1.textContent = r.standId;
 
       const td2 = document.createElement("td");
-      td2.textContent = r.status === "sold" ? "Sold" : "Available";
-      td2.className = r.status === "sold" ? "badge sold" : "badge avail";
+      const badge = document.createElement("span");
+      badge.className = "badge " + (r.status === "sold" ? "bSold" : "bAvail");
+      badge.textContent = r.status === "sold" ? "Sold" : "Available";
+      td2.appendChild(badge);
 
-      const td3 = document.createElement("td");
-      td3.textContent = r.company || "";
+      const td3 = document.createElement("td"); td3.textContent = r.company || "";
 
-      tr.appendChild(td1);
-      tr.appendChild(td2);
-      tr.appendChild(td3);
-
-      tr.addEventListener("click", () => selectStand(r.stand));
-
+      tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
+      tr.addEventListener("click", () => selectStand(r.standId));
       tbody.appendChild(tr);
     });
 
@@ -196,384 +180,257 @@
     if (totalEl) totalEl.textContent = String(rows.length);
   }
 
-  function updatePlanColors() {
-    if (!coreSvg) return;
-    rows.forEach((r) => {
-      const el = S.findStandElement(coreSvg, r.stand);
-      S.setStandVisual(el, r.status, r.stand === selectedStandId);
-    });
-  }
+  function selectStand(standId){
+    selectedStandId = String(standId||"").trim().toUpperCase();
+    const row = rows.find(r => r.standId === selectedStandId);
 
-  function updateCalloutLine() {
-    if (!planStack || !calloutSvg || !selectedStandId) {
-      if (calloutSvg) S.drawCalloutLine(calloutSvg, { x: 0, y: 0 }, { x: 0, y: 0 });
-      return;
-    }
+    if (standIdEl) standIdEl.value = selectedStandId;
+    if (statusEl) statusEl.value = row ? row.status : "available";
+    if (companyEl) companyEl.value = row ? (row.company||"") : "";
 
-    const standEl = S.findStandElement(coreSvg, selectedStandId);
-    if (!standEl) return;
+    F.applyColoursAdmin(rows, standMap, getComputedStyle(document.documentElement));
 
-    const stackRect = planStack.getBoundingClientRect();
-    const bb = standEl.getBoundingClientRect();
-    const fromPx = {
-      x: bb.left + bb.width / 2 - stackRect.left,
-      y: bb.top + bb.height / 2 - stackRect.top,
-    };
-
-    // target: top-middle of the labelBay lozenge if present; else just bottom-left area
-    const lozenge = document.getElementById("lozenge");
-    if (!lozenge || lozenge.style.display === "none") return;
-
-    const lozRect = lozenge.getBoundingClientRect();
-    const toPx = { x: lozRect.left + lozRect.width / 2 - stackRect.left, y: lozRect.top - stackRect.top };
-
-    S.drawCalloutLine(calloutSvg, fromPx, toPx);
-  }
-
-  function selectStand(standId) {
-    selectedStandId = S.normalizeStandId(standId);
-    const row = rows.find((r) => r.stand === selectedStandId);
-
-    if (selectedStandIdEl) selectedStandIdEl.value = selectedStandId || "";
-    if (statusEl) statusEl.value = row?.status === "sold" ? "sold" : "available";
-    if (companyEl) companyEl.value = row?.company || "";
-
-    // Update lozenge if exists
-    const lozenge = document.getElementById("lozenge");
-    const lozStand = document.getElementById("lozStand");
-    const lozCompany = document.getElementById("lozCompany");
-    if (lozenge && lozStand && lozCompany) {
-      lozenge.style.display = selectedStandId ? "block" : "none";
-      lozStand.textContent = selectedStandId || "—";
-      lozCompany.textContent = row?.company || "";
-      lozCompany.style.display = row?.company ? "block" : "none";
-    }
-
-    renderTable();
-    updatePlanColors();
-    updateCalloutLine();
-  }
-
-  // --------- BACKEND IO ----------
-  async function loadMeta() {
-    const backend = S.getBackendUrl();
-    try {
-      const meta = await S.fetchJson(`${backend}/api/meta`);
-      const name = (meta && meta.eventName) || S.getEventName() || "";
-      if (eventNameInput) eventNameInput.value = name || "";
-    } catch (_) {
-      // fall back to local only
-      if (eventNameInput) eventNameInput.value = S.getEventName() || "";
-    }
-  }
-
-  async function loadStands() {
-    const backend = S.getBackendUrl();
-    const data = await S.fetchJson(`${backend}/api/stands`);
-    const list = Array.isArray(data) ? data : (data && data.rows) || [];
-
-    rows = list
-      .map((r) => ({
-        stand: S.normalizeStandId(r.stand || r.standId || r.id),
-        status: S.normalizeStatus(r.status),
-        company: String(r.company || ""),
-      }))
-      .filter((r) => r.stand)
-      .sort((a, b) => a.stand.localeCompare(b.stand, undefined, { numeric: true }));
-
-    renderTable();
-    updatePlanColors();
-  }
-
-  async function tryUpdateEndpoints(standId, payload) {
-    const backend = S.getBackendUrl();
-    const id = encodeURIComponent(standId);
-
-    // We try common patterns (because backends differ):
-    const attempts = [
-      { method: "PUT", url: `${backend}/api/stands/${id}` },
-      { method: "POST", url: `${backend}/api/stands/${id}` },
-      { method: "POST", url: `${backend}/api/stand` },
-      { method: "POST", url: `${backend}/api/stands` },
-    ];
-
-    let lastErr = null;
-    for (const a of attempts) {
-      try {
-        const body =
-          a.url.endsWith("/api/stand") || a.url.endsWith("/api/stands")
-            ? JSON.stringify(Object.assign({ stand: standId }, payload))
-            : JSON.stringify(payload);
-
-        const res = await S.fetchJson(a.url, { method: a.method, body });
-        return res;
-      } catch (e) {
-        lastErr = e;
-      }
-    }
-    throw lastErr || new Error("Update failed");
-  }
-
-  async function applyUpdate(standId, newStatus, newCompany, opts = {}) {
-    if (!standId) return;
-
-    // password once per session for any write
-    if (!opts.skipPassword) {
-      const ok = await ensurePasswordOnce();
-      if (!ok) return;
-    }
-
-    // record previous state for undo
-    const prev = rows.find((r) => r.stand === standId);
-    if (prev && !opts.skipUndo) {
-      pushUndo({
-        stand: standId,
-        status: prev.status,
-        company: prev.company || "",
-        ts: Date.now(),
-      });
-    }
-
-    await tryUpdateEndpoints(standId, {
-      status: newStatus,
-      company: newCompany || "",
+    const elStand = F.elementForStand(standMap, selectedStandId);
+    const company = (row && row.status === "sold") ? (row.company||"") : "";
+    F.drawCallout({
+      standElem: elStand,
+      standId: selectedStandId,
+      company,
+      planStack,
+      calloutSvg,
+      lozenge,
+      lozStand,
+      lozCompany
     });
 
-    // local update
-    const idx = rows.findIndex((r) => r.stand === standId);
-    if (idx !== -1) {
-      rows[idx] = { stand: standId, status: newStatus, company: newCompany || "" };
-    }
-
-    setSyncedAt(new Date().toLocaleTimeString());
     renderTable();
-    updatePlanColors();
-    selectStand(standId);
   }
 
-  // --------- CSV (simple) ----------
-  function toCsv() {
-    const lines = [["Stand", "Status", "Company"]];
-    rows.forEach((r) => {
-      lines.push([r.stand, r.status, r.company || ""]);
-    });
-    return lines
-      .map((row) =>
-        row
-          .map((v) => `"${String(v || "").replace(/"/g, '""')}"`)
-          .join(",")
-      )
-      .join("\n");
-  }
-
-  function download(filename, text) {
-    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-      URL.revokeObjectURL(a.href);
-      a.remove();
-    }, 0);
-  }
-
-  async function importCsvFile(file) {
+  async function saveCurrent(nextStatusOverride=null){
+    if (!selectedStandId) return;
     const ok = await ensurePasswordOnce();
     if (!ok) return;
 
-    const text = await file.text();
-    (text || "")
-      .split(/\r?\n/)
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .slice(1) // skip header
-      .forEach((line) => {
-        const parts = line
-          .split(",")
-          .map((p) => p.trim().replace(/^"|"$/g, "").replace(/""/g, '"'));
-        const stand = S.normalizeStandId(parts[0] || "");
-        const status = S.normalizeStatus(parts[1] || "");
-        const company = parts.slice(2).join(",") || "";
-        if (!stand) return;
-        const idx = rows.findIndex((r) => r.stand === stand);
-        if (idx !== -1) rows[idx] = { stand, status, company };
-      });
+    const backend = F.getBackendUrl();
+    const status = nextStatusOverride || (statusEl?.value || "available");
+    const company = (status === "sold") ? String(companyEl?.value || "").trim() : "";
 
-    // Push each changed stand to backend (sequential, safer)
-    for (const r of rows) {
-      await tryUpdateEndpoints(r.stand, { status: r.status, company: r.company || "" });
-    }
-
-    setSyncedAt(new Date().toLocaleTimeString());
-    renderTable();
-    updatePlanColors();
-    updateUndoUi();
-    alert("CSV imported.");
-  }
-
-  // --------- INIT ----------
-  async function init() {
-    enforceUrlKeyLock();
-
-    updateUndoUi();
-
-    // Pre-fill event name from backend/local
-    await loadMeta();
-
-    // Load SVG inline
     try {
-      if (svgHost) {
-        coreSvg = await S.loadSvgInline(S.DEFAULTS.svgUrl, svgHost);
-      }
+      await F.fetchJson(`${backend}/stand`, {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({
+          standId: selectedStandId,
+          status,
+          company,
+          adminPassword: getAdminPasswordFromSettings()
+        })
+      });
     } catch (e) {
+      showToast(true, "Can't reach the backend right now.");
       console.error(e);
-      // fallback to <img> if present
-      if (svgFallback) svgFallback.style.display = "block";
       return;
     }
 
-    // Click plan to select
-    if (coreSvg) {
-      coreSvg.addEventListener("click", (ev) => {
-        let el = ev.target;
-        for (let i = 0; i < 6 && el; i++) {
-          const id = el.getAttribute && el.getAttribute("id");
-          const ds =
-            el.getAttribute &&
-            (el.getAttribute("data-stand") || el.getAttribute("data-stand-id"));
-          const guess = S.normalizeStandId(ds || id || "");
-          if (guess) {
-            selectStand(guess);
-            return;
-          }
-          el = el.parentNode;
-        }
-      });
-    }
-
-    // Data load
-    await loadStands();
-    setSyncedAt("—");
-
-    // Search / filter
-    if (searchEl) searchEl.addEventListener("input", renderTable);
-    if (filterEl) filterEl.addEventListener("change", renderTable);
-
-    // Buttons
-    if (setEventBtn && eventNameInput) {
-      setEventBtn.addEventListener("click", async () => {
-        const ok = await ensurePasswordOnce();
-        if (!ok) return;
-
-        const name = String(eventNameInput.value || "").trim();
-        S.setEventName(name);
-
-        // Try to persist to backend if supported
-        const backend = S.getBackendUrl();
-        try {
-          await S.fetchJson(`${backend}/api/meta`, {
-            method: "POST",
-            body: JSON.stringify({ eventName: name }),
-          });
-        } catch (_) {
-          // ok if backend doesn't support meta write
-        }
-        alert("Event name saved.");
-      });
-    }
-
-    if (pauseBtn) {
-      pauseBtn.addEventListener("click", () => {
-        paused = !paused;
-        pauseBtn.textContent = paused ? "Resume sync" : "Pause sync";
-      });
-    }
-
-    if (exportBtn) {
-      exportBtn.addEventListener("click", () => {
-        download("floorplan.csv", toCsv());
-      });
-    }
-
-    if (importBtn) {
-      importBtn.addEventListener("click", async () => {
-        const input = document.createElement("input");
-        input.type = "file";
-        input.accept = ".csv,text/csv";
-        input.onchange = async () => {
-          if (!input.files || !input.files[0]) return;
-          await importCsvFile(input.files[0]);
-        };
-        input.click();
-      });
-    }
-
-    if (resetBtn) {
-      resetBtn.addEventListener("click", async () => {
-        const ok = await ensurePasswordOnce();
-        if (!ok) return;
-        if (!confirm("Reset ALL stands to Available?")) return;
-
-        // Build a batch reset (best-effort)
-        for (const r of rows) {
-          // store undo snapshots (but cap)
-          pushUndo({ stand: r.stand, status: r.status, company: r.company || "", ts: Date.now() });
-          await tryUpdateEndpoints(r.stand, { status: "available", company: "" });
-          r.status = "available";
-          r.company = "";
-        }
-
-        setSyncedAt(new Date().toLocaleTimeString());
-        renderTable();
-        updatePlanColors();
-        updateUndoUi();
-      });
-    }
-
-    if (saveBtn) {
-      saveBtn.addEventListener("click", async () => {
-        const stand = S.normalizeStandId(selectedStandIdEl?.value || selectedStandId);
-        if (!stand) return alert("Select a stand first.");
-        const status = S.normalizeStatus(statusEl?.value || "available");
-        const company =
-          status === "sold" ? String(companyEl?.value || "").trim() : "";
-        await applyUpdate(stand, status, company);
-      });
-    }
-
-    if (markAvailBtn) {
-      markAvailBtn.addEventListener("click", async () => {
-        const stand = S.normalizeStandId(selectedStandIdEl?.value || selectedStandId);
-        if (!stand) return alert("Select a stand first.");
-        if (statusEl) statusEl.value = "available";
-        if (companyEl) companyEl.value = "";
-        await applyUpdate(stand, "available", "");
-      });
-    }
-
-    if (undoBtn) {
-      undoBtn.addEventListener("click", async () => {
-        const entry = popUndo();
-        if (!entry) return;
-        // Undo should not re-prompt password (already authed usually),
-        // but to be safe we still require once per session for writes.
-        await applyUpdate(entry.stand, entry.status, entry.company || "", { skipUndo: true });
-      });
-    }
-
-    // Keep callout line correct
-    window.addEventListener("resize", updateCalloutLine);
-    window.addEventListener("scroll", updateCalloutLine, true);
-
-    updateUndoUi();
+    // Update local
+    const idx = rows.findIndex(r => r.standId === selectedStandId);
+    if (idx >= 0) rows[idx] = { standId: selectedStandId, status, company };
+    F.applyColoursAdmin(rows, standMap, getComputedStyle(document.documentElement));
+    renderTable();
+    selectStand(selectedStandId);
+    if (syncedAt) syncedAt.textContent = fmtTime();
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
-    init().catch((e) => {
-      // If locked, we already replaced body. Otherwise log.
+  async function setEventName(){
+    const ok = await ensurePasswordOnce();
+    if (!ok) return;
+    const backend = F.getBackendUrl();
+    const name = String(eventNameEl?.value || "").trim();
+    try{
+      await F.fetchJson(`${backend}/settings`, {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ eventName: name, adminPassword: getAdminPasswordFromSettings() })
+      });
+    }catch(e){
+      showToast(true, "Can't reach backend to save event name.");
       console.error(e);
+      return;
+    }
+    // refresh settings
+    await loadSettings();
+  }
+
+  function startPolling(){
+    stopPolling();
+    syncTimer = setInterval(async () => {
+      if (!autoSync || isEditing) return;
+      try { await loadData(); } catch(e){ showToast(true, "Can't reach backend."); }
+    }, 8000);
+  }
+  function stopPolling(){
+    if (syncTimer) clearInterval(syncTimer);
+    syncTimer = null;
+  }
+
+  function exportCsv(){
+    const ok = sessionStorage.getItem(SESSION_AUThed) === "1" || !getAdminPasswordFromSettings();
+    if (!ok) { // require prompt now
+      ensurePasswordOnce().then(passed => { if (passed) exportCsv(); });
+      return;
+    }
+    const lines = ["standId,status,company"].concat(rows.map(r => {
+      const c = (r.company||"").replaceAll('"','""');
+      return `${r.standId},${r.status},"${c}"`;
+    }));
+    const blob = new Blob([lines.join("\n")], { type:"text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "stands.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function importCsv(){
+    const ok = sessionStorage.getItem(SESSION_AUThed) === "1" || !getAdminPasswordFromSettings();
+    const go = async () => {
+      const inp = document.createElement("input");
+      inp.type="file";
+      inp.accept=".csv,text/csv";
+      inp.onchange = async () => {
+        const f = inp.files && inp.files[0];
+        if (!f) return;
+        const txt = await f.text();
+        const lines = txt.split(/\r?\n/).filter(Boolean);
+        const updates = [];
+        for (let i=1;i<lines.length;i++){
+          const line = lines[i];
+          const m = line.match(/^([^,]+),([^,]+),"(.*)"$/);
+          if (!m) continue;
+          updates.push({ standId: String(m[1]).trim().toUpperCase(), status: String(m[2]).trim().toLowerCase(), company: m[3].replaceAll('""','"') });
+        }
+        // push updates to sheet via backend
+        for (const u of updates){
+          try{
+            await F.fetchJson(`${F.getBackendUrl()}/stand`, {
+              method:"POST",
+              headers:{ "Content-Type":"application/json" },
+              body: JSON.stringify({ standId:u.standId, status:u.status, company:u.status==="sold"?u.company:"", adminPassword: getAdminPasswordFromSettings() })
+            });
+          }catch(e){
+            showToast(true, "Import failed to reach backend.");
+            console.error(e);
+            return;
+          }
+        }
+        await loadData();
+      };
+      inp.click();
+    };
+
+    if (ok) { go(); return; }
+    ensurePasswordOnce().then(passed => { if (passed) go(); });
+  }
+
+  async function resetAll(){
+    const ok = await ensurePasswordOnce();
+    if (!ok) return;
+    if (!confirm("Reset ALL stands to Available?")) return;
+
+    // Reset only stands that exist in rows (and map). This keeps it safe.
+    for (const r of rows){
+      try{
+        await F.fetchJson(`${F.getBackendUrl()}/stand`, {
+          method:"POST",
+          headers:{ "Content-Type":"application/json" },
+          body: JSON.stringify({ standId:r.standId, status:"available", company:"", adminPassword: getAdminPasswordFromSettings() })
+        });
+      }catch(e){
+        showToast(true, "Reset failed to reach backend.");
+        console.error(e);
+        return;
+      }
+    }
+    await loadData();
+    alert("Reset complete.");
+  }
+
+  function wireEditingPause(){
+    const on = () => { isEditing = true; };
+    const off = () => { isEditing = false; };
+    [companyEl, eventNameEl, searchEl].forEach(inp => {
+      if (!inp) return;
+      inp.addEventListener("focus", on);
+      inp.addEventListener("input", on);
+      inp.addEventListener("blur", off);
     });
+  }
+
+  // Backend URL setter
+  setBackendBtn?.addEventListener("click", () => {
+    const current = F.getBackendUrl();
+    const v = prompt("Paste your backend base URL:", current);
+    if (v && v.trim().startsWith("http")) {
+      F.setBackendUrl(v.trim());
+      location.reload();
+    }
   });
+  hideToastBtn?.addEventListener("click", () => showToast(false));
+
+  // init
+  (async () => {
+    try { enforceUrlLock(); } catch { return; }
+
+    try {
+      await loadSettings();
+      await loadSvg();
+    } catch (e) {
+      console.error(e);
+      showToast(true, "Couldn't load SVG. Is event_plan.svg in the same folder?");
+      return;
+    }
+
+    try {
+      await loadData();
+      startPolling();
+    } catch (e) {
+      console.error(e);
+      showToast(true, "Couldn't load data from backend.");
+    }
+
+    wireEditingPause();
+
+    // UI wiring
+    searchEl?.addEventListener("input", renderTable);
+    filterEl?.addEventListener("change", renderTable);
+
+    saveBtn?.addEventListener("click", () => saveCurrent());
+    // Enter on company saves
+    companyEl?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); saveCurrent(); }
+    });
+    markAvailBtn?.addEventListener("click", () => saveCurrent("available"));
+
+    setEventBtn?.addEventListener("click", setEventName);
+
+    pauseBtn?.addEventListener("click", () => {
+      autoSync = !autoSync;
+      pauseBtn.textContent = autoSync ? "Pause sync" : "Resume sync";
+    });
+
+    exportBtn?.addEventListener("click", exportCsv);
+    importBtn?.addEventListener("click", importCsv);
+    resetBtn?.addEventListener("click", resetAll);
+
+    // keep callout correct on resize/scroll
+    const redraw = () => {
+      if (!selectedStandId) return;
+      const row = rows.find(r => r.standId === selectedStandId);
+      const elStand = F.elementForStand(standMap, selectedStandId);
+      const company = (row && row.status === "sold") ? (row.company||"") : "";
+      F.drawCallout({ standElem: elStand, standId: selectedStandId, company, planStack, calloutSvg, lozenge, lozStand, lozCompany });
+    };
+    window.addEventListener("resize", redraw);
+    window.addEventListener("scroll", redraw, true);
+  })();
 })();
