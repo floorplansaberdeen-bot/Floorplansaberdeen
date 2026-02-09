@@ -283,7 +283,12 @@
     if (!standId || !svgRoot) return;
 
     const clone = svgRoot.cloneNode(true);
-        zoomSvgHost.appendChild(clone);
+
+    // Zoom view should be black/white for readability (no sold/available fill overlay).
+    // Remove any fills/styles we add to the main plan (applyColours), but keep text visible.
+    try { forceBlackAndWhite(clone); } catch (_) {}
+
+    zoomSvgHost.appendChild(clone);
 
     // Find element in clone by exact ID
     const target = clone.querySelector("#"+CSS.escape(standId));
