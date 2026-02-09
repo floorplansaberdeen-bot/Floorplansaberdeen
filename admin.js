@@ -67,6 +67,9 @@
   const hideToastBtn = el("hideToastBtn");
 
   let svgRoot = null;
+  // Keep the original SVG markup so the Zoom window can show the raw plan
+  // without any colour/stroke manipulation.
+  let rawSvgText = "";
   let standMap = new Map();
   let rows = [];
   let selectedStandId = null;
@@ -280,15 +283,13 @@
     if (!zoomSvgHost || !zoomRing) return;
     zoomSvgHost.innerHTML = "";
     zoomRing.style.display = "none";
-    if (!standId || !svgRoot) return;
+    // For the zoom view we want the *raw SVG* (no colouring / no stroke overrides)
+    // so stand labels remain readable.
+    if (!standId || !rawSvgText) return;
 
-    const clone = svgRoot.cloneNode(true);
-
-    // Zoom view should be black/white for readability (no sold/available fill overlay).
-    // Remove any fills/styles we add to the main plan (applyColours), but keep text visible.
-    try { forceBlackAndWhite(clone); } catch (_) {}
-
-    zoomSvgHost.appendChild(clone);
+    zoomSvgHost.innerHTML = rawSvgText;
+    const clone = zoomSvgHost.querySelector("svg");
+    if (!clone) return;
 
     // Find element in clone by exact ID
     const target = clone.querySelector("#"+CSS.escape(standId));
@@ -299,7 +300,10 @@
     if (!resolved || !resolved.getBBox) return;
 
     const bbox = resolved.getBBox();
-    const pad = Math.max(40, Math.max(bbox.width, bbox.height) * 0.9);
+    // Use a *tight* viewBox (small padding) so the stand label text becomes readable.
+    // The previous build used a huge pad, effectively zooming OUT.
+    const maxSide = Math.max(bbox.width, bbox.height);
+    const pad = Math.max(10, maxSide * 0.15);
     const vx = bbox.x - pad;
     const vy = bbox.y - pad;
     const vw = bbox.width + pad*2;
@@ -344,6 +348,7 @@
     const res = await fetch(SVG_URL, { cache:"no-store" });
     if (!res.ok) throw new Error("Could not load SVG");
     const txt = await res.text();
+    rawSvgText = txt;
     svgHost.innerHTML = txt;
     svgRoot = svgHost.querySelector("svg");
     if (!svgRoot) throw new Error("SVG invalid");
