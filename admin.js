@@ -15,6 +15,22 @@
 
   const el = (id) => document.getElementById(id);
 
+  // iOS Safari can be flaky with SVG/table "click". Use a lightweight tap helper.
+  function onTap(node, handler) {
+    if (!node) return;
+    node.addEventListener("click", handler, { passive: true });
+    node.addEventListener(
+      "touchend",
+      (e) => {
+        try {
+          e.preventDefault();
+        } catch (_) {}
+        handler(e);
+      },
+      { passive: false }
+    );
+  }
+
   const svgHost = el("svgHost");
   const planWrap = el("planWrap");
   const planStack = el("planStack");
@@ -214,7 +230,7 @@
       if (r.standId === selectedStandId) tr.classList.add("active");
 
       tr.innerHTML = `<td>${r.standId}</td><td>${r.status === "sold" ? "Sold" : "Available"}</td><td>${r.company || ""}</td>`;
-      tr.addEventListener("click", () => selectStand(r.standId));
+      onTap(tr, () => selectStand(r.standId));
       tbody.appendChild(tr);
     });
 
@@ -335,7 +351,7 @@
 
     buildStandMap();
 
-    svgRoot.addEventListener("click", (ev) => {
+    onTap(svgRoot, (ev) => {
       let node = ev.target;
       for (let i=0; i<10 && node; i++){
         const id = node.id ? normStandId(node.id) : "";
@@ -346,7 +362,7 @@
         }
         node = node.parentElement;
       }
-    }, { passive:true });
+    });
   }
 
   async function loadSettings(){

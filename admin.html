@@ -60,21 +60,10 @@
     /* Zoom */
     .zoomCard{ margin:12px; }
     .zoomBody{ padding:12px; }
-    /* Ensure zoom layers stack correctly */
-.zoomWrap { position: relative; }
-
-/* The zoomed SVG should be above the ring */
-.zoomSvgHost { position: relative; z-index: 2; }
-
-/* The ring should sit underneath (or be removable) */
-.zoomRing {
-  position: absolute;
-  inset: 0;
-  z-index: 1;          /* was likely above */
-  pointer-events: none;
-}
-
-    .zoomRing{ position:absolute; border:4px solid rgba(0,0,0,.75); border-radius:999px; pointer-events:none; box-shadow: 0 6px 18px rgba(0,0,0,.12); display:none; }
+    .zoomWrap{ position:relative; border:1px solid var(--border); border-radius:14px; overflow:hidden; min-height:220px; background:#fff; }
+    #zoomSvgHost{ width:100%; height:auto; display:block; }
+    /* Zoom ring: keep it subtle so it doesn't obscure stand labels when zoomed */
+    .zoomRing{ position:absolute; border:2px solid rgba(0,0,0,.35); border-radius:999px; pointer-events:none; box-shadow: 0 6px 18px rgba(0,0,0,.12); display:none; }
     @media (max-width: 980px){ main{ grid-template-columns: 1fr; } }
     @media (max-width: 640px){
       main{ padding:12px; gap:12px; }
