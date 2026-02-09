@@ -1,28 +1,31 @@
-/* admin.js — Floorplan Admin (password + stable save)
-   Works with Cloudflare Worker routes:
+/* admin.js — Floorplan Admin (zoom + event name + password + stable save)
+   Backend: Cloudflare Worker routes:
    GET  /stands
    GET  /settings
-   POST /stand   (JSON: {standId,status,company,adminPassword})
+   POST /stand      JSON: {standId,status,company,adminPassword}
+   POST /settings   JSON: {eventName,adminPassword}
 */
-
 (() => {
   "use strict";
 
   const BACKEND_DEFAULT = "https://floorplansaberdeen.floorplansaberdeen.workers.dev";
   const BACKEND_KEY = "floorplan_backend_url";
   const AUTH_KEY = "floorplan_admin_authed_pwd";
-  const AUTH_ONCE_KEY = "floorplan_admin_authed_once";
-
   const SVG_URL = "./event_plan.svg";
 
   const el = (id) => document.getElementById(id);
 
   const svgHost = el("svgHost");
+  const planWrap = el("planWrap");
   const planStack = el("planStack");
   const calloutSvg = el("calloutSvg");
   const lozenge = el("lozenge");
   const lozStand = el("lozStand");
   const lozCompany = el("lozCompany");
+
+  const zoomWrap = el("zoomWrap");
+  const zoomSvgHost = el("zoomSvgHost");
+  const zoomRing = el("zoomRing");
 
   const tbody = el("tbody");
   const searchEl = el("search");
@@ -39,6 +42,9 @@
   const syncedAt = el("syncedAt");
   const pauseBtn = el("pauseBtn");
 
+  const eventNameEl = el("eventName");
+  const setEventBtn = el("setEventBtn");
+
   const toast = el("toast");
   const toastMsg = el("toastMsg");
   const setBackendBtn = el("setBackendBtn");
@@ -51,7 +57,7 @@
 
   let autoSync = true;
   let syncTimer = null;
-  let suspendUntil = 0; // timestamp ms: pause polling temporarily
+  let suspendUntil = 0;
   let isEditing = false;
 
   function showToast(show, msg){
@@ -97,22 +103,20 @@
 
   function normStandId(s){ return String(s||"").trim().toUpperCase(); }
 
-  // Only accept real stand IDs (prevents LWPOLYLINE...)
   function looksLikeStandId(id){
     const s = normStandId(id);
     return /^[A-Z]{1,3}\d{1,3}$/.test(s);
-  }
-
-  function normalizeDomId(id) {
-    return String(id || "").trim();
   }
 
   function buildStandMap() {
     standMap.clear();
     if (!svgRoot) return;
     svgRoot.querySelectorAll("[id]").forEach(node => {
-      const raw = normalizeDomId(node.id);
-      const key = normStandId(raw);
+      const key = normStandId(node.id);
+      if (looksLikeStandId(key) && !standMap.has(key)) standMap.set(key, node);
+    });
+    svgRoot.querySelectorAll("[data-stand]").forEach(node => {
+      const key = normStandId(node.getAttribute("data-stand"));
       if (looksLikeStandId(key) && !standMap.has(key)) standMap.set(key, node);
     });
   }
@@ -209,36 +213,13 @@
       const tr = document.createElement("tr");
       if (r.standId === selectedStandId) tr.classList.add("active");
 
-      const td1 = document.createElement("td");
-      td1.textContent = r.standId;
-
-      const td2 = document.createElement("td");
-      td2.textContent = r.status === "sold" ? "Sold" : "Available";
-
-      const td3 = document.createElement("td");
-      td3.textContent = r.company || "";
-
-      tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
+      tr.innerHTML = `<td>${r.standId}</td><td>${r.status === "sold" ? "Sold" : "Available"}</td><td>${r.company || ""}</td>`;
       tr.addEventListener("click", () => selectStand(r.standId));
       tbody.appendChild(tr);
     });
 
     if (countEl) countEl.textContent = String(filtered.length);
     if (totalEl) totalEl.textContent = String(rows.length);
-  }
-
-  function selectStand(standId) {
-    selectedStandId = normStandId(standId);
-    const row = rows.find(r => r.standId === selectedStandId);
-    if (!row) return;
-
-    standIdEl.value = row.standId;
-    statusEl.value = row.status;
-    companyEl.value = row.company || "";
-
-    applyColours();
-    drawCallout(row.standId, (row.status === "sold") ? (row.company||"") : "");
-    renderTable();
   }
 
   function setSyncedNow(){
@@ -254,28 +235,89 @@
     return Date.now() < suspendUntil || isEditing;
   }
 
-  async function getAdminPasswordFromSettings(){
-    const backend = getBackendUrl();
-    const settings = await fetchJson(`${backend}/settings`);
-    // Worker proxies Apps Script settings; common keys:
-    return String(settings.adminPassword || settings.password || settings.admin_password || settings.admin_pass || "").trim();
-  }
-
   async function ensureAdminPassword(){
-    // If already stored in session, use it
     const cached = sessionStorage.getItem(AUTH_KEY);
     if (cached && cached.trim()) return cached.trim();
-
-    // Prefer pulling the required password from backend settings if present
-    // (If backend doesn't expose it, we still prompt and send it.)
-    try { await getAdminPasswordFromSettings(); } catch(_) {}
-
     const entered = prompt("Admin password:", "");
-    if (entered === null) return null; // user cancelled
+    if (entered === null) return null;
     const pwd = String(entered).trim();
     if (!pwd) return null;
     sessionStorage.setItem(AUTH_KEY, pwd);
     return pwd;
+  }
+
+  function forceBlackAndWhite(svg){
+    const all = svg.querySelectorAll("*");
+    all.forEach(n=>{
+      if (n.hasAttribute("style")) n.removeAttribute("style");
+      if (n.tagName !== "text"){
+        n.setAttribute("fill","none");
+        n.setAttribute("stroke","black");
+        n.setAttribute("stroke-width","1");
+      } else {
+        n.setAttribute("fill","black");
+      }
+    });
+  }
+
+  function updateZoom(standId){
+    if (!zoomSvgHost || !zoomRing) return;
+    zoomSvgHost.innerHTML = "";
+    zoomRing.style.display = "none";
+    if (!standId || !svgRoot) return;
+
+    const clone = svgRoot.cloneNode(true);
+    forceBlackAndWhite(clone);
+    zoomSvgHost.appendChild(clone);
+
+    // Find element in clone by exact ID
+    const target = clone.querySelector("#"+CSS.escape(standId));
+    let resolved = target;
+    if (!resolved){
+      resolved = Array.from(clone.querySelectorAll("[id]")).find(n => normStandId(n.id) === standId);
+    }
+    if (!resolved || !resolved.getBBox) return;
+
+    const bbox = resolved.getBBox();
+    const pad = Math.max(40, Math.max(bbox.width, bbox.height) * 0.9);
+    const vx = bbox.x - pad;
+    const vy = bbox.y - pad;
+    const vw = bbox.width + pad*2;
+    const vh = bbox.height + pad*2;
+
+    clone.setAttribute("viewBox", `${vx} ${vy} ${vw} ${vh}`);
+    clone.setAttribute("preserveAspectRatio","xMidYMid meet");
+    clone.style.width = "100%";
+    clone.style.height = "auto";
+    clone.style.display = "block";
+
+    requestAnimationFrame(() => {
+      const r = resolved.getBoundingClientRect();
+      const zw = zoomWrap.getBoundingClientRect();
+      const cx = (r.left + r.right)/2 - zw.left;
+      const cy = (r.top + r.bottom)/2 - zw.top;
+      const radius = Math.max(18, Math.min(60, Math.max(r.width, r.height) * 0.9));
+      zoomRing.style.display = "block";
+      zoomRing.style.width = `${radius*2}px`;
+      zoomRing.style.height = `${radius*2}px`;
+      zoomRing.style.left = `${cx - radius}px`;
+      zoomRing.style.top = `${cy - radius}px`;
+    });
+  }
+
+  function selectStand(standId) {
+    selectedStandId = normStandId(standId);
+    const row = rows.find(r => r.standId === selectedStandId);
+    if (!row) return;
+
+    standIdEl.value = row.standId;
+    statusEl.value = row.status;
+    companyEl.value = row.company || "";
+
+    applyColours();
+    drawCallout(row.standId, (row.status === "sold") ? (row.company||"") : "");
+    renderTable();
+    updateZoom(row.standId);
   }
 
   async function loadSvg() {
@@ -293,7 +335,6 @@
 
     buildStandMap();
 
-    // Click-to-select: walk up parents until we hit a real stand id
     svgRoot.addEventListener("click", (ev) => {
       let node = ev.target;
       for (let i=0; i<10 && node; i++){
@@ -306,6 +347,42 @@
         node = node.parentElement;
       }
     }, { passive:true });
+  }
+
+  async function loadSettings(){
+    const backend = getBackendUrl();
+    try{
+      const settings = await fetchJson(`${backend}/settings`);
+      const name = String(settings.eventName || settings.event_name || "").trim();
+      if (eventNameEl) eventNameEl.value = name || "";
+    }catch(_){}
+  }
+
+  async function saveEventName(){
+    const name = String(eventNameEl.value || "").trim();
+    if (!name) return;
+    const pwd = await ensureAdminPassword();
+    if (!pwd) return;
+    const backend = getBackendUrl();
+    beginSuspend(6000);
+    try{
+      const res = await fetchJson(`${backend}/settings`, {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ eventName: name, adminPassword: pwd })
+      });
+      if (res && res.ok === false) throw new Error(res.error || "Save failed");
+      await loadSettings();
+      setSyncedNow();
+    }catch(e){
+      const msg = String(e.message||e);
+      if (msg.toLowerCase().includes("password")){
+        sessionStorage.removeItem(AUTH_KEY);
+        showToast(true, "Password rejected. Try again.");
+      } else {
+        showToast(true, "Couldn't save event name.");
+      }
+    }
   }
 
   async function loadData() {
@@ -321,22 +398,23 @@
     renderTable();
     setSyncedNow();
     showToast(false);
-    // Maintain selection visuals
+
     if (selectedStandId) {
       const row = rows.find(r => r.standId === selectedStandId);
-      if (row) drawCallout(row.standId, row.status==="sold" ? (row.company||"") : "");
+      if (row) {
+        drawCallout(row.standId, row.status==="sold" ? (row.company||"") : "");
+        updateZoom(row.standId);
+      }
     }
   }
 
   async function saveCurrent() {
     if (!selectedStandId) return;
     const backend = getBackendUrl();
-
-    // Ask password the first time we try to write in this tab
     let pwd = sessionStorage.getItem(AUTH_KEY) || "";
     if (!pwd) {
       pwd = await ensureAdminPassword();
-      if (!pwd) return; // cancelled
+      if (!pwd) return;
     }
 
     const payload = {
@@ -346,7 +424,6 @@
       adminPassword: pwd
     };
 
-    // Pause sync while saving so we don't revert immediately
     beginSuspend(6000);
 
     try{
@@ -355,14 +432,10 @@
         headers:{ "Content-Type":"application/json" },
         body: JSON.stringify(payload)
       });
-
-      // If backend returns {ok:false,...} treat as failure
       if (res && res.ok === false) throw new Error(res.error || "Save failed");
-
     }catch(e){
-      // If password wrong, clear cached and re-prompt next time
       const msg = String(e.message || e);
-      if (msg.toLowerCase().includes("password") || msg.toLowerCase().includes("invalid admin")){
+      if (msg.toLowerCase().includes("password")){
         sessionStorage.removeItem(AUTH_KEY);
         showToast(true, "Password rejected. Try again.");
       } else {
@@ -371,18 +444,13 @@
       return;
     }
 
-    // Reload from backend (source of truth) to avoid local mismatch
-    try{
-      await loadData();
-    }catch(_){}
-
-    // Re-select to keep UI consistent
+    // reload from backend (source of truth)
+    try{ await loadData(); }catch(_){}
     selectStand(selectedStandId);
   }
 
-  // Editing detection: pause polling while typing
   function wireEditingPause(){
-    [companyEl, statusEl].forEach(inp => {
+    [companyEl, statusEl, eventNameEl].forEach(inp => {
       if (!inp) return;
       inp.addEventListener("focus", () => { isEditing = true; });
       inp.addEventListener("blur",  () => { isEditing = false; beginSuspend(1500); });
@@ -403,7 +471,6 @@
     syncTimer = null;
   }
 
-  // Toast buttons
   if (setBackendBtn){
     setBackendBtn.addEventListener("click", () => {
       const current = getBackendUrl();
@@ -416,7 +483,6 @@
   }
   if (hideToastBtn) hideToastBtn.addEventListener("click", () => showToast(false));
 
-  // Buttons
   if (saveBtn) saveBtn.addEventListener("click", saveCurrent);
   if (markAvailBtn) markAvailBtn.addEventListener("click", () => {
     statusEl.value = "available";
@@ -431,19 +497,23 @@
 
   if (searchEl) searchEl.addEventListener("input", renderTable);
   if (filterEl) filterEl.addEventListener("change", renderTable);
+  if (setEventBtn) setEventBtn.addEventListener("click", saveEventName);
 
   window.addEventListener("resize", () => {
     if (selectedStandId) {
       const row = rows.find(r => r.standId === selectedStandId);
-      if (row) drawCallout(row.standId, row.status==="sold" ? (row.company||"") : "");
+      if (row) {
+        drawCallout(row.standId, row.status==="sold" ? (row.company||"") : "");
+        updateZoom(row.standId);
+      }
     }
   });
 
-  // init
   (async () => {
     try {
       await loadSvg();
       wireEditingPause();
+      await loadSettings();
       await loadData();
       startPolling();
     } catch(e) {
@@ -451,5 +521,4 @@
       showToast(true, "Failed to load SVG or backend.");
     }
   })();
-
 })();
