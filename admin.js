@@ -1,19 +1,22 @@
-/* admin.js — Clean, stable admin (backend critical)
-   - GET /stands, GET /settings, POST /stand, POST /settings
-   - password comes from backend /settings (if provided) OR prompts each session before first write
+/* admin.js — Floorplan Admin (password + stable save)
+   Works with Cloudflare Worker routes:
+   GET  /stands
+   GET  /settings
+   POST /stand   (JSON: {standId,status,company,adminPassword})
 */
+
 (() => {
   "use strict";
-  const F = window.Floorplan;
 
-  // OPTIONAL: URL-only secret lock (set to "" to disable)
-  const ADMIN_URL_KEY = "CHANGE_ME"; // set to same secret you use in URL: admin.html?k=SECRET
-  const URL_PARAM = "k";
+  const BACKEND_DEFAULT = "https://floorplansaberdeen.floorplansaberdeen.workers.dev";
+  const BACKEND_KEY = "floorplan_backend_url";
+  const AUTH_KEY = "floorplan_admin_authed_pwd";
+  const AUTH_ONCE_KEY = "floorplan_admin_authed_once";
 
   const SVG_URL = "./event_plan.svg";
-  const SESSION_AUThed = "floorplan_admin_authed_pwd";
 
-  const el = F.$;
+  const el = (id) => document.getElementById(id);
+
   const svgHost = el("svgHost");
   const planStack = el("planStack");
   const calloutSvg = el("calloutSvg");
@@ -30,125 +33,170 @@
   const standIdEl = el("standId");
   const statusEl = el("status");
   const companyEl = el("company");
-
   const saveBtn = el("saveBtn");
   const markAvailBtn = el("markAvailBtn");
 
-  const eventNameEl = el("eventName");
-  const setEventBtn = el("setEventBtn");
-
+  const syncedAt = el("syncedAt");
   const pauseBtn = el("pauseBtn");
-  const exportBtn = el("exportBtn");
-  const importBtn = el("importBtn");
-  const resetBtn = el("resetBtn");
 
   const toast = el("toast");
   const toastMsg = el("toastMsg");
   const setBackendBtn = el("setBackendBtn");
   const hideToastBtn = el("hideToastBtn");
-  const syncedAt = el("syncedAt");
 
   let svgRoot = null;
   let standMap = new Map();
   let rows = [];
   let selectedStandId = null;
+
   let autoSync = true;
   let syncTimer = null;
-  let settings = null;
+  let suspendUntil = 0; // timestamp ms: pause polling temporarily
   let isEditing = false;
 
-  function showToast(show, msg) {
-    if (toastMsg && msg) toastMsg.textContent = msg;
-    if (toast) toast.style.display = show ? "flex" : "none";
+  function showToast(show, msg){
+    if (!toast) return;
+    toast.style.display = show ? "flex" : "none";
+    if (msg && toastMsg) toastMsg.textContent = msg;
   }
 
-  function enforceUrlLock() {
-    if (!ADMIN_URL_KEY || ADMIN_URL_KEY === "CHANGE_ME") return;
-    const u = new URL(location.href);
-    const got = (u.searchParams.get(URL_PARAM) || "").trim();
-    if (got !== ADMIN_URL_KEY) {
-      document.body.innerHTML = `
-        <div style="padding:24px;font-family:ui-sans-serif,system-ui;max-width:720px;margin:0 auto;">
-          <div style="font-weight:900;font-size:20px;margin-bottom:8px;">Floorplan Admin</div>
-          <div>This page is locked. Add <code>?k=…</code> to the URL.</div>
-        </div>`;
-      throw new Error("Admin locked");
-    }
-  }
-
-  function fmtTime() {
-    return new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
-  }
-
-  async function loadSettings() {
-    const backend = F.getBackendUrl();
+  function normalizeBackendUrl(input) {
+    if (!input) return "";
+    let s = String(input).trim();
     try {
-      settings = await F.fetchJson(`${backend}/settings`);
-      if (eventNameEl) eventNameEl.value = (settings && settings.eventName) ? String(settings.eventName) : "";
-    } catch (e) {
-      settings = null;
-      // keep going (stands may still load)
+      const u = new URL(s);
+      u.search = "";
+      u.hash = "";
+      u.pathname = u.pathname.replace(/\/+$/,"");
+      return (u.origin + u.pathname).replace(/\/+$/,"");
+    } catch {
+      return s.replace(/\/+$/,"");
     }
   }
 
-  function getAdminPasswordFromSettings() {
-    if (!settings) return "";
-    const pwd =
-      settings.adminPassword ||
-      settings.password ||
-      settings.admin_pass ||
-      settings.admin_password ||
-      "";
-    return String(pwd || "").trim();
+  function getBackendUrl() {
+    const saved = localStorage.getItem(BACKEND_KEY);
+    const base = (saved && saved.startsWith("http")) ? saved : BACKEND_DEFAULT;
+    return normalizeBackendUrl(base);
   }
 
-  async function ensurePasswordOnce() {
-    const required = getAdminPasswordFromSettings();
-    if (!required) return true; // no password configured upstream
-    if (sessionStorage.getItem(SESSION_AUThed) === "1") return true;
-
-    const entered = prompt("Admin password required:", "");
-    if (entered === null) return false;
-    if (String(entered) !== required) {
-      alert("Incorrect password.");
-      return false;
+  async function fetchJson(url, opts = {}) {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 12000);
+    try {
+      const res = await fetch(url, { ...opts, signal: controller.signal, cache:"no-store" });
+      const text = await res.text();
+      let data = null;
+      try { data = text ? JSON.parse(text) : null; } catch { data = null; }
+      if (!res.ok) throw new Error((data && (data.error || data.message)) || text || `HTTP ${res.status}`);
+      return data;
+    } finally {
+      clearTimeout(t);
     }
-    sessionStorage.setItem(SESSION_AUThed, "1");
-    return true;
   }
 
-  async function loadSvg() {
-    const svg = await F.loadSvgInline(SVG_URL, svgHost);
-    svgRoot = svg;
-    standMap = F.buildStandMap(svgRoot);
+  function normStandId(s){ return String(s||"").trim().toUpperCase(); }
 
-    svgRoot.addEventListener("click", (ev) => {
-      const standId = F.findClickedStandId(ev.target, rows);
-      if (standId) selectStand(standId);
-    }, { passive:true });
+  // Only accept real stand IDs (prevents LWPOLYLINE...)
+  function looksLikeStandId(id){
+    const s = normStandId(id);
+    return /^[A-Z]{1,3}\d{1,3}$/.test(s);
   }
 
-  function normRow(row){
-    return {
-      standId: String(row.standId ?? row.stand ?? row.id ?? "").trim().toUpperCase(),
-      status: String(row.status || "available").toLowerCase(),
-      company: String(row.company || "").trim()
-    };
+  function normalizeDomId(id) {
+    return String(id || "").trim();
   }
 
-  async function loadData() {
-    const backend = F.getBackendUrl();
-    const data = await F.fetchJson(`${backend}/stands`);
-    rows = (Array.isArray(data) ? data : []).map(normRow).filter(r => r.standId);
-    F.applyColoursAdmin(rows, standMap, getComputedStyle(document.documentElement));
-    renderTable();
-    if (syncedAt) syncedAt.textContent = fmtTime();
-    showToast(false);
+  function buildStandMap() {
+    standMap.clear();
+    if (!svgRoot) return;
+    svgRoot.querySelectorAll("[id]").forEach(node => {
+      const raw = normalizeDomId(node.id);
+      const key = normStandId(raw);
+      if (looksLikeStandId(key) && !standMap.has(key)) standMap.set(key, node);
+    });
   }
 
-  function renderTable(){
-    const q = (searchEl?.value || "").trim().toLowerCase();
-    const f = (filterEl?.value || "all").toLowerCase();
+  function elementForStand(standId){
+    const k = normStandId(standId);
+    return standMap.get(k) || null;
+  }
+
+  function setFillForElement(elem, rgba) {
+    if (!elem) return;
+    const shapes = elem.matches("path,rect,polygon,polyline,ellipse,circle")
+      ? [elem]
+      : Array.from(elem.querySelectorAll("path,rect,polygon,polyline,ellipse,circle"));
+
+    shapes.forEach(s => {
+      const bbox = s.getBBox ? s.getBBox() : null;
+      if (bbox && (bbox.width < 6 || bbox.height < 6)) return;
+      s.style.fill = rgba;
+      s.style.fillOpacity = "1";
+    });
+  }
+
+  function applyColours() {
+    const sold = getComputedStyle(document.documentElement).getPropertyValue("--sold").trim() || "#e63b3b";
+    const avail = getComputedStyle(document.documentElement).getPropertyValue("--avail").trim() || "rgba(213,109,50,0.75)";
+    rows.forEach(r => {
+      const elem = elementForStand(r.standId);
+      if (!elem) return;
+      setFillForElement(elem, r.status === "sold" ? sold : avail);
+    });
+  }
+
+  function clearCallout(){
+    if (calloutSvg) calloutSvg.innerHTML = "";
+    if (lozenge) lozenge.style.display = "none";
+    if (lozStand) lozStand.textContent = "—";
+    if (lozCompany){
+      lozCompany.style.display = "none";
+      lozCompany.textContent = "";
+    }
+  }
+
+  function drawCallout(standId, company){
+    const elem = elementForStand(standId);
+    if (!elem) { clearCallout(); return; }
+
+    lozStand.textContent = standId;
+    if (company){
+      lozCompany.style.display = "block";
+      lozCompany.textContent = company;
+    } else {
+      lozCompany.style.display = "none";
+      lozCompany.textContent = "";
+    }
+    lozenge.style.display = "inline-block";
+
+    const standRect = elem.getBoundingClientRect();
+    const standPt = { x: standRect.left + standRect.width/2, y: standRect.top + standRect.height/2 };
+
+    const lozRect = lozenge.getBoundingClientRect();
+    const lozTop = { x: lozRect.left + lozRect.width/2, y: lozRect.top };
+
+    const stackRect = planStack.getBoundingClientRect();
+    const x1 = lozTop.x - stackRect.left;
+    const y1 = lozTop.y - stackRect.top;
+    const x2 = standPt.x - stackRect.left;
+    const y2 = standPt.y - stackRect.top;
+
+    calloutSvg.setAttribute("viewBox", `0 0 ${stackRect.width} ${stackRect.height}`);
+    calloutSvg.setAttribute("preserveAspectRatio", "none");
+
+    const dotPx = 10;
+    const r = dotPx/2;
+
+    calloutSvg.innerHTML = `
+      <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="rgba(0,0,0,.70)" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="${x2}" cy="${y2}" r="${r}" fill="rgba(0,0,0,.72)"/>
+    `;
+  }
+
+  function renderTable() {
+    const q = (searchEl.value || "").trim().toLowerCase();
+    const f = filterEl.value;
 
     const filtered = rows.filter(r => {
       if (f !== "all" && r.status !== f) return false;
@@ -159,17 +207,16 @@
     tbody.innerHTML = "";
     filtered.forEach(r => {
       const tr = document.createElement("tr");
-      if (selectedStandId && r.standId === selectedStandId) tr.classList.add("active");
+      if (r.standId === selectedStandId) tr.classList.add("active");
 
-      const td1 = document.createElement("td"); td1.textContent = r.standId;
+      const td1 = document.createElement("td");
+      td1.textContent = r.standId;
 
       const td2 = document.createElement("td");
-      const badge = document.createElement("span");
-      badge.className = "badge " + (r.status === "sold" ? "bSold" : "bAvail");
-      badge.textContent = r.status === "sold" ? "Sold" : "Available";
-      td2.appendChild(badge);
+      td2.textContent = r.status === "sold" ? "Sold" : "Available";
 
-      const td3 = document.createElement("td"); td3.textContent = r.company || "";
+      const td3 = document.createElement("td");
+      td3.textContent = r.company || "";
 
       tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
       tr.addEventListener("click", () => selectStand(r.standId));
@@ -180,92 +227,175 @@
     if (totalEl) totalEl.textContent = String(rows.length);
   }
 
-  function selectStand(standId){
-    selectedStandId = String(standId||"").trim().toUpperCase();
+  function selectStand(standId) {
+    selectedStandId = normStandId(standId);
     const row = rows.find(r => r.standId === selectedStandId);
+    if (!row) return;
 
-    if (standIdEl) standIdEl.value = selectedStandId;
-    if (statusEl) statusEl.value = row ? row.status : "available";
-    if (companyEl) companyEl.value = row ? (row.company||"") : "";
+    standIdEl.value = row.standId;
+    statusEl.value = row.status;
+    companyEl.value = row.company || "";
 
-    F.applyColoursAdmin(rows, standMap, getComputedStyle(document.documentElement));
-
-    const elStand = F.elementForStand(standMap, selectedStandId);
-    const company = (row && row.status === "sold") ? (row.company||"") : "";
-    F.drawCallout({
-      standElem: elStand,
-      standId: selectedStandId,
-      company,
-      planStack,
-      calloutSvg,
-      lozenge,
-      lozStand,
-      lozCompany
-    });
-
+    applyColours();
+    drawCallout(row.standId, (row.status === "sold") ? (row.company||"") : "");
     renderTable();
   }
 
-  async function saveCurrent(nextStatusOverride=null){
+  function setSyncedNow(){
+    if (!syncedAt) return;
+    syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+  }
+
+  function beginSuspend(ms){
+    suspendUntil = Date.now() + (ms||0);
+  }
+
+  function isSuspended(){
+    return Date.now() < suspendUntil || isEditing;
+  }
+
+  async function getAdminPasswordFromSettings(){
+    const backend = getBackendUrl();
+    const settings = await fetchJson(`${backend}/settings`);
+    // Worker proxies Apps Script settings; common keys:
+    return String(settings.adminPassword || settings.password || settings.admin_password || settings.admin_pass || "").trim();
+  }
+
+  async function ensureAdminPassword(){
+    // If already stored in session, use it
+    const cached = sessionStorage.getItem(AUTH_KEY);
+    if (cached && cached.trim()) return cached.trim();
+
+    // Prefer pulling the required password from backend settings if present
+    // (If backend doesn't expose it, we still prompt and send it.)
+    try { await getAdminPasswordFromSettings(); } catch(_) {}
+
+    const entered = prompt("Admin password:", "");
+    if (entered === null) return null; // user cancelled
+    const pwd = String(entered).trim();
+    if (!pwd) return null;
+    sessionStorage.setItem(AUTH_KEY, pwd);
+    return pwd;
+  }
+
+  async function loadSvg() {
+    const res = await fetch(SVG_URL, { cache:"no-store" });
+    if (!res.ok) throw new Error("Could not load SVG");
+    const txt = await res.text();
+    svgHost.innerHTML = txt;
+    svgRoot = svgHost.querySelector("svg");
+    if (!svgRoot) throw new Error("SVG invalid");
+
+    svgRoot.setAttribute("preserveAspectRatio","xMidYMid meet");
+    svgRoot.style.width = "100%";
+    svgRoot.style.height = "auto";
+    svgRoot.style.display = "block";
+
+    buildStandMap();
+
+    // Click-to-select: walk up parents until we hit a real stand id
+    svgRoot.addEventListener("click", (ev) => {
+      let node = ev.target;
+      for (let i=0; i<10 && node; i++){
+        const id = node.id ? normStandId(node.id) : "";
+        if (looksLikeStandId(id)) {
+          const found = rows.find(r => r.standId === id);
+          if (found) selectStand(found.standId);
+          return;
+        }
+        node = node.parentElement;
+      }
+    }, { passive:true });
+  }
+
+  async function loadData() {
+    const backend = getBackendUrl();
+    const data = await fetchJson(`${backend}/stands`);
+    rows = (Array.isArray(data) ? data : []).map(r => ({
+      standId: normStandId(r.standId ?? r.stand ?? r.id),
+      status: String(r.status || "available").toLowerCase(),
+      company: String(r.company || "").trim()
+    })).filter(r => r.standId);
+
+    applyColours();
+    renderTable();
+    setSyncedNow();
+    showToast(false);
+    // Maintain selection visuals
+    if (selectedStandId) {
+      const row = rows.find(r => r.standId === selectedStandId);
+      if (row) drawCallout(row.standId, row.status==="sold" ? (row.company||"") : "");
+    }
+  }
+
+  async function saveCurrent() {
     if (!selectedStandId) return;
-    const ok = await ensurePasswordOnce();
-    if (!ok) return;
+    const backend = getBackendUrl();
 
-    const backend = F.getBackendUrl();
-    const status = nextStatusOverride || (statusEl?.value || "available");
-    const company = (status === "sold") ? String(companyEl?.value || "").trim() : "";
+    // Ask password the first time we try to write in this tab
+    let pwd = sessionStorage.getItem(AUTH_KEY) || "";
+    if (!pwd) {
+      pwd = await ensureAdminPassword();
+      if (!pwd) return; // cancelled
+    }
 
-    try {
-      await F.fetchJson(`${backend}/stand`, {
+    const payload = {
+      standId: selectedStandId,
+      status: statusEl.value,
+      company: (statusEl.value === "sold") ? companyEl.value.trim() : "",
+      adminPassword: pwd
+    };
+
+    // Pause sync while saving so we don't revert immediately
+    beginSuspend(6000);
+
+    try{
+      const res = await fetchJson(`${backend}/stand`, {
         method:"POST",
         headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({
-          standId: selectedStandId,
-          status,
-          company,
-          adminPassword: getAdminPasswordFromSettings()
-        })
+        body: JSON.stringify(payload)
       });
-    } catch (e) {
-      showToast(true, "Can't reach the backend right now.");
-      console.error(e);
+
+      // If backend returns {ok:false,...} treat as failure
+      if (res && res.ok === false) throw new Error(res.error || "Save failed");
+
+    }catch(e){
+      // If password wrong, clear cached and re-prompt next time
+      const msg = String(e.message || e);
+      if (msg.toLowerCase().includes("password") || msg.toLowerCase().includes("invalid admin")){
+        sessionStorage.removeItem(AUTH_KEY);
+        showToast(true, "Password rejected. Try again.");
+      } else {
+        showToast(true, "Can't reach backend or save failed.");
+      }
       return;
     }
 
-    // Update local
-    const idx = rows.findIndex(r => r.standId === selectedStandId);
-    if (idx >= 0) rows[idx] = { standId: selectedStandId, status, company };
-    F.applyColoursAdmin(rows, standMap, getComputedStyle(document.documentElement));
-    renderTable();
+    // Reload from backend (source of truth) to avoid local mismatch
+    try{
+      await loadData();
+    }catch(_){}
+
+    // Re-select to keep UI consistent
     selectStand(selectedStandId);
-    if (syncedAt) syncedAt.textContent = fmtTime();
   }
 
-  async function setEventName(){
-    const ok = await ensurePasswordOnce();
-    if (!ok) return;
-    const backend = F.getBackendUrl();
-    const name = String(eventNameEl?.value || "").trim();
-    try{
-      await F.fetchJson(`${backend}/settings`, {
-        method:"POST",
-        headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({ eventName: name, adminPassword: getAdminPasswordFromSettings() })
-      });
-    }catch(e){
-      showToast(true, "Can't reach backend to save event name.");
-      console.error(e);
-      return;
-    }
-    // refresh settings
-    await loadSettings();
+  // Editing detection: pause polling while typing
+  function wireEditingPause(){
+    [companyEl, statusEl].forEach(inp => {
+      if (!inp) return;
+      inp.addEventListener("focus", () => { isEditing = true; });
+      inp.addEventListener("blur",  () => { isEditing = false; beginSuspend(1500); });
+      inp.addEventListener("input", () => { isEditing = true; });
+    });
   }
 
   function startPolling(){
     stopPolling();
     syncTimer = setInterval(async () => {
-      if (!autoSync || isEditing) return;
-      try { await loadData(); } catch(e){ showToast(true, "Can't reach backend."); }
+      if (!autoSync) return;
+      if (isSuspended()) return;
+      try { await loadData(); } catch(e){ showToast(true, "Can't reach backend right now."); }
     }, 8000);
   }
   function stopPolling(){
@@ -273,164 +403,53 @@
     syncTimer = null;
   }
 
-  function exportCsv(){
-    const ok = sessionStorage.getItem(SESSION_AUThed) === "1" || !getAdminPasswordFromSettings();
-    if (!ok) { // require prompt now
-      ensurePasswordOnce().then(passed => { if (passed) exportCsv(); });
-      return;
-    }
-    const lines = ["standId,status,company"].concat(rows.map(r => {
-      const c = (r.company||"").replaceAll('"','""');
-      return `${r.standId},${r.status},"${c}"`;
-    }));
-    const blob = new Blob([lines.join("\n")], { type:"text/csv" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "stands.csv";
-    a.click();
-    URL.revokeObjectURL(a.href);
-  }
-
-  function importCsv(){
-    const ok = sessionStorage.getItem(SESSION_AUThed) === "1" || !getAdminPasswordFromSettings();
-    const go = async () => {
-      const inp = document.createElement("input");
-      inp.type="file";
-      inp.accept=".csv,text/csv";
-      inp.onchange = async () => {
-        const f = inp.files && inp.files[0];
-        if (!f) return;
-        const txt = await f.text();
-        const lines = txt.split(/\r?\n/).filter(Boolean);
-        const updates = [];
-        for (let i=1;i<lines.length;i++){
-          const line = lines[i];
-          const m = line.match(/^([^,]+),([^,]+),"(.*)"$/);
-          if (!m) continue;
-          updates.push({ standId: String(m[1]).trim().toUpperCase(), status: String(m[2]).trim().toLowerCase(), company: m[3].replaceAll('""','"') });
-        }
-        // push updates to sheet via backend
-        for (const u of updates){
-          try{
-            await F.fetchJson(`${F.getBackendUrl()}/stand`, {
-              method:"POST",
-              headers:{ "Content-Type":"application/json" },
-              body: JSON.stringify({ standId:u.standId, status:u.status, company:u.status==="sold"?u.company:"", adminPassword: getAdminPasswordFromSettings() })
-            });
-          }catch(e){
-            showToast(true, "Import failed to reach backend.");
-            console.error(e);
-            return;
-          }
-        }
-        await loadData();
-      };
-      inp.click();
-    };
-
-    if (ok) { go(); return; }
-    ensurePasswordOnce().then(passed => { if (passed) go(); });
-  }
-
-  async function resetAll(){
-    const ok = await ensurePasswordOnce();
-    if (!ok) return;
-    if (!confirm("Reset ALL stands to Available?")) return;
-
-    // Reset only stands that exist in rows (and map). This keeps it safe.
-    for (const r of rows){
-      try{
-        await F.fetchJson(`${F.getBackendUrl()}/stand`, {
-          method:"POST",
-          headers:{ "Content-Type":"application/json" },
-          body: JSON.stringify({ standId:r.standId, status:"available", company:"", adminPassword: getAdminPasswordFromSettings() })
-        });
-      }catch(e){
-        showToast(true, "Reset failed to reach backend.");
-        console.error(e);
-        return;
+  // Toast buttons
+  if (setBackendBtn){
+    setBackendBtn.addEventListener("click", () => {
+      const current = getBackendUrl();
+      const v = prompt("Paste your backend URL:", current);
+      if (v && v.trim().startsWith("http")) {
+        localStorage.setItem(BACKEND_KEY, v.trim().replace(/\/+$/,""));
+        location.reload();
       }
-    }
-    await loadData();
-    alert("Reset complete.");
-  }
-
-  function wireEditingPause(){
-    const on = () => { isEditing = true; };
-    const off = () => { isEditing = false; };
-    [companyEl, eventNameEl, searchEl].forEach(inp => {
-      if (!inp) return;
-      inp.addEventListener("focus", on);
-      inp.addEventListener("input", on);
-      inp.addEventListener("blur", off);
     });
   }
+  if (hideToastBtn) hideToastBtn.addEventListener("click", () => showToast(false));
 
-  // Backend URL setter
-  setBackendBtn?.addEventListener("click", () => {
-    const current = F.getBackendUrl();
-    const v = prompt("Paste your backend base URL:", current);
-    if (v && v.trim().startsWith("http")) {
-      F.setBackendUrl(v.trim());
-      location.reload();
+  // Buttons
+  if (saveBtn) saveBtn.addEventListener("click", saveCurrent);
+  if (markAvailBtn) markAvailBtn.addEventListener("click", () => {
+    statusEl.value = "available";
+    companyEl.value = "";
+    saveCurrent();
+  });
+  if (pauseBtn) pauseBtn.addEventListener("click", () => {
+    autoSync = !autoSync;
+    pauseBtn.textContent = autoSync ? "Pause sync" : "Resume sync";
+    if (autoSync) startPolling(); else stopPolling();
+  });
+
+  if (searchEl) searchEl.addEventListener("input", renderTable);
+  if (filterEl) filterEl.addEventListener("change", renderTable);
+
+  window.addEventListener("resize", () => {
+    if (selectedStandId) {
+      const row = rows.find(r => r.standId === selectedStandId);
+      if (row) drawCallout(row.standId, row.status==="sold" ? (row.company||"") : "");
     }
   });
-  hideToastBtn?.addEventListener("click", () => showToast(false));
 
   // init
   (async () => {
-    try { enforceUrlLock(); } catch { return; }
-
     try {
-      await loadSettings();
       await loadSvg();
-    } catch (e) {
-      console.error(e);
-      showToast(true, "Couldn't load SVG. Is event_plan.svg in the same folder?");
-      return;
-    }
-
-    try {
+      wireEditingPause();
       await loadData();
       startPolling();
-    } catch (e) {
+    } catch(e) {
       console.error(e);
-      showToast(true, "Couldn't load data from backend.");
+      showToast(true, "Failed to load SVG or backend.");
     }
-
-    wireEditingPause();
-
-    // UI wiring
-    searchEl?.addEventListener("input", renderTable);
-    filterEl?.addEventListener("change", renderTable);
-
-    saveBtn?.addEventListener("click", () => saveCurrent());
-    // Enter on company saves
-    companyEl?.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") { e.preventDefault(); saveCurrent(); }
-    });
-    markAvailBtn?.addEventListener("click", () => saveCurrent("available"));
-
-    setEventBtn?.addEventListener("click", setEventName);
-
-    pauseBtn?.addEventListener("click", () => {
-      autoSync = !autoSync;
-      pauseBtn.textContent = autoSync ? "Pause sync" : "Resume sync";
-    });
-
-    exportBtn?.addEventListener("click", exportCsv);
-    importBtn?.addEventListener("click", importCsv);
-    resetBtn?.addEventListener("click", resetAll);
-
-    // keep callout correct on resize/scroll
-    const redraw = () => {
-      if (!selectedStandId) return;
-      const row = rows.find(r => r.standId === selectedStandId);
-      const elStand = F.elementForStand(standMap, selectedStandId);
-      const company = (row && row.status === "sold") ? (row.company||"") : "";
-      F.drawCallout({ standElem: elStand, standId: selectedStandId, company, planStack, calloutSvg, lozenge, lozStand, lozCompany });
-    };
-    window.addEventListener("resize", redraw);
-    window.addEventListener("scroll", redraw, true);
   })();
+
 })();
