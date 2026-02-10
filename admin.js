@@ -1,0 +1,481 @@
+(() => {
+  const { el, fetchJson, getBackendUrl, BACKEND_KEY } = window.FloorplanShared;
+
+  const svgHost = el("svgHost");
+  const planWrap = el("planWrap");
+  const planStack = el("planStack");
+  const calloutSvg = el("calloutSvg");
+  const lozenge = el("lozenge");
+  const lozStand = el("lozStand");
+  const lozCompany = el("lozCompany");
+
+  const zoomWrap = el("zoomWrap");
+  const zoomSvgHost = el("zoomSvgHost");
+  const zoomRing = el("zoomRing");
+
+  const tbody = el("tbody");
+  const searchEl = el("search");
+  const filterEl = el("filter");
+  const countEl = el("count");
+  const totalEl = el("total");
+
+  const standIdEl = el("standId");
+  const statusEl = el("status");
+  const companyEl = el("company");
+  const saveBtn = el("saveBtn");
+  const markAvailBtn = el("markAvailBtn");
+
+  const eventNameEl = el("eventName");
+  const setEventBtn = el("setEventBtn");
+
+  const exportBtn = el("exportBtn");
+  const importBtn = el("importBtn");
+  const resetBtn = el("resetBtn");
+  const pauseBtn = el("pauseBtn");
+  const undoBtn = el("undoBtn");
+
+  const toast = el("toast");
+  const toastMsg = el("toastMsg");
+  const setBackendBtn = el("setBackendBtn");
+  const hideToastBtn = el("hideToastBtn");
+  const syncedAt = el("syncedAt");
+
+  const progressOverlay = el("progressOverlay");
+  const progressTitle = el("progressTitle");
+  const progressMsg = el("progressMsg");
+  const progressBarFill = el("progressBarFill");
+
+  const lockState = el("lockState");
+
+  let core = null;
+  let autoSync = true;
+  let syncTimer = null;
+  let selectedStandId = null;
+  let rows = [];
+  let isBusy = false;
+  let isUserEditing = false;
+
+  let lastChange = null; // single undo (reliable)
+
+  const SESSION_PWD = "admin_session_pwd";
+
+  function setUnlocked(unlocked){
+    if(unlocked){
+      lockState.textContent = "🔓 Unlocked";
+      lockState.classList.add("unlocked");
+    } else {
+      lockState.textContent = "🔒 Locked";
+      lockState.classList.remove("unlocked");
+    }
+  }
+  function getPwd(){ return sessionStorage.getItem(SESSION_PWD) || ""; }
+  function setPwd(p){ sessionStorage.setItem(SESSION_PWD, p); setUnlocked(true); }
+  function clearPwd(){ sessionStorage.removeItem(SESSION_PWD); setUnlocked(false); }
+
+  async function promptPassword({always=false, reason="Admin password required"}={}){
+    if(!always){
+      const cached = getPwd();
+      if(cached) return cached;
+    }
+    const entered = prompt(reason, "");
+    if(entered === null) return null;
+    const pwd = String(entered).trim();
+    if(!pwd) return null;
+    if(!always) setPwd(pwd);
+    return pwd;
+  }
+
+  function showToast(msg){
+    toastMsg.textContent = msg || "Can't reach the backend right now.";
+    toast.style.display = "flex";
+  }
+  function hideToast(){ toast.style.display = "none"; }
+
+  setBackendBtn.addEventListener("click", () => {
+    const current = getBackendUrl();
+    const v = prompt("Paste your backend URL (Cloudflare Worker):", current);
+    if (v && v.trim().startsWith("http")) {
+      localStorage.setItem(BACKEND_KEY, v.trim().replace(/\/+$/,""));
+      location.reload();
+    }
+  });
+  hideToastBtn.addEventListener("click", hideToast);
+
+  function setBusyState(b){
+    isBusy = b;
+    saveBtn.disabled = b;
+    markAvailBtn.disabled = b;
+    exportBtn.disabled = b;
+    importBtn.disabled = b;
+    resetBtn.disabled = b;
+    setEventBtn.disabled = b;
+    undoBtn.disabled = b || !lastChange;
+  }
+
+  function showProgress(title, msg, pct){
+    progressOverlay.style.display = "flex";
+    progressTitle.textContent = title || "Updating…";
+    progressMsg.textContent = msg || "Please keep this tab open.";
+    progressBarFill.style.width = `${Math.max(0, Math.min(100, pct||0))}%`;
+  }
+  function hideProgress(){
+    progressOverlay.style.display = "none";
+    progressBarFill.style.width = "0%";
+  }
+
+  function renderTable(){
+    const q = (searchEl.value||"").trim().toLowerCase();
+    const f = filterEl.value;
+
+    const filtered = rows.filter(r=>{
+      if(f !== "all" && r.status !== f) return false;
+      if(!q) return true;
+      return r.standId.toLowerCase().includes(q) || (r.company||"").toLowerCase().includes(q);
+    });
+
+    tbody.innerHTML = "";
+    filtered.forEach(r=>{
+      const tr = document.createElement("tr");
+      if(selectedStandId === r.standId) tr.classList.add("active");
+
+      const td1 = document.createElement("td"); td1.textContent = r.standId;
+
+      const td2 = document.createElement("td");
+      const badge = document.createElement("span");
+      badge.className = "badge " + (r.status === "sold" ? "bSold" : "bAvail");
+      badge.textContent = r.status === "sold" ? "Sold" : "Available";
+      td2.appendChild(badge);
+
+      const td3 = document.createElement("td"); td3.textContent = r.company || "";
+
+      tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
+      tr.addEventListener("click", ()=>selectStand(r.standId));
+      tbody.appendChild(tr);
+    });
+
+    countEl.textContent = String(filtered.length);
+    totalEl.textContent = String(rows.length);
+  }
+
+  function selectStand(id){
+    selectedStandId = id;
+    const row = rows.find(r=>r.standId === id);
+    if(!row) return;
+
+    standIdEl.value = row.standId;
+    statusEl.value = row.status;
+    companyEl.value = row.company || "";
+
+    core.applyColoursAdmin();
+    core.drawCallout(row.standId, row.status==="sold" ? (row.company||"") : "");
+    renderTable();
+    core.updateZoom(row.standId, zoomSvgHost, zoomWrap, zoomRing);
+  }
+
+  async function loadSettings(){
+    try{
+      const s = await fetchJson(`${getBackendUrl()}/settings?_=${Date.now()}`);
+      if(s && typeof s.eventName === "string") eventNameEl.value = s.eventName;
+    }catch(_){}
+  }
+
+  async function loadData(){
+    const data = await fetchJson(`${getBackendUrl()}/stands?_=${Date.now()}`);
+    rows = (Array.isArray(data)?data:[]).map(r=>({
+      standId: String(r.standId||"").trim().toUpperCase(),
+      status: String(r.status||"available").toLowerCase(),
+      company: String(r.company||"").trim()
+    })).filter(r=>r.standId);
+
+    core.rows = rows;
+    core.applyColoursAdmin();
+    renderTable();
+    syncedAt.textContent = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+    hideToast();
+  }
+
+  async function postStand(payload, pwd){
+    return await fetchJson(`${getBackendUrl()}/stand`, {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ ...payload, adminPassword: pwd })
+    });
+  }
+
+  async function postSettings(payload, pwd){
+    return await fetchJson(`${getBackendUrl()}/settings`, {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({ ...payload, adminPassword: pwd })
+    });
+  }
+
+  function stopPolling(){ if(syncTimer) clearInterval(syncTimer); syncTimer=null; }
+  function startPolling(){
+    stopPolling();
+    syncTimer = setInterval(async ()=>{
+      if(!autoSync) return;
+      if(isBusy || isUserEditing) return;
+      try{
+        await loadData();
+        if(selectedStandId){
+          const row = rows.find(r=>r.standId===selectedStandId);
+          if(row){
+            core.drawCallout(row.standId, row.status==="sold" ? (row.company||"") : "");
+            core.updateZoom(row.standId, zoomSvgHost, zoomWrap, zoomRing);
+          }
+        }
+      }catch(_){
+        showToast("Can't reach the backend right now.");
+      }
+    }, 8000);
+  }
+
+  pauseBtn.addEventListener("click", ()=>{
+    autoSync = !autoSync;
+    pauseBtn.textContent = autoSync ? "Pause sync" : "Resume sync";
+    if(autoSync) startPolling(); else stopPolling();
+  });
+
+  // Pause polling while typing
+  document.addEventListener("focusin", (e)=>{
+    if(e.target === companyEl || e.target === eventNameEl) isUserEditing = true;
+  });
+  document.addEventListener("focusout", (e)=>{
+    if(e.target === companyEl || e.target === eventNameEl) setTimeout(()=>{ isUserEditing=false; }, 350);
+  });
+
+  async function saveCurrent(){
+    if(!selectedStandId) return;
+    const row = rows.find(r=>r.standId===selectedStandId);
+    if(!row) return;
+
+    const nextStatus = statusEl.value;
+    const nextCompany = (nextStatus==="sold") ? companyEl.value.trim() : "";
+    const prevStatus = row.status;
+    const prevCompany = row.company || "";
+
+    const pwd = await promptPassword({always:false, reason:"Admin password (save/export):"});
+    if(pwd === null) return;
+
+    setBusyState(true);
+    stopPolling();
+    try{
+      await postStand({ standId:selectedStandId, status:nextStatus, company:nextCompany }, pwd);
+      lastChange = { standId:selectedStandId, prevStatus, prevCompany, nextStatus, nextCompany };
+      undoBtn.disabled = false;
+
+      await loadData();
+      selectStand(selectedStandId);
+    }catch(e){
+      clearPwd();
+      showToast("Save failed (password wrong or backend offline).");
+    }finally{
+      setBusyState(false);
+      if(autoSync) startPolling();
+    }
+  }
+
+  saveBtn.addEventListener("click", saveCurrent);
+  companyEl.addEventListener("keydown", (e)=>{
+    if(e.key==="Enter"){ e.preventDefault(); saveCurrent(); }
+  });
+  markAvailBtn.addEventListener("click", ()=>{
+    statusEl.value = "available";
+    companyEl.value = "";
+    saveCurrent();
+  });
+
+  undoBtn.addEventListener("click", async ()=>{
+    if(!lastChange) return;
+    const pwd = await promptPassword({always:false, reason:"Admin password (save/export):"});
+    if(pwd === null) return;
+
+    setBusyState(true);
+    stopPolling();
+    try{
+      await postStand({
+        standId:lastChange.standId,
+        status:lastChange.prevStatus,
+        company:(lastChange.prevStatus==="sold") ? (lastChange.prevCompany||"") : ""
+      }, pwd);
+
+      lastChange = null;
+      undoBtn.disabled = true;
+
+      await loadData();
+      if(selectedStandId) selectStand(selectedStandId);
+    }catch(e){
+      clearPwd();
+      showToast("Undo failed (password wrong or backend offline).");
+    }finally{
+      setBusyState(false);
+      if(autoSync) startPolling();
+    }
+  });
+
+  setEventBtn.addEventListener("click", async ()=>{
+    const pwd = await promptPassword({always:false, reason:"Admin password (save/export):"});
+    if(pwd === null) return;
+
+    setBusyState(true);
+    stopPolling();
+    try{
+      await postSettings({ eventName: (eventNameEl.value||"").trim() || "New Event" }, pwd);
+      await loadSettings();
+    }catch(e){
+      clearPwd();
+      showToast("Could not save event name (password wrong or backend offline).");
+    }finally{
+      setBusyState(false);
+      if(autoSync) startPolling();
+    }
+  });
+
+  exportBtn.addEventListener("click", async ()=>{
+    const pwd = await promptPassword({always:false, reason:"Admin password (save/export):"});
+    if(pwd === null) return;
+
+    const lines = ["standId,status,company"].concat(rows.map(r=>{
+      const c = (r.company||"").replaceAll('"','""');
+      return `${r.standId},${r.status},"${c}"`;
+    }));
+    const blob = new Blob([lines.join("\n")], { type:"text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "stands.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  importBtn.addEventListener("click", async ()=>{
+    const pwd = await promptPassword({always:true, reason:"Admin password (import CSV):"});
+    if(pwd === null) return;
+
+    const inp = document.createElement("input");
+    inp.type="file";
+    inp.accept=".csv,text/csv";
+    inp.onchange = async ()=>{
+      const f = inp.files && inp.files[0];
+      if(!f) return;
+
+      setBusyState(true);
+      stopPolling();
+      try{
+        const txt = await f.text();
+        const lines = txt.split(/\r?\n/).filter(Boolean);
+        const updates = [];
+        for(let i=1;i<lines.length;i++){
+          const m = lines[i].match(/^([^,]+),([^,]+),"(.*)"$/);
+          if(!m) continue;
+          const standId = String(m[1]||"").trim().toUpperCase();
+          const status = String(m[2]||"").trim().toLowerCase()==="sold" ? "sold" : "available";
+          const company = status==="sold" ? String(m[3]||"").replaceAll('""','"').trim() : "";
+          updates.push({ standId, status, company });
+        }
+
+        const backendIds = new Set(rows.map(r=>r.standId));
+        const svgIds = new Set(Array.from(core.standMap.keys()));
+        const filtered = updates.filter(u=>backendIds.has(u.standId) && svgIds.has(u.standId));
+
+        if(filtered.length===0){
+          showToast("No matching stands found in CSV (must match SVG stand IDs).");
+          return;
+        }
+
+        showProgress("Importing CSV…", `Updating 0 / ${filtered.length}`, 0);
+        for(let i=0;i<filtered.length;i++){
+          const u = filtered[i];
+          showProgress("Importing CSV…", `Updating ${i+1} / ${filtered.length} (${u.standId})`, Math.round(((i+1)/filtered.length)*100));
+          await postStand(u, pwd);
+        }
+        hideProgress();
+
+        await loadData();
+        if(selectedStandId) selectStand(selectedStandId);
+      }catch(e){
+        hideProgress();
+        showToast("Import failed (password wrong or backend offline).");
+      }finally{
+        setBusyState(false);
+        if(autoSync) startPolling();
+      }
+    };
+    inp.click();
+  });
+
+  resetBtn.addEventListener("click", async ()=>{
+    const pwd = await promptPassword({always:true, reason:"Admin password (RESET ALL):"});
+    if(pwd === null) return;
+
+    if(!confirm("Reset all SVG stands to Available (clears company names)?")) return;
+
+    setBusyState(true);
+    stopPolling();
+    try{
+      const svgIds = new Set(Array.from(core.standMap.keys()));
+      const targets = rows.filter(r=>svgIds.has(r.standId));
+      showProgress("Resetting…", `Updating 0 / ${targets.length}`, 0);
+      for(let i=0;i<targets.length;i++){
+        const r = targets[i];
+        showProgress("Resetting…", `Updating ${i+1} / ${targets.length} (${r.standId})`, Math.round(((i+1)/targets.length)*100));
+        await postStand({ standId:r.standId, status:"available", company:"" }, pwd);
+      }
+      hideProgress();
+      await loadData();
+      if(selectedStandId) selectStand(selectedStandId);
+      showToast("Reset complete.");
+      setTimeout(()=>hideToast(), 1800);
+    }catch(e){
+      hideProgress();
+      showToast("Reset failed (password wrong or backend offline).");
+    }finally{
+      setBusyState(false);
+      if(autoSync) startPolling();
+    }
+  });
+
+  searchEl.addEventListener("input", renderTable);
+  filterEl.addEventListener("change", renderTable);
+
+  window.addEventListener("resize", ()=>{
+    if(!selectedStandId) return;
+    const row = rows.find(r=>r.standId===selectedStandId);
+    if(row) core.drawCallout(row.standId, row.status==="sold" ? (row.company||"") : "");
+  });
+
+  async function init(){
+    core = new window.FloorplanCore({
+      svgHost, planWrap, planStack, calloutSvg,
+      lozenge, lozStand, lozCompany,
+      onSelect: (row)=> selectStand(row.standId)
+    });
+
+    try{
+      await core.loadSvg();
+    }catch(e){
+      showToast("Could not load SVG. Make sure event_plan.svg is in the same folder.");
+      console.error(e);
+      return;
+    }
+
+    // Enable clicking the plan (all devices)
+    core.enablePlanClick({ enabled:true, disableOnMobile:false, onPick:(standId)=>{
+      const row = rows.find(r=>r.standId===standId);
+      if(row) selectStand(row.standId);
+    }});
+
+    try{
+      await loadSettings();
+      await loadData();
+      startPolling();
+    }catch(e){
+      showToast("Can't reach backend right now.");
+      console.error(e);
+    }
+
+    if(getPwd()) setUnlocked(true);
+  }
+
+  init();
+})();
