@@ -65,13 +65,14 @@
     return "available";
   }
 
-  function extractStandIdFromText(t){
-    if (!t) return "";
-    const s = String(t).trim().toUpperCase();
-    // common patterns: A1, AB12, AD19, C4, AA2 etc.
-    const m = s.match(/^[A-Z]{1,3}\d{1,3}$/);
-    return m ? m[0] : "";
-  }
+function extractStandIdFromText(t){
+  if (!t) return "";
+  const s = String(t).toUpperCase();
+  // Look for tokens like A1, B12, AA2, AD19 embedded in IDs like "stand_A1".
+  // Restrict to 1-2 letters followed by 1-3 digits, with non-alnum boundaries.
+  const m = s.match(/(?:^|[^A-Z0-9])([A-Z]{1,2}\d{1,3})(?:$|[^A-Z0-9])/);
+  return m ? m[1] : "";
+}
 
   function findStandIdFromElement(el){
     if (!el) return "";
@@ -112,12 +113,12 @@
     return ["path","rect","polygon","polyline","ellipse","circle"].includes(tag);
   }
 
-  function setFillForElement(el, fill){
+  function setFillForElement(el, fill, opacity){
     if (!el || !el.tagName) return;
     const tag = el.tagName.toLowerCase();
     if (isShapeTag(tag)){
       el.style.fill = fill;
-      el.style.fillOpacity = "1";
+      el.style.fillOpacity = String(opacity == null ? 1 : opacity);
     }
   }
 
@@ -238,8 +239,9 @@
       return this.rows.find(r=>r.standId === sid) || null;
     }
 
+    // Public viewer: colour sold + available, like the admin view, but without editing tools.
     applyColoursPublic(){
-      this.applyColours({mode:"public"});
+      this.applyColours({mode:"viewer"});
     }
 
     applyColoursAdmin(){
@@ -250,27 +252,40 @@
       if (!this.svgEl) return;
       const soldFill = getComputedStyle(document.documentElement).getPropertyValue("--sold").trim() || "#e74c3c";
       const availFill = getComputedStyle(document.documentElement).getPropertyValue("--avail").trim() || "#e0a070";
-      // Public pages should keep the SVG's original look and only highlight SOLD stands.
-      // Admin page can colour both sold + available.
-      const isPublic = opts && opts.mode === "public";
+      // Modes:
+      // - admin: colour sold + available
+      // - viewer: colour sold + available (slightly lighter)
+      // - public: only highlight sold (available stays as original SVG)
+      const mode = (opts && opts.mode) || "admin";
+      const isPublic = mode === "public";
+      const isViewer = mode === "viewer";
       const defaultFill = ""; // leave as-is when unknown
 
       const statusMap = new Map(this.rows.map(r=>[r.standId, r.status]));
       for (const [id, obj] of this.standElements.entries()){
         const st = statusMap.get(id);
-        const fill = st === "sold" ? soldFill : (st === "available" ? (isPublic ? "" : availFill) : defaultFill);
 
-        // Clear any previous fill in public mode so the original SVG shows through.
+        let fill = defaultFill;
+        let opacity = 1;
+
+        if (st === "sold"){
+          fill = soldFill;
+          opacity = isViewer ? 0.75 : 0.85;
+        } else if (st === "available"){
+          // In true public mode we leave available unfilled; in viewer/admin we fill it.
+          fill = isPublic ? "" : availFill;
+          opacity = isViewer ? 0.45 : 0.65;
+        }
+
+        // If we have no fill (unknown stand or public available), clear any previous inline fill.
         if (!fill){
-          if (isPublic){
-            for (const sh of obj.shapes){
-              sh.style.fill = "";
-              sh.style.fillOpacity = "";
-            }
+          for (const sh of obj.shapes){
+            sh.style.fill = "";
+            sh.style.fillOpacity = "";
           }
           continue;
         }
-        for (const sh of obj.shapes) setFillForElement(sh, fill);
+        for (const sh of obj.shapes) setFillForElement(sh, fill, opacity);
       }
     }
 
