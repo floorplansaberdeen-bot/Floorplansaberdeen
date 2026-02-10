@@ -99,8 +99,8 @@
       await pollSettings();
       await core.loadStands();
 
-      // list: sold stands with company, plus available with company if you want (keep simple: company non-empty)
-      exhibitorRows = core.rows.filter(r=> (r.company||"").trim().length > 0);
+      // Public list: show all stands. Company may be blank until set in admin.
+      exhibitorRows = core.rows.slice();
       exhibitorRows.sort((a,b)=>a.standId.localeCompare(b.standId, undefined, {numeric:true, sensitivity:"base"}));
       renderList();
       core.applyColoursPublic();

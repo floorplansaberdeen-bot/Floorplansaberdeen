@@ -250,13 +250,26 @@
       if (!this.svgEl) return;
       const soldFill = getComputedStyle(document.documentElement).getPropertyValue("--sold").trim() || "#e74c3c";
       const availFill = getComputedStyle(document.documentElement).getPropertyValue("--avail").trim() || "#e0a070";
+      // Public pages should keep the SVG's original look and only highlight SOLD stands.
+      // Admin page can colour both sold + available.
+      const isPublic = opts && opts.mode === "public";
       const defaultFill = ""; // leave as-is when unknown
 
       const statusMap = new Map(this.rows.map(r=>[r.standId, r.status]));
       for (const [id, obj] of this.standElements.entries()){
         const st = statusMap.get(id);
-        const fill = st === "sold" ? soldFill : (st === "available" ? availFill : defaultFill);
-        if (!fill) continue;
+        const fill = st === "sold" ? soldFill : (st === "available" ? (isPublic ? "" : availFill) : defaultFill);
+
+        // Clear any previous fill in public mode so the original SVG shows through.
+        if (!fill){
+          if (isPublic){
+            for (const sh of obj.shapes){
+              sh.style.fill = "";
+              sh.style.fillOpacity = "";
+            }
+          }
+          continue;
+        }
         for (const sh of obj.shapes) setFillForElement(sh, fill);
       }
     }

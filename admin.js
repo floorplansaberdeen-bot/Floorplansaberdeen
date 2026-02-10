@@ -42,19 +42,10 @@
   let pollTimer = null;
   let paused = false;
 
-  // --- Password (per-session) ---
-  let sessionPasswordOk = false;
+  // --- Password ---
+  // Password prompts were removed to keep the workflow simple.
+  // If you want to re-introduce auth later, this is the single place to do it.
   async function ensurePassword(){
-    if (sessionPasswordOk) return true;
-    const pw = prompt("To save changes, enter the admin password:");
-    if (pw === null) return false;
-    // NOTE: password check is currently client-side placeholder.
-    // If you have server-side auth, validate here.
-    if (String(pw).trim().length < 1){
-      alert("Password required.");
-      return false;
-    }
-    sessionPasswordOk = true;
     return true;
   }
 
