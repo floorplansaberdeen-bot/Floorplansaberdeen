@@ -140,6 +140,13 @@ function extractStandIdFromText(t){
 
       this.svgEl = null;
       this.standElements = new Map(); // standId -> {group, shapes[]}
+
+      // Admin auth (URL key + optional password)
+      try{
+        const usp = new URLSearchParams(window.location.search || "");
+        this.adminKey = usp.get("k") || "";
+      }catch(e){ this.adminKey = ""; }
+      this.adminPassword = sessionStorage.getItem("floorplan_admin_pass") || "";
     }
 
     backend(){
@@ -171,210 +178,109 @@ function extractStandIdFromText(t){
       this.indexStandsFromSvg();
     }
 
-    indexStandsFromSvg(){
-      this.standElements.clear();
-      if (!this.svgEl) return;
+  indexStandsFromSvg(){
+    // Build a robust index:
+    // 1) Prefer mapping from stand-number TEXT -> nearest enclosing shape (smallest bbox that contains text center)
+    // 2) Fallback to any element with data-stand/id that parses like a stand id
+    this.standElements = new Map();
+    this.standHits = []; // {standId, el, bbox, area}
 
-      // Heuristic: any <g> that contains a <text> with a standId is a stand group.
-      const groups = this.svgEl.querySelectorAll("g");
-      for (const g of groups){
-        const texts = g.querySelectorAll("text");
-        let id = "";
-        for (const t of texts){
-          id = extractStandIdFromText(t.textContent);
-          if (id) break;
-        }
-        if (!id) continue;
+    if (!this.svgEl) return;
 
-        // shapes to color: shapes inside this group excluding very tiny ones
-        const shapes = [];
-        const nodes = g.querySelectorAll("path,rect,polygon,polyline,ellipse,circle");
-        for (const n of nodes){
-          // ignore shapes that are likely text outlines? (very small bbox)
-          try{
-            const bb = n.getBBox();
-            if (bb.width < 2 && bb.height < 2) continue;
-          }catch(_){}
-          shapes.push(n);
-        }
-        if (shapes.length){
-          this.standElements.set(id, {group:g, shapes});
-        }
-      }
+    const isShape = (el)=> el && el.matches && el.matches("path,rect,polygon,polyline,ellipse,circle");
+    const safeBBox = (el)=>{
+      try{ return el.getBBox(); }catch(e){ return null; }
+    };
+    const bboxArea = (b)=> (b ? Math.max(0,b.width) * Math.max(0,b.height) : Infinity);
+    const contains = (b, x, y)=> !!b && x >= b.x && x <= (b.x + b.width) && y >= b.y && y <= (b.y + b.height);
 
-      // Fallback: elements with id=data-stand attribute
-      const candidates = this.svgEl.querySelectorAll("[data-stand],[data-stand-id],[data-standid],[id]");
-      for (const el of candidates){
-        const id = findStandIdFromElement(el);
-        if (!id) continue;
-        if (this.standElements.has(id)) continue;
-        const shapes = [];
-        if (isShapeTag((el.tagName||"").toLowerCase())) shapes.push(el);
-        if (!shapes.length){
-          const nodes = el.querySelectorAll ? el.querySelectorAll("path,rect,polygon,polyline,ellipse,circle") : [];
-          for (const n of nodes) shapes.push(n);
-        }
-        if (shapes.length){
-          this.standElements.set(id, {group: el, shapes});
-        }
-      }
-    }
+    const pickBestShapeForText = (textEl)=>{
+      const tb = safeBBox(textEl);
+      if (!tb) return null;
+      const cx = tb.x + tb.width/2;
+      const cy = tb.y + tb.height/2;
 
-    async loadStands(){
-      const url = this.backend() + "/stands?ts=" + Date.now();
-      const js = await fetchJson(url);
-      const arr = Array.isArray(js) ? js : (Array.isArray(js.rows) ? js.rows : []);
-      this.rows = arr.map(r=>({
-        standId: normStandId(r.standId || r.stand || r.id),
-        status: statusNorm(r.status),
-        company: String(r.company||"").trim()
-      })).filter(r=>r.standId);
-      // keep stable sort
-      this.rows.sort((a,b)=>a.standId.localeCompare(b.standId, undefined, {numeric:true, sensitivity:"base"}));
-      return this.rows;
-    }
+      let best = null;
+      let bestArea = Infinity;
 
-    rowById(id){
-      const sid = normStandId(id);
-      return this.rows.find(r=>r.standId === sid) || null;
-    }
-
-    // Public viewer: colour sold + available, like the admin view, but without editing tools.
-    applyColoursPublic(){
-      this.applyColours({mode:"viewer"});
-    }
-
-    applyColoursAdmin(){
-      this.applyColours({mode:"admin"});
-    }
-
-    applyColours(opts){
-      if (!this.svgEl) return;
-      const soldFill = getComputedStyle(document.documentElement).getPropertyValue("--sold").trim() || "#e74c3c";
-      const availFill = getComputedStyle(document.documentElement).getPropertyValue("--avail").trim() || "#e0a070";
-      // Modes:
-      // - admin: colour sold + available
-      // - viewer: colour sold + available (slightly lighter)
-      // - public: only highlight sold (available stays as original SVG)
-      const mode = (opts && opts.mode) || "admin";
-      const isPublic = mode === "public";
-      const isViewer = mode === "viewer";
-      const defaultFill = ""; // leave as-is when unknown
-
-      const statusMap = new Map(this.rows.map(r=>[r.standId, r.status]));
-      for (const [id, obj] of this.standElements.entries()){
-        const st = statusMap.get(id);
-
-        let fill = defaultFill;
-        let opacity = 1;
-
-        if (st === "sold"){
-          fill = soldFill;
-          opacity = isViewer ? 0.75 : 0.85;
-        } else if (st === "available"){
-          // In true public mode we leave available unfilled; in viewer/admin we fill it.
-          fill = isPublic ? "" : availFill;
-          opacity = isViewer ? 0.45 : 0.65;
-        }
-
-        // If we have no fill (unknown stand or public available), clear any previous inline fill.
-        if (!fill){
-          for (const sh of obj.shapes){
-            sh.style.fill = "";
-            sh.style.fillOpacity = "";
+      // Walk up a few levels to find shapes "near" the text.
+      let p = textEl;
+      for (let depth=0; depth<4 && p && p.parentElement; depth++){
+        p = p.parentElement;
+        const shapes = p.querySelectorAll("path,rect,polygon,polyline,ellipse,circle");
+        shapes.forEach(sh=>{
+          const b = safeBBox(sh);
+          if (!b) return;
+          const a = bboxArea(b);
+          if (a < 50) return; // ignore tiny glyph paths
+          if (!contains(b, cx, cy)) return;
+          if (a < bestArea){
+            best = sh;
+            bestArea = a;
           }
-          continue;
-        }
-        for (const sh of obj.shapes) setFillForElement(sh, fill, opacity);
+        });
+        if (best) break;
       }
-    }
+      return best;
+    };
 
-    clearCallout(){
-      if (this.calloutSvg) this.calloutSvg.innerHTML = "";
-      if (this.lozenge) this.lozenge.style.display = "none";
-      if (this.lozCompany) this.lozCompany.style.display = "none";
-    }
-
-    drawCallout(standId, company){
-      if (!this.svgEl || !this.calloutSvg || !this.planWrap) return;
-      const sid = normStandId(standId);
-      const obj = this.standElements.get(sid);
-      if (!obj) return;
-
-      // find bbox for group
-      let bbox = null;
-      try{
-        bbox = obj.group.getBBox();
-      }catch(e){
-        // try shapes
-        for (const sh of obj.shapes){
-          try{ bbox = sh.getBBox(); break; }catch(_){}
-        }
+    // First pass: stand IDs from visible text
+    const texts = this.svgEl.querySelectorAll("text, tspan");
+    texts.forEach(t=>{
+      const sid = extractStandIdFromText(t.textContent || "");
+      if (!sid) return;
+      if (this.standElements.has(sid)) return;
+      const shape = pickBestShapeForText(t);
+      if (shape){
+        this.standElements.set(sid, [shape]);
+        const b = safeBBox(shape);
+        if (b) this.standHits.push({ standId: sid, el: shape, bbox: b, area: bboxArea(b) });
       }
-      if (!bbox) return;
+    });
 
-      const wrapRect = this.planWrap.getBoundingClientRect();
-      const svgRect = this.svgEl.getBoundingClientRect();
+    // Fallback: data-stand / id based
+    const candidates = this.svgEl.querySelectorAll("[data-stand],[id]");
+    candidates.forEach(el=>{
+      const sid = findStandIdFromElement(el);
+      if (!sid) return;
+      if (this.standElements.has(sid)) return;
+      if (isShape(el)){
+        this.standElements.set(sid, [el]);
+        const b = safeBBox(el);
+        if (b) this.standHits.push({ standId: sid, el, bbox: b, area: bboxArea(b) });
+      }
+    });
 
-      // map svg coords -> screen coords
-      const pt = this.svgEl.createSVGPoint();
+    // Sort hits smallest first (helps point hit-testing)
+    this.standHits.sort((a,b)=>a.area-b.area);
+  }
+
+  standIdAtClientPoint(clientX, clientY){
+    if (!this.svgEl || !this.standHits || !this.standHits.length) return "";
+    let pt = null;
+    try{
+      pt = this.svgEl.createSVGPoint();
+      pt.x = clientX; pt.y = clientY;
       const ctm = this.svgEl.getScreenCTM();
-      if (!ctm) return;
-
-      const centerSvg = {x: bbox.x + bbox.width/2, y: bbox.y + bbox.height/2};
-      pt.x = centerSvg.x; pt.y = centerSvg.y;
-      const centerScreen = pt.matrixTransform(ctm);
-
-      // compute relative position inside planWrap
-      const cx = centerScreen.x - wrapRect.left;
-      const cy = centerScreen.y - wrapRect.top;
-
-      // label target: bottom-left label bay
-      const labelX = 24;
-      const labelY = wrapRect.height - 24;
-
-      this.calloutSvg.setAttribute("viewBox", `0 0 ${wrapRect.width} ${wrapRect.height}`);
-      this.calloutSvg.innerHTML = "";
-
-      const ns = "http://www.w3.org/2000/svg";
-      const line = document.createElementNS(ns,"line");
-      line.setAttribute("x1", String(cx));
-      line.setAttribute("y1", String(cy));
-      line.setAttribute("x2", String(labelX));
-      line.setAttribute("y2", String(labelY));
-      line.setAttribute("stroke", "#333");
-      line.setAttribute("stroke-width", "2");
-      line.setAttribute("stroke-linecap","round");
-      this.calloutSvg.appendChild(line);
-
-      if (this.lozenge){
-        this.lozenge.style.display = "block";
-      }
-      if (this.lozStand) this.lozStand.textContent = sid;
-      if (this.lozCompany){
-        const txt = String(company||"").trim();
-        if (txt){
-          this.lozCompany.style.display = "block";
-          this.lozCompany.textContent = txt;
-        }else{
-          this.lozCompany.style.display = "none";
-        }
-      }
+      if (!ctm) return "";
+      const inv = ctm.inverse();
+      pt = pt.matrixTransform(inv);
+    }catch(e){
+      return "";
     }
 
-    selectStand(id, opts){
-      const sid = normStandId(id);
-      const row = this.rowById(sid) || {standId:sid, status:"available", company:""};
-      this.selectedStandId = sid;
-      this.selectionNonce++;
-      if (this.opts.onSelect) this.opts.onSelect(row);
-      // callout + colours
-      if (this.opts.onBeforeSelect) this.opts.onBeforeSelect(row, opts||{});
-      this.applyColoursPublic();
-      this.drawCallout(row.standId, row.company||"");
+    const x = pt.x, y = pt.y;
+    for (const h of this.standHits){
+      const b = h.bbox;
+      if (x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height){
+        return h.standId;
+      }
     }
+    return "";
+  }
 
-    enablePlanClick(config){
+
+  enablePlanClick(config){
       if (!this.svgEl) return;
       const enabled = !!(config && config.enabled);
       const disableOnMobile = !!(config && config.disableOnMobile);
@@ -386,8 +292,7 @@ function extractStandIdFromText(t){
       this.svgEl.style.pointerEvents = "auto";
 
       const handler = (ev)=>{
-        const target = ev.target;
-        const sid = findStandIdFromElement(target);
+        const sid = this.standIdAtClientPoint(ev.clientX, ev.clientY) || findStandIdFromElement(ev.target);
         if (!sid) return;
         ev.preventDefault();
         this.selectStand(sid, {fromPlan:true});
@@ -412,13 +317,53 @@ function extractStandIdFromText(t){
       });
     }
 
+
+    getAuthHeaders(){
+      const h = {};
+      if (this.adminKey) h["x-admin-key"] = this.adminKey;
+      if (this.adminPassword) h["x-admin-pass"] = this.adminPassword;
+      return h;
+    }
+
+    async ensureAdminPassword(){
+      // Only prompt if we don't already have a password
+      if (this.adminPassword) return this.adminPassword;
+      const pw = window.prompt("Enter admin password to save changes:");
+      if (pw && String(pw).trim()){
+        this.adminPassword = String(pw).trim();
+        sessionStorage.setItem("floorplan_admin_pass", this.adminPassword);
+        return this.adminPassword;
+      }
+      return "";
+    }
+
     async updateStand(standId, status, company){
+      // Ensure we have a password before writing (backend may require it)
+      await this.ensureAdminPassword();
+
       const payload = { standId: normStandId(standId), status: statusNorm(status), company: String(company||"").trim() };
-      return await fetchJson(this.backend() + "/stand", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body: JSON.stringify(payload)
-      });
+
+      try{
+        return await fetchJson(this.backend() + "/stand", {
+          method:"POST",
+          headers: Object.assign({"Content-Type":"application/json"}, this.getAuthHeaders()),
+          body: JSON.stringify(payload)
+        });
+      }catch(err){
+        // If auth failed, clear saved password and retry once
+        const msg = String(err && err.message ? err.message : err || "");
+        if (msg.includes("401") || msg.includes("403")){
+          this.adminPassword = "";
+          sessionStorage.removeItem("floorplan_admin_pass");
+          await this.ensureAdminPassword();
+          return await fetchJson(this.backend() + "/stand", {
+            method:"POST",
+            headers: Object.assign({"Content-Type":"application/json"}, this.getAuthHeaders()),
+            body: JSON.stringify(payload)
+          });
+        }
+        throw err;
+      }
     }
   }
 
