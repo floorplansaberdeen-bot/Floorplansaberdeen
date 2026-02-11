@@ -63,6 +63,18 @@
     return map;
   }
 
+  // The SVG contains many IDs that are NOT stands (e.g. background shapes).
+  // To avoid colouring/clicking those, we whitelist against the stand IDs returned by /stands.
+  function filterStandMapToAllowedIds(map, allowedIds){
+    if(!allowedIds || allowedIds.size===0) return map;
+    const out = new Map();
+    allowedIds.forEach(id=>{
+      const el = map.get(id);
+      if(el) out.set(id, el);
+    });
+    return out;
+  }
+
   function elementCenterInPage(elem){
     const r = elem.getBoundingClientRect();
     return { x: r.left + r.width/2, y: r.top + r.height/2 };
@@ -126,6 +138,13 @@
         status: String(r.status||"available").toLowerCase(),
         company: String(r.company||"").trim()
       })).filter(r=>r.standId);
+
+      // After we know the canonical stand IDs, restrict the standMap to ONLY those.
+      // This prevents background elements (e.g. X301) being treated as stands.
+      if(this.svgRoot && this.standMap && this.standMap.size){
+        const allowed = new Set(this.rows.map(r=>normalizeDomId(r.standId)));
+        this.standMap = filterStandMapToAllowedIds(this.standMap, allowed);
+      }
       return this.rows;
     }
 
