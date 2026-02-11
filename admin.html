@@ -77,15 +77,55 @@
     .progressBar{ margin-top:12px; height:10px; border-radius:999px; background:#efefef; overflow:hidden; }
     #progressBarFill{ height:100%; width:0%; background:rgba(0,0,0,.8); }
     @media (max-width: 980px){ main{ grid-template-columns: 1fr; } .tableWrap{ max-height: none; } }
-    @media (max-width: 640px){ main{ padding:12px; gap:12px; } header input{ min-width: 170px; width: 100%; } .planCard{ position: sticky; top: 0; z-index: 20; background: var(--bg); } .zoomCard{ display:none; } .planWrap{ min-height:0; max-height:42vh; }
+    @media (max-width: 640px){
+      /* Make sure the page (not an inner wrapper) is the scrolling container so sticky works on mobile */
+      html, body{ height:auto; }
+      body{ overflow-y:auto; }
+
+      main{
+        padding:12px; gap:12px;
+        grid-template-columns: 1fr;
+        overflow: visible;
+      }
+
+      header input{ min-width: 170px; width: 100%; }
+
+      /* Keep the plan card pinned at the top */
+      .planCard{
+        position: -webkit-sticky;
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        background: var(--bg);
+      }
+
+      /* Prevent overflow on common wrappers from breaking sticky */
+      .planCard, .planBody, .planStack, .planWrap{ overflow: visible; }
+
+      /* Compact plan on phones */
+      .planWrap{ min-height:0; max-height:42vh; }
+
       #svgHost{ height:100%; }
       #svgHost > svg{ width:100%; height:100%; }
+
       .planBody{ padding:10px; }
       .labelBay{ padding:10px; min-height:56px; }
+
       header{ padding:10px 12px; }
       button{ padding:8px 10px; border-radius:12px; }
+
       .actions,.btnRow{ flex-wrap:wrap; gap:8px; }
-      .tableWrap{ max-height:46vh; } }
+
+      /* Ensure the list area scrolls under the pinned plan */
+      .tableWrap{
+        max-height: calc(100vh - 46vh - 140px);
+        overflow:auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      /* Hide the zoom card on mobile (as before) */
+      .zoomCard{ display:none; }
+    }
   </style>
   <link rel="icon" href="./favicon.ico">
 </head>

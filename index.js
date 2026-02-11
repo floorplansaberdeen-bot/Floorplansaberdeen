@@ -142,7 +142,7 @@
       return;
     }
 
-    core.enablePlanClick({ enabled:true, disableOnMobile:true, onPick:(standId)=>{
+    core.enablePlanClick({ enabled:true, disableOnMobile:false, onPick:(standId)=>{
       core.selectStand(standId, {fromPlan:true});
       core.applyColoursPublic();
       const row = core.rows.find(r=>r.standId===standId);
