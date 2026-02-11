@@ -213,9 +213,27 @@
     }
 
     applyColoursPublic(){
-      const orange = (getComputedStyle(document.documentElement).getPropertyValue("--orange") || "rgba(213,109,50,0.75)").trim();
-      const selected = (getComputedStyle(document.documentElement).getPropertyValue("--selected") || "#e63b3b").trim();
-      this.standMap.forEach((elem)=> setFillForElement(elem, orange));
+      const avail = (getComputedStyle(document.documentElement).getPropertyValue("--avail")
+        || getComputedStyle(document.documentElement).getPropertyValue("--orange")
+        || "rgba(213,109,50,0.75)").trim();
+
+      const sold = (getComputedStyle(document.documentElement).getPropertyValue("--sold")
+        || getComputedStyle(document.documentElement).getPropertyValue("--selected")
+        || "#e63b3b").trim();
+
+      const selected = (getComputedStyle(document.documentElement).getPropertyValue("--selected") || sold).trim();
+
+      // Base colour for all stands
+      this.standMap.forEach((elem)=> setFillForElement(elem, avail));
+
+      // Sold stands (matches admin colouring)
+      this.rows.forEach(r=>{
+        if(r.status !== "sold") return;
+        const elem = this.standElement(r.standId);
+        if(elem) setFillForElement(elem, sold);
+      });
+
+      // Selected stand on top
       if(this.selectedStandId){
         const elem = this.standElement(this.selectedStandId);
         if(elem) setFillForElement(elem, selected);

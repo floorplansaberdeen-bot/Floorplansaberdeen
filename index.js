@@ -81,7 +81,7 @@
       await pollSettings();
       await core.loadStands();
 
-      soldRows = core.rows.filter(r=>r.status==="sold" && (r.company||"").trim().length>0);
+      soldRows = core.rows.filter(r=>r.status==="sold");
       renderList();
 
       // Avoid "jump" by refusing to restore selection if user clicked during polling

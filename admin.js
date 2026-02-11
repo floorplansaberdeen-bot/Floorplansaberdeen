@@ -355,6 +355,8 @@
     const inp = document.createElement("input");
     inp.type="file";
     inp.accept=".csv,text/csv";
+    inp.style.display="none";
+    document.body.appendChild(inp);
     inp.onchange = async ()=>{
       const f = inp.files && inp.files[0];
       if(!f) return;
@@ -397,11 +399,12 @@
         hideProgress();
         showToast("Import failed (password wrong or backend offline).");
       }finally{
+        try{ document.body.removeChild(inp); }catch(_){ }
         setBusyState(false);
         if(autoSync) startPolling();
       }
     };
-    inp.click();
+    setTimeout(()=>inp.click(), 0);
   });
 
   resetBtn.addEventListener("click", async ()=>{
