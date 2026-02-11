@@ -77,7 +77,15 @@
     .progressBar{ margin-top:12px; height:10px; border-radius:999px; background:#efefef; overflow:hidden; }
     #progressBarFill{ height:100%; width:0%; background:rgba(0,0,0,.8); }
     @media (max-width: 980px){ main{ grid-template-columns: 1fr; } .tableWrap{ max-height: none; } }
-    @media (max-width: 640px){ main{ padding:12px; gap:12px; } header input{ min-width: 170px; width: 100%; } .planCard{ position: sticky; top: 0; z-index: 20; background: var(--bg); } .zoomCard{ display:none; } .tableWrap{ max-height: calc(100vh - 520px); } }
+    @media (max-width: 640px){ main{ padding:12px; gap:12px; } header input{ min-width: 170px; width: 100%; } .planCard{ position: sticky; top: 0; z-index: 20; background: var(--bg); } .zoomCard{ display:none; } .planWrap{ min-height:0; max-height:42vh; }
+      #svgHost{ height:100%; }
+      #svgHost > svg{ width:100%; height:100%; }
+      .planBody{ padding:10px; }
+      .labelBay{ padding:10px; min-height:56px; }
+      header{ padding:10px 12px; }
+      button{ padding:8px 10px; border-radius:12px; }
+      .actions,.btnRow{ flex-wrap:wrap; gap:8px; }
+      .tableWrap{ max-height:46vh; } }
   </style>
   <link rel="icon" href="./favicon.ico">
 </head>
