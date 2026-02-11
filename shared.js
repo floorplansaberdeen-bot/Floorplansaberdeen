@@ -232,30 +232,36 @@
     }
 
     applyColoursPublic(){
-      const avail = (getComputedStyle(document.documentElement).getPropertyValue("--avail")
-        || getComputedStyle(document.documentElement).getPropertyValue("--orange")
-        || "rgba(213,109,50,0.75)").trim();
+      const orange = "rgba(213,109,50,0.75)";
+      const red = "#e63b3b";
 
-      const sold = (getComputedStyle(document.documentElement).getPropertyValue("--sold")
-        || getComputedStyle(document.documentElement).getPropertyValue("--selected")
-        || "#e63b3b").trim();
-
-      const selected = (getComputedStyle(document.documentElement).getPropertyValue("--selected") || sold).trim();
-
-      // Base colour for all stands
-      this.standMap.forEach((elem)=> setFillForElement(elem, avail));
-
-      // Sold stands (matches admin colouring)
+      // Paint ONLY real stands from backend rows
       this.rows.forEach(r=>{
-        if(r.status !== "sold") return;
         const elem = this.standElement(r.standId);
-        if(elem) setFillForElement(elem, sold);
+        if(!elem) return;
+
+        const shapes = elem.matches("path,rect,polygon,polyline,ellipse,circle")
+          ? [elem]
+          : Array.from(elem.querySelectorAll("path,rect,polygon,polyline,ellipse,circle"));
+
+        shapes.forEach(s=>{
+          s.style.fill = orange;
+          s.style.fillOpacity = "";
+        });
       });
 
-      // Selected stand on top
+      // Selected stand turns red
       if(this.selectedStandId){
         const elem = this.standElement(this.selectedStandId);
-        if(elem) setFillForElement(elem, selected);
+        if(elem){
+          const shapes = elem.matches("path,rect,polygon,polyline,ellipse,circle")
+            ? [elem]
+            : Array.from(elem.querySelectorAll("path,rect,polygon,polyline,ellipse,circle"));
+          shapes.forEach(s=>{
+            s.style.fill = red;
+            s.style.fillOpacity = "";
+          });
+        }
       }
     }
 
