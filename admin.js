@@ -365,18 +365,58 @@
       stopPolling();
       try{
         const txt = await f.text();
-        const lines = txt.split(/\r?\n/).filter(Boolean);
-        const updates = [];
-        for(let i=1;i<lines.length;i++){
-          const m = lines[i].match(/^([^,]+),([^,]+),"(.*)"$/);
-          if(!m) continue;
-          const standId = String(m[1]||"").trim().toUpperCase();
-          const status = String(m[2]||"").trim().toLowerCase()==="sold" ? "sold" : "available";
-          const company = status==="sold" ? String(m[3]||"").replaceAll('""','"').trim() : "";
-          updates.push({ standId, status, company });
-        }
 
-        const backendIds = new Set(rows.map(r=>r.standId));
+// Robust CSV parsing: supports quoted/unquoted company, extra columns, and different header names
+const lines = txt.split(/\r?\n/).filter(l => l && l.trim().length>0);
+const updates = [];
+
+const parseLine = (line) => {
+  const out = [];
+  let cur = "";
+  let inQ = false;
+  for(let i=0;i<line.length;i++){
+    const ch = line[i];
+    if(ch === '"'){
+      if(inQ && line[i+1] === '"'){ cur += '"'; i++; }
+      else inQ = !inQ;
+    }else if(ch === ',' && !inQ){
+      out.push(cur);
+      cur = "";
+    }else{
+      cur += ch;
+    }
+  }
+  out.push(cur);
+  return out.map(v => (v ?? "").trim());
+};
+
+// Try to detect a header row
+const header = parseLine(lines[0]).map(h => h.toLowerCase());
+const idxStand = header.findIndex(h => ["standid","stand_id","stand","id"].includes(h));
+const idxStatus = header.findIndex(h => ["status","state"].includes(h));
+const idxCompany = header.findIndex(h => ["company","exhibitor","name"].includes(h));
+
+const hasHeader = (idxStand !== -1 && idxStatus !== -1);
+
+const standCol = idxStand !== -1 ? idxStand : 0;
+const statusCol = idxStatus !== -1 ? idxStatus : 1;
+const companyCol = idxCompany !== -1 ? idxCompany : 2;
+
+const startRow = hasHeader ? 1 : 1; // your exports include a header; keep consistent
+
+for(let i=startRow;i<lines.length;i++){
+  const cols = parseLine(lines[i]);
+  const standId = String((cols[standCol] ?? "")).trim().toUpperCase();
+  if(!standId) continue;
+
+  const s = String((cols[statusCol] ?? "")).trim().toLowerCase();
+  const status = (s==="sold" || s==="s" || s==="yes" || s==="true") ? "sold" : "available";
+
+  const company = status==="sold" ? String((cols[companyCol] ?? "")).trim() : "";
+  updates.push({ standId, status, company });
+}
+
+const backendIds = new Set(rows.map(r=>r.standId));
         const svgIds = new Set(Array.from(core.standMap.keys()));
         const filtered = updates.filter(u=>backendIds.has(u.standId) && svgIds.has(u.standId));
 
