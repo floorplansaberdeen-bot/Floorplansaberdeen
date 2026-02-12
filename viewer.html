@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Exhibitor Viewer</title>
+<link rel="stylesheet" href="style.css?v=20260212i">
+</head>
+<body>
+<header>
+  <h1 id="eventName">Event</h1>
+  <nav>
+    <a href="index.html">Public</a> |
+    <a href="viewer.html">Viewer</a> |
+    <a href="admin.html">Admin</a>
+  </nav>
+</header>
+
+<main class="layout">
+  <section class="plan-card">
+    <div id="svgHost"></div>
+    <div id="zoomWrap">
+      <div id="zoomSvgHost"></div>
+      <div id="zoomRing"></div>
+    </div>
+  </section>
+
+  <section class="list-card">
+    <input type="text" id="search" placeholder="Search stands or companies..." />
+    <div id="list"></div>
+  </section>
+</main>
+
+<script src="shared.js?v=20260212i"></script>
+<script src="viewer.js?v=20260212i"></script>
+</body>
+</html>

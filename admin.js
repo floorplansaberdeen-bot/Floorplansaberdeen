@@ -572,4 +572,32 @@
   }
 
   init();
+
+  const toggleBtn = document.createElement("button");
+  toggleBtn.textContent = "Toggle Exhibitor Names in Viewer";
+  toggleBtn.style.marginTop = "10px";
+  document.querySelector("header").appendChild(toggleBtn);
+
+  toggleBtn.addEventListener("click", async ()=>{
+    const pwd = await promptPassword({always:true, reason:"Admin password required"});
+    if(pwd===null) return;
+
+    const confirmTyped = prompt("Type CONFIRM to toggle exhibitor name visibility:");
+    if(confirmTyped!=="CONFIRM"){ alert("Cancelled."); return; }
+
+    const settings = await fetchJson("/settings");
+    const newVal = !(settings.showNames !== false);
+
+    await fetchJson("/settings", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify({
+        eventName: settings.eventName,
+        showNames: newVal
+      })
+    });
+
+    alert("Viewer exhibitor name visibility updated.");
+  });
+
 })();
