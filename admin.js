@@ -149,7 +149,7 @@
       const td3 = document.createElement("td"); td3.textContent = r.company || "";
 
       tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3);
-      tr.addEventListener("click", ()=>selectStand(r.standId));
+      tr.addEventListener("click", ()=> core.selectStand(r.standId, {fromPlan:false}));
       tbody.appendChild(tr);
     });
 
@@ -522,8 +522,8 @@ const backendIds = new Set(rows.map(r=>r.standId));
 
     // Enable clicking the plan (all devices)
     core.enablePlanClick({ enabled:true, disableOnMobile:false, onPick:(standId)=>{
-      const row = rows.find(r=>r.standId===standId);
-      if(row) selectStand(row.standId);
+      // Use core.selectStand so core tracks selection and miss-click clearing works
+      core.selectStand(standId, {fromPlan:true});
     }});
 
     try{

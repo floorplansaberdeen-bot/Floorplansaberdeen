@@ -279,9 +279,9 @@
 
 
     clearSelection({fromPlan=false}={}){
-      if(this.selectedStandId == null) return;
+      const had = this.selectedStandId != null;
       this.selectedStandId = null;
-      this.selectionNonce++;
+      if(had) this.selectionNonce++;
       if(this.opts.onClearSelection) this.opts.onClearSelection({fromPlan});
     }
 
