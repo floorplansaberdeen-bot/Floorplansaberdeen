@@ -188,15 +188,6 @@
     core.updateZoom(row.standId, zoomSvgHost, zoomWrap, zoomRing);
   }
 
-    standIdEl.value = row.standId;
-    statusEl.value = row.status;
-    companyEl.value = row.company || "";
-
-    core.applyColoursAdmin();
-    core.drawCallout(row.standId, row.status==="sold" ? (row.company||"") : "");
-    renderTable();
-    core.updateZoom(row.standId, zoomSvgHost, zoomWrap, zoomRing);
-  }
 
   async function loadSettings(){
     try{
