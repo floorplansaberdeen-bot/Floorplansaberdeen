@@ -393,75 +393,83 @@
   });
 
 
-  importBtn.addEventListener("click", async ()=>{
-    const pwd = await promptPassword({always:true, reason:"Admin password (import CSV):"});
-    if(pwd === null) return;
-
+  importBtn.addEventListener("click", ()=>{
+    // IMPORTANT: trigger file picker synchronously inside the user gesture (mobile Safari requirement)
     const inp = document.createElement("input");
-    inp.type="file";
-    inp.accept=".csv,text/csv";
-    inp.style.display="none";
+    inp.type = "file";
+    inp.accept = ".csv,text/csv";
+    inp.style.display = "none";
     document.body.appendChild(inp);
+
     inp.onchange = async ()=>{
       const f = inp.files && inp.files[0];
-      if(!f) return;
+      if(!f){
+        try{ inp.remove(); }catch(_){}
+        return;
+      }
+
+      const pwd = await promptPassword({always:true, reason:"Admin password (import CSV):"});
+      if(pwd === null){
+        try{ inp.remove(); }catch(_){}
+        return;
+      }
 
       setBusyState(true);
       stopPolling();
       try{
         const txt = await f.text();
 
-// Robust CSV parsing: supports quoted/unquoted company, extra columns, and different header names
-const lines = txt.split(/\r?\n/).filter(l => l && l.trim().length>0);
-const updates = [];
+        // Robust CSV parsing: supports quoted/unquoted company, extra columns, and different header names
+        const lines = String(txt).replaceAll("\r","").split("\n").filter(l => l && l.trim().length>0);
+        const updates = [];
 
-const parseLine = (line) => {
-  const out = [];
-  let cur = "";
-  let inQ = false;
-  for(let i=0;i<line.length;i++){
-    const ch = line[i];
-    if(ch === '"'){
-      if(inQ && line[i+1] === '"'){ cur += '"'; i++; }
-      else inQ = !inQ;
-    }else if(ch === ',' && !inQ){
-      out.push(cur);
-      cur = "";
-    }else{
-      cur += ch;
-    }
-  }
-  out.push(cur);
-  return out.map(v => (v ?? "").trim());
-};
+        const parseLine = (line) => {
+          const out = [];
+          let cur = "";
+          let inQ = false;
+          for(let i=0;i<line.length;i++){
+            const ch = line[i];
+            if(ch === '"'){
+              if(inQ && line[i+1] === '"'){ cur += '"'; i++; }
+              else inQ = !inQ;
+            }else if(ch === ',' && !inQ){
+              out.push(cur);
+              cur = "";
+            }else{
+              cur += ch;
+            }
+          }
+          out.push(cur);
+          return out.map(v => (v ?? "").trim());
+        };
 
-// Try to detect a header row
-const header = parseLine(lines[0]).map(h => h.toLowerCase());
-const idxStand = header.findIndex(h => ["standid","stand_id","stand","id"].includes(h));
-const idxStatus = header.findIndex(h => ["status","state"].includes(h));
-const idxCompany = header.findIndex(h => ["company","exhibitor","name"].includes(h));
+        // Try to detect a header row
+        const header = parseLine(lines[0]).map(h => h.toLowerCase());
+        const idxStand = header.findIndex(h => ["standid","stand_id","stand","id"].includes(h));
+        const idxStatus = header.findIndex(h => ["status","state"].includes(h));
+        const idxCompany = header.findIndex(h => ["company","exhibitor","name"].includes(h));
 
-const hasHeader = (idxStand !== -1 && idxStatus !== -1);
+        const hasHeader = (idxStand !== -1 && idxStatus !== -1);
 
-const standCol = idxStand !== -1 ? idxStand : 0;
-const statusCol = idxStatus !== -1 ? idxStatus : 1;
-const companyCol = idxCompany !== -1 ? idxCompany : 2;
+        const standCol = idxStand !== -1 ? idxStand : 0;
+        const statusCol = idxStatus !== -1 ? idxStatus : 1;
+        const companyCol = idxCompany !== -1 ? idxCompany : 2;
 
-const startRow = hasHeader ? 1 : 1; // your exports include a header; keep consistent
+        const startRow = hasHeader ? 1 : 0;
 
-for(let i=startRow;i<lines.length;i++){
-  const cols = parseLine(lines[i]);
-  const standId = String((cols[standCol] ?? "")).trim().toUpperCase();
-  if(!standId) continue;
+        for(let i=startRow;i<lines.length;i++){
+          const cols = parseLine(lines[i]);
+          const standId = String((cols[standCol] ?? "")).trim().toUpperCase();
+          if(!standId) continue;
 
-  const s = String((cols[statusCol] ?? "")).trim().toLowerCase();
-  const status = (s==="sold" || s==="s" || s==="yes" || s==="true") ? "sold" : "available";
+          const s = String((cols[statusCol] ?? "")).trim().toLowerCase();
+          const status = (s==="sold" || s==="s" || s==="yes" || s==="true") ? "sold" : "available";
 
-  const company = status==="sold" ? String((cols[companyCol] ?? "")).trim() : "";
-  updates.push({ standId, status, company });
-}
+          const company = status==="sold" ? String((cols[companyCol] ?? "")).trim() : "";
+          updates.push({ standId, status, company });
+        }
 
-const backendIds = new Set(rows.map(r=>r.standId));
+        const backendIds = new Set(rows.map(r=>r.standId));
         const svgIds = new Set(Array.from(core.standMap.keys()));
         const filtered = updates.filter(u=>backendIds.has(u.standId) && svgIds.has(u.standId));
 
@@ -484,13 +492,16 @@ const backendIds = new Set(rows.map(r=>r.standId));
         hideProgress();
         showToast("Import failed (password wrong or backend offline).");
       }finally{
-        try{ document.body.removeChild(inp); }catch(_){ }
+        try{ inp.remove(); }catch(_){}
         setBusyState(false);
         if(autoSync) startPolling();
       }
     };
-    setTimeout(()=>inp.click(), 0);
+
+    inp.click();
   });
+
+
 
   resetBtn.addEventListener("click", async ()=>{
     const pwd = await promptPassword({always:true, reason:"Admin password (RESET ALL):"});
