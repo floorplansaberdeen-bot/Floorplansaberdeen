@@ -177,7 +177,6 @@
         this.clearSelection({fromPlan:true});
       };
       this.svgRoot.addEventListener("click", handler);
-      this.svgRoot.addEventListener("touchend", handler);
       this._planClickHandler = handler;
     }
 

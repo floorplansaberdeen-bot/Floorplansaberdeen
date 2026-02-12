@@ -162,16 +162,31 @@
     const row = rows.find(r=>r.standId === selectedStandId);
 
     if(!row){
-      // Clear form + callout + zoom when clicking off stands
+      // Clear everything when clicking off plan
       standIdEl.value = "";
       statusEl.value = "available";
       companyEl.value = "";
+
       core.applyColoursAdmin();
       core.clearCallout();
       renderTable();
       core.updateZoom(null, zoomSvgHost, zoomWrap, zoomRing);
       return;
     }
+
+    standIdEl.value = row.standId;
+    statusEl.value = row.status;
+    companyEl.value = row.company || "";
+
+    core.applyColoursAdmin();
+    core.drawCallout(
+      row.standId,
+      row.status==="sold" ? (row.company||"") : ""
+    );
+
+    renderTable();
+    core.updateZoom(row.standId, zoomSvgHost, zoomWrap, zoomRing);
+  }
 
     standIdEl.value = row.standId;
     statusEl.value = row.status;
