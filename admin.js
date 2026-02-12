@@ -1,5 +1,5 @@
 (() => {
-  const { el, fetchJson, getBackendUrl, BACKEND_KEY } = window.FloorplanShared;
+  const { el, fetchJson, getBackendUrl } = window.FloorplanShared;
 
   const svgHost = el("svgHost");
   const planWrap = el("planWrap");
@@ -35,9 +35,7 @@
   const undoBtn = el("undoBtn");
 
   const toast = el("toast");
-  const toastMsg = el("toastMsg");
-  const setBackendBtn = el("setBackendBtn");
-  const hideToastBtn = el("hideToastBtn");
+  const toastMsg = el("toastMsg");  const hideToastBtn = el("hideToastBtn");
   const syncedAt = el("syncedAt");
 
   const progressOverlay = el("progressOverlay");
@@ -91,15 +89,7 @@
   }
   function hideToast(){ toast.style.display = "none"; }
 
-  setBackendBtn.addEventListener("click", () => {
-    const current = getBackendUrl();
-    const v = prompt("Paste your backend URL (Cloudflare Worker):", current);
-    if (v && v.trim().startsWith("http")) {
-      localStorage.setItem(BACKEND_KEY, v.trim().replace(/\/+$/,""));
-      location.reload();
-    }
-  });
-  hideToastBtn.addEventListener("click", hideToast);
+    hideToastBtn.addEventListener("click", hideToast);
 
   function setBusyState(b){
     isBusy = b;
@@ -508,6 +498,10 @@
     if(pwd === null) return;
 
     if(!confirm("Reset all SVG stands to Available (clears company names)?")) return;
+
+    const typed = prompt("Type RESET to confirm wiping all stands:");
+    if(typed !== "RESET") { showToast("Reset cancelled."); return; }
+
 
     setBusyState(true);
     stopPolling();
