@@ -357,13 +357,41 @@
       const c = (r.company||"").replaceAll('"','""');
       return `${r.standId},${r.status},"${c}"`;
     }));
-    const blob = new Blob([lines.join("\n")], { type:"text/csv" });
+    const csv = lines.join("\n");
+    const blob = new Blob([csv], { type:"text/csv;charset=utf-8" });
+    const fileName = "stands.csv";
+
+    // Best experience on phones (iOS/Android): share sheet when available
+    try{
+      if(navigator.canShare && navigator.canShare({ files: [new File([blob], fileName, {type: blob.type})] })){
+        const file = new File([blob], fileName, {type: blob.type});
+        await navigator.share({ files: [file], title: "Export CSV" });
+        return;
+      }
+    }catch(_){}
+
+    // Fallback: download via temporary link (works on desktop + many Android browsers)
+    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "stands.csv";
+    a.href = url;
+    a.download = fileName;
+    a.rel = "noopener";
+    a.style.display = "none";
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(a.href);
+    setTimeout(()=>{
+      URL.revokeObjectURL(url);
+      a.remove();
+    }, 1500);
+
+    // iOS Safari sometimes ignores download attribute; open a new tab as last resort
+    if(/iPad|iPhone|iPod/.test(navigator.userAgent)){
+      setTimeout(()=>{
+        try{ window.open(url, "_blank"); }catch(_){}
+      }, 250);
+    }
   });
+
 
   importBtn.addEventListener("click", async ()=>{
     const pwd = await promptPassword({always:true, reason:"Admin password (import CSV):"});
