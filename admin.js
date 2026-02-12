@@ -158,9 +158,20 @@
   }
 
   function selectStand(id){
-    selectedStandId = id;
-    const row = rows.find(r=>r.standId === id);
-    if(!row) return;
+    selectedStandId = id || null;
+    const row = rows.find(r=>r.standId === selectedStandId);
+
+    if(!row){
+      // Clear form + callout + zoom when clicking off stands
+      standIdEl.value = "";
+      statusEl.value = "available";
+      companyEl.value = "";
+      core.applyColoursAdmin();
+      core.clearCallout();
+      renderTable();
+      core.updateZoom(null, zoomSvgHost, zoomWrap, zoomRing);
+      return;
+    }
 
     standIdEl.value = row.standId;
     statusEl.value = row.status;
@@ -491,7 +502,8 @@ const backendIds = new Set(rows.map(r=>r.standId));
     core = new window.FloorplanCore({
       svgHost, planWrap, planStack, calloutSvg,
       lozenge, lozStand, lozCompany,
-      onSelect: (row)=> selectStand(row.standId)
+      onSelect: (row)=> selectStand(row.standId),
+      onClearSelection: ()=> selectStand(null)
     });
 
     try{

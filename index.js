@@ -131,6 +131,11 @@
         core.applyColoursPublic();
         core.drawCallout(row.standId, row.company||"");
         renderList();
+      },
+      onClearSelection: ()=>{
+        core.applyColoursPublic();
+        core.clearCallout();
+        renderList();
       }
     });
 

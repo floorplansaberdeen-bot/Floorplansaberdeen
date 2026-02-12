@@ -172,6 +172,9 @@
           }
           n = n.parentElement;
         }
+
+        // Clicked outside any stand -> clear selection
+        this.clearSelection({fromPlan:true});
       };
       this.svgRoot.addEventListener("click", handler);
       this._planClickHandler = handler;
@@ -272,6 +275,14 @@
       this.selectedStandId = row.standId;
       this.selectionNonce++;
       if(this.opts.onSelect) this.opts.onSelect(row, {fromPlan});
+    }
+
+
+    clearSelection({fromPlan=false}={}){
+      if(this.selectedStandId == null) return;
+      this.selectedStandId = null;
+      this.selectionNonce++;
+      if(this.opts.onClearSelection) this.opts.onClearSelection({fromPlan});
     }
 
     forceZoomBlackAndWhite(svg){
