@@ -74,6 +74,8 @@
 
     for(const r of filtered){
       const tr = document.createElement("tr");
+      tr.style.cursor = "pointer";
+      tr.style.userSelect = "none";
       if(core.selectedStandId === r.standId) tr.classList.add("rowSel");
       const td1 = document.createElement("td"); td1.textContent = r.standId;
       const td2 = document.createElement("td"); td2.textContent = r.status;
@@ -122,13 +124,15 @@
     try{
       const s = await fetchJson(`${getBackendUrl()}/settings?_=${Date.now()}`);
       settings = s || settings;
+      if(settings.showNames === "false") settings.showNames = false;
+      if(settings.showNames === "true") settings.showNames = true;
       if(settings.showNames === undefined) settings.showNames = true;
       eventNameTitle.textContent = settings.eventName || "Exhibitors";
     }catch(e){
       console.warn("Viewer settings fetch failed", e);
     }
 
-    const prevSel = core && core.selectedStandId ? core.selectedStandId : null;
+    const prevSel = (core && core.selectedStandId) ? core.selectedStandId : null;
 
     try{
       await core.loadStands();

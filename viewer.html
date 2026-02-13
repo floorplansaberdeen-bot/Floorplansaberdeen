@@ -146,6 +146,14 @@
 .table tbody tr.selected{outline:2px solid rgba(0,0,0,0.12); background: rgba(0,0,0,0.03);}
 .table td, .table th{user-select:none;}
 </style>
+
+<style>
+/* viewer table interactions v2 */
+.table tbody tr, .table tbody td { cursor: pointer !important; }
+.table tbody tr.selected td { background: rgba(0,0,0,0.05) !important; }
+.table tbody tr:hover td { background: rgba(0,0,0,0.03); }
+.table tbody td { user-select: none !important; }
+</style>
 </head>
 <body>
   <header>
@@ -212,7 +220,7 @@
     </aside>
   </main>
 
-  <script src="shared.js?v=20260213g"></script>
-  <script src="viewer.js?v=20260213g"></script>
+  <script src="shared.js?v=20260213h"></script>
+  <script src="viewer.js?v=20260213h"></script>
 </body>
 </html>
