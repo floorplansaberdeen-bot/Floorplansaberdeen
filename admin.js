@@ -603,6 +603,8 @@
           })
         });
         if(viewerNamesState) viewerNamesState.textContent = desired ? "On" : "Off";
+        const openViewerBtn = el("openViewerBtn");
+        if(openViewerBtn){ openViewerBtn.href = `viewer.html?names=${desired ? 1 : 0}`; }
         showToast("Viewer setting saved.");
       }catch(e){
         viewerNamesToggle.checked = !desired;

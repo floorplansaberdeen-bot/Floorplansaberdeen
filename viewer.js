@@ -26,6 +26,10 @@
 
   let rows = [];
   let settings = { eventName:"Event", showNames:true };
+  const urlParams = new URLSearchParams(location.search);
+  const namesOverrideRaw = urlParams.get("names");
+  const namesOverride = (namesOverrideRaw==null) ? null : namesOverrideRaw;
+
 
   function normShowNames(v){
     if(v === undefined || v === null) return true;
@@ -89,7 +93,11 @@
       const tr = document.createElement("tr");
       tr.style.cursor = "pointer";
       tr.style.userSelect = "none";
-      if(core.selectedStandId === r.standId) tr.classList.add("rowSel");
+      if(core.selectedStandId === r.standId){
+        tr.classList.add("rowSel");
+        tr.style.background = "rgba(0,0,0,0.06)";
+        tr.style.outline = "2px solid rgba(0,0,0,0.12)";
+      }
       const td1 = document.createElement("td"); td1.textContent = r.standId;
       const td2 = document.createElement("td"); td2.textContent = r.status;
       const td3 = document.createElement("td");
@@ -138,6 +146,10 @@
       const s = await fetchJson(`${getBackendUrl()}/settings?_=${Date.now()}`);
       settings = s || settings;
       settings.showNames = normShowNames(settings.showNames);
+      // Optional override via ?names=0/1 (useful if backend does not persist showNames)
+      if(namesOverride !== null){
+        settings.showNames = normShowNames(namesOverride);
+      }
       eventNameTitle.textContent = settings.eventName || "Exhibitors";
     }catch(e){
       console.warn("Viewer settings fetch failed", e);
