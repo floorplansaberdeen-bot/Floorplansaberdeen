@@ -220,8 +220,8 @@
       const r = dotPx/2;
 
       this.opts.calloutSvg.innerHTML = `
-        <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="rgba(0,0,0,.70)" stroke-width="3" stroke-linecap="round"/>
-        <circle cx="${x2}" cy="${y2}" r="${r}" fill="rgba(0,0,0,.72)"/>
+        <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="rgba(70,70,70,.85)" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="${x2}" cy="${y2}" r="${r}" fill="rgba(70,70,70,.90)"/>
       `;
     }
 
