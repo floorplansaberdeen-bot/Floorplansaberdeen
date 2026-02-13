@@ -117,7 +117,7 @@
   async function loadAll({isPoll=false}={}){
     // Settings first so title updates even if stands fail
     try{
-      const s = await fetchJson(`${getBackendUrl()}/settings`);
+      const s = await fetchJson(`${getBackendUrl()}/settings?_=${Date.now()}`);
       settings = s || settings;
       if(settings.showNames === undefined) settings.showNames = true;
       eventNameTitle.textContent = settings.eventName || "Exhibitors";
@@ -132,7 +132,7 @@
       rows = core.rows || [];
       // rows live on core.rows
 
-      if(prevSel) core.selectedStandId = prevSel;
+      if(prevSel) core.selectedStandId = prevSel; // preserve selection across polls
       refreshUI();
       setUpdatedAt();
       if(offlineBanner) offlineBanner.style.display = "none";
