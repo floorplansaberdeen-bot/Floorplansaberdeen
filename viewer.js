@@ -26,6 +26,19 @@
 
   let rows = [];
   let settings = { eventName:"Event", showNames:true };
+
+  function normShowNames(v){
+    if(v === undefined || v === null) return true;
+    if(typeof v === "string"){
+      const s = v.trim().toLowerCase();
+      if(s === "false" || s === "0" || s === "no" || s === "off") return false;
+      if(s === "true" || s === "1" || s === "yes" || s === "on") return true;
+    }
+    if(v === false || v === 0) return false;
+    if(v === true || v === 1) return true;
+    return !!v;
+  }
+
   let userInteractingUntil = 0;
 
   const core = new FloorplanCore({
@@ -80,7 +93,7 @@
       const td1 = document.createElement("td"); td1.textContent = r.standId;
       const td2 = document.createElement("td"); td2.textContent = r.status;
       const td3 = document.createElement("td");
-      td3.textContent = (r.status==="sold" && settings.showNames !== false) ? (r.company||"") : "";
+      td3.textContent = (r.status==="sold" && settings.showNames === true) ? (r.company||"") : "";
       tr.append(td1, td2, td3);
       tr.addEventListener("click", (e)=>{
         e.preventDefault();
@@ -105,7 +118,7 @@
     }
 
     const row = rows.find(r=>r.standId===core.selectedStandId);
-    const company = (row && row.status==="sold" && settings.showNames !== false) ? (row.company||"") : "";
+    const company = (row && row.status==="sold" && settings.showNames === true) ? (row.company||"") : "";
     core.drawCallout(core.selectedStandId, company);
     lozStand.textContent = core.selectedStandId;
     if(company){
@@ -124,9 +137,7 @@
     try{
       const s = await fetchJson(`${getBackendUrl()}/settings?_=${Date.now()}`);
       settings = s || settings;
-      if(settings.showNames === "false") settings.showNames = false;
-      if(settings.showNames === "true") settings.showNames = true;
-      if(settings.showNames === undefined) settings.showNames = true;
+      settings.showNames = normShowNames(settings.showNames);
       eventNameTitle.textContent = settings.eventName || "Exhibitors";
     }catch(e){
       console.warn("Viewer settings fetch failed", e);
@@ -140,8 +151,6 @@
       // Prevent poll races from reverting selection
       if(latestUserSelection) core.selectedStandId = latestUserSelection;
       // rows live on core.rows
-
-      if(prevSel) core.selectedStandId = prevSel; // preserve selection across polls
       refreshUI();
       setUpdatedAt();
       if(offlineBanner) offlineBanner.style.display = "none";
