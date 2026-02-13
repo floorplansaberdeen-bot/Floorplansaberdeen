@@ -1,5 +1,5 @@
 (() => {
-  const { el, fetchJson } = window.FloorplanShared;
+  const { el, fetchJson, getBackendUrl } = window.FloorplanShared;
 
   const svgHost = el("svgHost");
   const planWrap = el("planWrap");
@@ -114,7 +114,7 @@
   }
 
   async function loadAll({isPoll=false}={}){
-    const [s, r] = await Promise.all([fetchJson("/settings"), fetchJson("/stands")]);
+    const [s, r] = await Promise.all([fetchJson(`${getBackendUrl()}/settings?_=${Date.now()}`), fetchJson(`${getBackendUrl()}/stands?_=${Date.now()}`)]);
     settings = s || settings;
     if(settings.showNames === undefined) settings.showNames = true;
     eventNameTitle.textContent = settings.eventName || "Event";

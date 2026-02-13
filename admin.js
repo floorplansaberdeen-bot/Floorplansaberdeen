@@ -571,33 +571,46 @@
     if(getPwd()) setUnlocked(true);
   }
 
-  init();
+  
+  // Viewer names toggle (requires password + typed confirm)
+  const viewerNamesToggle = el("viewerNamesToggle");
+  const viewerNamesState = el("viewerNamesState");
+  if(viewerNamesToggle){
+    viewerNamesToggle.addEventListener("change", async ()=>{
+      const desired = !!viewerNamesToggle.checked;
 
-  const toggleBtn = document.createElement("button");
-  toggleBtn.textContent = "Toggle Exhibitor Names in Viewer";
-  toggleBtn.style.marginTop = "10px";
-  document.querySelector("header").appendChild(toggleBtn);
+      const pwd = await promptPassword({always:true, reason:"Admin password required"});
+      if(pwd === null){
+        viewerNamesToggle.checked = !desired;
+        return;
+      }
 
-  toggleBtn.addEventListener("click", async ()=>{
-    const pwd = await promptPassword({always:true, reason:"Admin password required"});
-    if(pwd===null) return;
+      const typed = prompt('Type CONFIRM to ' + (desired ? 'SHOW' : 'HIDE') + ' company names in Viewer:');
+      if(typed !== "CONFIRM"){
+        viewerNamesToggle.checked = !desired;
+        showToast("Cancelled.");
+        return;
+      }
 
-    const confirmTyped = prompt("Type CONFIRM to toggle exhibitor name visibility:");
-    if(confirmTyped!=="CONFIRM"){ alert("Cancelled."); return; }
-
-    const settings = await fetchJson("/settings");
-    const newVal = !(settings.showNames !== false);
-
-    await fetchJson("/settings", {
-      method:"POST",
-      headers:{ "Content-Type":"application/json" },
-      body: JSON.stringify({
-        eventName: settings.eventName,
-        showNames: newVal
-      })
+      try{
+        const current = await fetchJson(`${getBackendUrl()}/settings?_=${Date.now()}`);
+        await fetchJson(`${getBackendUrl()}/settings`, {
+          method:"POST",
+          headers:{ "Content-Type":"application/json" },
+          body: JSON.stringify({
+            eventName: current.eventName || "",
+            showNames: desired
+          })
+        });
+        if(viewerNamesState) viewerNamesState.textContent = desired ? "On" : "Off";
+        showToast("Viewer setting saved.");
+      }catch(e){
+        viewerNamesToggle.checked = !desired;
+        showToast("Failed to save viewer setting.");
+      }
     });
+  }
 
-    alert("Viewer exhibitor name visibility updated.");
-  });
+  init();
 
 })();
