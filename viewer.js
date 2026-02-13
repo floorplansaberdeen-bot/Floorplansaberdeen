@@ -116,7 +116,7 @@
   async function loadAll({isPoll=false}={}){
     // Fetch settings first so the title always updates even if stands fail
     try{
-      const s = await fetchJson(`${getBackendUrl()}/settings?_=${Date.now()}`);
+      const s = await fetchJson(`${core.backend()}/settings?_=${Date.now()}`);
       settings = s || settings;
       if(settings.showNames === undefined) settings.showNames = true;
       eventNameTitle.textContent = settings.eventName || "Event";
@@ -129,16 +129,17 @@
     const prevSel = keep ? core.selectedStandId : null;
 
     try{
-      const r = await fetchJson(`${getBackendUrl()}/stands?_=${Date.now()}`);
-      rows = normalizeRows(r);
-      core.setRows(rows);
+      await core.loadData();
+      rows = core.rows || [];
       if(prevSel) core.selectedStandId = prevSel;
       refreshUI();
       setUpdatedAt();
     }catch(e){
-      console.error("Viewer stands fetch failed", e);
-      // keep last known rows on screen; show offline indicator
+      console.error("Viewer stands load failed", e);
       updatedAt.textContent = "Offline";
+      // show backend URL for debugging
+      const b = (core && core.backend) ? core.backend() : (getBackendUrl ? getBackendUrl() : "");
+      console.warn("Viewer backend:", b);
     }
   }
 
