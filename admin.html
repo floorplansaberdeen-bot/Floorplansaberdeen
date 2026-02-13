@@ -138,20 +138,20 @@
         <div style="font-weight:900;">Event name</div>
         <input id="eventName" placeholder="New Event" />
         <button id="setEventBtn" class="primary" title="Save event name">Set</button>
-      </div>
-      <div style="display:flex; gap:10px; align-items:center; margin-top:8px;">
-        <label style="display:flex; gap:8px; align-items:center; user-select:none;">
-          <input type="checkbox" id="viewerNamesToggle" style="width:18px; height:18px;"/>
-          <span style="font-weight:700;">Include company names in Exhibitor Viewer</span>
-        </label>
-        <span id="viewerNamesState" class="muted"></span>
-      </div>
-      <button id="pauseBtn">Pause sync</button>
+      </div><button id="pauseBtn">Pause sync</button>
       <button id="exportBtn">Export CSV</button>
       <button id="importBtn">Import CSV</button>
       <button class="danger" id="resetBtn">Reset all</button>
       <button id="undoBtn" disabled title="Undo last change">Undo</button>
     </div>
+      <div class="row" style="align-items:center; gap:12px; margin-top:10px;">
+        <label style="display:flex; align-items:center; gap:10px; user-select:none;">
+          <input id="viewerNamesToggle" type="checkbox" style="width:18px; height:18px;"/>
+          <span style="font-weight:600;">Include company names in Exhibitor Viewer</span>
+        </label>
+        <span id="viewerNamesState" class="muted"></span>
+      </div>
+
   </header>
 
   <main>
@@ -255,7 +255,7 @@
     </div>
   </div>
 
-  <script src="./shared.js?v=20260213b"></script>
-  <script src="./admin.js?v=20260213b" defer></script>
+  <script src="./shared.js?v=20260213c"></script>
+  <script src="./admin.js?v=20260213c" defer></script>
 </body>
 </html>
