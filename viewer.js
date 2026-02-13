@@ -110,7 +110,7 @@
       lozCompany.style.display = "none";
       lozCompany.textContent = "";
     }
-    lozenge.style.display = "flex";
+    lozenge.style.display = "block";
     core.updateZoom(core.selectedStandId, zoomSvgHost, zoomWrap, zoomRing);
   }
 
@@ -147,6 +147,8 @@
   async function init(){
     await core.loadSvg();
     core.enablePlanClick({ enabled:true, disableOnMobile:false, onPick:(standId)=>{
+      // Ignore clicks on non-stand SVG elements
+      if(!(core.rows||[]).some(r=>r.standId===standId)) return;
       markInteracting();
       core.selectStand(standId, {fromPlan:true});
     }});
