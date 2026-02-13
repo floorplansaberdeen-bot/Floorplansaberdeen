@@ -128,9 +128,10 @@
     const prevSel = core && core.selectedStandId ? core.selectedStandId : null;
 
     try{
-      const r = await fetchJson(`${getBackendUrl()}/stands`);
-      rows = normalizeRows(r);
-      core.setRows(rows);
+      await core.loadStands();
+      rows = core.rows || [];
+      // rows live on core.rows
+
       if(prevSel) core.selectedStandId = prevSel;
       refreshUI();
       setUpdatedAt();
