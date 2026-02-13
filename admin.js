@@ -230,6 +230,18 @@
     try{
       const s = await fetchJson(`${getBackendUrl()}/settings?_=${Date.now()}`);
       if(s && typeof s.eventName === "string") eventNameEl.value = s.eventName;
+
+      // Apply Viewer show/hide setting to UI
+      const tgl = el("viewerNamesToggle");
+      const st  = el("viewerNamesState");
+      const openViewerBtn = el("openViewerBtn");
+      if(tgl && typeof s.showNames !== "undefined"){
+        tgl.checked = (s.showNames === true);
+        if(st) st.textContent = tgl.checked ? "On" : "Off";
+      }
+      if(openViewerBtn){
+        openViewerBtn.href = "viewer.html";
+      }
     }catch(_){}
   }
 
@@ -633,7 +645,7 @@
       const desired = !!viewerNamesToggle.checked;
 
       const openViewerBtn = el("openViewerBtn");
-      if(openViewerBtn){ openViewerBtn.href = `viewer.html?names=${desired ? 1 : 0}`; }
+      if(openViewerBtn){ openViewerBtn.href = `viewer.html`; }
 
       const pwd = await promptPassword({always:true, reason:"Admin password required"});
       if(pwd === null){
@@ -657,7 +669,7 @@
         });
         if(viewerNamesState) viewerNamesState.textContent = desired ? "On" : "Off";
         const openViewerBtn = el("openViewerBtn");
-        if(openViewerBtn){ openViewerBtn.href = `viewer.html?names=${desired ? 1 : 0}`; }
+        if(openViewerBtn){ openViewerBtn.href = `viewer.html`; }
         showToast("Viewer setting saved.");
       }catch(e){
         showToast("Viewer link updated. (Backend may not persist this setting.)");
