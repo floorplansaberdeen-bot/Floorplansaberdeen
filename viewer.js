@@ -16,6 +16,7 @@
 
   const eventNameTitle = el("eventNameTitle");
   const updatedAt = el("updatedAt");
+  const offlineBanner = el("offlineBanner");
 
   const tbody = el("tbody");
   const searchEl = el("search");
@@ -114,32 +115,31 @@
   }
 
   async function loadAll({isPoll=false}={}){
-    // Fetch settings first so the title always updates even if stands fail
+    // Settings first so title updates even if stands fail
     try{
-      const s = await fetchJson(`${core.backend()}/settings?_=${Date.now()}`);
+      const s = await fetchJson(`${getBackendUrl()}/settings`);
       settings = s || settings;
       if(settings.showNames === undefined) settings.showNames = true;
-      eventNameTitle.textContent = settings.eventName || "Event";
+      eventNameTitle.textContent = settings.eventName || "Exhibitors";
     }catch(e){
-      // keep previous settings
-      console.error("Viewer settings fetch failed", e);
+      console.warn("Viewer settings fetch failed", e);
     }
 
-    const keep = core.selectedStandId && (shouldRespectUser() || !isPoll);
-    const prevSel = keep ? core.selectedStandId : null;
+    const prevSel = core && core.selectedStandId ? core.selectedStandId : null;
 
     try{
-      await core.loadData();
-      rows = core.rows || [];
+      const r = await fetchJson(`${getBackendUrl()}/stands`);
+      rows = normalizeRows(r);
+      core.setRows(rows);
       if(prevSel) core.selectedStandId = prevSel;
       refreshUI();
       setUpdatedAt();
+      if(offlineBanner) offlineBanner.style.display = "none";
     }catch(e){
-      console.error("Viewer stands load failed", e);
+      console.error("Viewer stands fetch failed", e);
       updatedAt.textContent = "Offline";
-      // show backend URL for debugging
-      const b = (core && core.backend) ? core.backend() : (getBackendUrl ? getBackendUrl() : "");
-      console.warn("Viewer backend:", b);
+      // Keep last known rows visible (don't wipe UI)
+      refreshUI();
     }
   }
 
