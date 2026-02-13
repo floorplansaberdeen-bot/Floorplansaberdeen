@@ -70,17 +70,64 @@
   function setPwd(p){ sessionStorage.setItem(SESSION_PWD, p); setUnlocked(true); }
   function clearPwd(){ sessionStorage.removeItem(SESSION_PWD); setUnlocked(false); }
 
-  async function promptPassword({always=false, reason="Admin password required"}={}){
+  async function promptPassword({always=false, reason="Admin password required"}={}) {
     if(!always){
       const cached = getPwd();
       if(cached) return cached;
     }
-    const entered = prompt(reason, "");
-    if(entered === null) return null;
-    const pwd = String(entered).trim();
-    if(!pwd) return null;
-    if(!always) setPwd(pwd);
-    return pwd;
+
+    // Modal password prompt (masked)
+    const modal = document.getElementById("pwdModal");
+    const input = document.getElementById("pwdInput");
+    const reasonEl = document.getElementById("pwdReason");
+    const btnOk = document.getElementById("pwdOk");
+    const btnCancel = document.getElementById("pwdCancel");
+
+    if(!modal || !input || !reasonEl || !btnOk || !btnCancel){
+      const entered = window.prompt(reason, "");
+      if(entered === null) return null;
+      const pwd = String(entered).trim();
+      if(!pwd) return null;
+      setPwd(pwd);
+      return pwd;
+    }
+
+    reasonEl.textContent = reason;
+
+    return await new Promise((resolve)=>{
+      let done=false;
+      const cleanup = ()=>{
+        btnOk.removeEventListener("click", onOk);
+        btnCancel.removeEventListener("click", onCancel);
+        input.removeEventListener("keydown", onKey);
+      };
+      const finish = (val)=>{
+        if(done) return;
+        done=true;
+        modal.style.display="none";
+        cleanup();
+        resolve(val);
+      };
+      const onOk = ()=>{
+        const pwd = String(input.value||"").trim();
+        if(!pwd) return;
+        setPwd(pwd);
+        finish(pwd);
+      };
+      const onCancel = ()=> finish(null);
+      const onKey = (e)=>{
+        if(e.key==="Enter"){ e.preventDefault(); onOk(); }
+        if(e.key==="Escape"){ e.preventDefault(); onCancel(); }
+      };
+
+      input.value="";
+      modal.style.display="flex";
+      input.focus();
+
+      btnOk.addEventListener("click", onOk);
+      btnCancel.addEventListener("click", onCancel);
+      input.addEventListener("keydown", onKey);
+    });
   }
 
   function showToast(msg){
@@ -538,6 +585,12 @@
   });
 
   async function init(){
+    // Always request password on page load (masked)
+    const bootPwd = await promptPassword({always:true, reason:"Admin password required"});
+    if(!bootPwd){
+      setUnlocked(false);
+    }
+
     core = new window.FloorplanCore({
       svgHost, planWrap, planStack, calloutSvg,
       lozenge, lozStand, lozCompany,

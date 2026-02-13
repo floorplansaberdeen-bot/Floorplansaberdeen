@@ -6,9 +6,10 @@
   <title>Floorplan</title>
   <style>
     :root{
-      --bg:#ffffff; --card:#ffffff; --border:#e9e9e9; --text:#111; --muted:#666;
+      --accentText:rgb(213,109,50);
+      --bg:#ffffff; --card:#ffffff; --border:#e9e9e9; --text:#111; --muted:rgb(213,109,50);
       --avail: rgba(213,109,50,0.75); --sold:#e63b3b; --orange: rgba(213,109,50,0.75); --selected:#e63b3b; --shadow: 0 12px 30px rgba(0,0,0,.12);
-      --dot: 10px; --line: rgba(0,0,0,.70); --safe: env(safe-area-inset-bottom, 0px);
+      --dot: 10px; --line:rgba(110,110,110,.9); --safe: env(safe-area-inset-bottom, 0px);
     }
     *{ box-sizing:border-box; }
     body{ margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; background:var(--bg); color:var(--text); }
@@ -75,6 +76,14 @@
   b, strong, th { color: #d56d32; }
   /* v38 callout line enforcement */
   #calloutSvg line, #calloutSvg circle { stroke: rgba(70,70,70,.85) !important; fill: rgba(70,70,70,.90) !important; }
+
+  /* v39 orange sweep */
+  .cardHead, .cardTitle, .sectionTitle, .topTitle, .brand, .pageTitle,
+  .title, .headerTitle, .panelTitle { color: var(--accentText) !important; }
+  b, strong, th { color: var(--accentText) !important; }
+  /* callout line/dot */
+  #calloutSvg line { stroke: rgba(110,110,110,.9) !important; }
+  #calloutSvg circle { stroke: rgba(110,110,110,.9) !important; fill: rgba(110,110,110,.95) !important; }
 </style>
   <link rel="icon" href="./favicon.ico">
 </head>
@@ -125,7 +134,7 @@
     </aside>
   </main>
 
-  <script src="./shared.js?v=20260213n"></script>
-  <script src="./index.js?v=20260213n" defer></script>
+  <script src="./shared.js?v=20260213p"></script>
+  <script src="./index.js?v=20260213p" defer></script>
 </body>
 </html>
