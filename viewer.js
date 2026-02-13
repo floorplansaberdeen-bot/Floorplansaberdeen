@@ -80,8 +80,11 @@
       const td3 = document.createElement("td");
       td3.textContent = (r.status==="sold" && settings.showNames !== false) ? (r.company||"") : "";
       tr.append(td1, td2, td3);
-      tr.addEventListener("click", ()=>{
+      tr.addEventListener("click", (e)=>{
+        e.preventDefault();
+        e.stopPropagation();
         markInteracting();
+        latestUserSelection = r.standId;
         core.selectStand(r.standId, {fromPlan:false});
       });
       tbody.appendChild(tr);
@@ -130,6 +133,8 @@
     try{
       await core.loadStands();
       rows = core.rows || [];
+      // Prevent poll races from reverting selection
+      if(latestUserSelection) core.selectedStandId = latestUserSelection;
       // rows live on core.rows
 
       if(prevSel) core.selectedStandId = prevSel; // preserve selection across polls
@@ -150,6 +155,7 @@
       // Ignore clicks on non-stand SVG elements
       if(!(core.rows||[]).some(r=>r.standId===standId)) return;
       markInteracting();
+      latestUserSelection = standId;
       core.selectStand(standId, {fromPlan:true});
     }});
 
