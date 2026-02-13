@@ -579,6 +579,9 @@
     viewerNamesToggle.addEventListener("change", async ()=>{
       const desired = !!viewerNamesToggle.checked;
 
+      const openViewerBtn = el("openViewerBtn");
+      if(openViewerBtn){ openViewerBtn.href = `viewer.html?names=${desired ? 1 : 0}`; }
+
       const pwd = await promptPassword({always:true, reason:"Admin password required"});
       if(pwd === null){
         viewerNamesToggle.checked = !desired;
@@ -607,8 +610,7 @@
         if(openViewerBtn){ openViewerBtn.href = `viewer.html?names=${desired ? 1 : 0}`; }
         showToast("Viewer setting saved.");
       }catch(e){
-        viewerNamesToggle.checked = !desired;
-        showToast("Failed to save viewer setting.");
+        showToast("Viewer link updated. (Backend may not persist this setting.)");
       }
     });
   }
