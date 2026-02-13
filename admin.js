@@ -600,10 +600,7 @@
         await fetchJson(`${getBackendUrl()}/settings`, {
           method:"POST",
           headers:{ "Content-Type":"application/json" },
-          body: JSON.stringify({
-            eventName: current.eventName || "",
-            showNames: desired
-          })
+          body: JSON.stringify({ eventName: current.eventName || "", showNames: desired, adminPassword: pwd })
         });
         if(viewerNamesState) viewerNamesState.textContent = desired ? "On" : "Off";
         const openViewerBtn = el("openViewerBtn");

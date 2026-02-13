@@ -26,9 +26,6 @@
 
   let rows = [];
   let settings = { eventName:"Event", showNames:true };
-  const urlParams = new URLSearchParams(location.search);
-  const namesOverrideRaw = urlParams.get("names");
-  const namesOverride = (namesOverrideRaw==null) ? null : namesOverrideRaw;
 
 
   function normShowNames(v){
@@ -146,10 +143,7 @@
       const s = await fetchJson(`${getBackendUrl()}/settings?_=${Date.now()}`);
       settings = s || settings;
       settings.showNames = normShowNames(settings.showNames);
-      // Optional override via ?names=0/1 (useful if backend does not persist showNames)
-      if(namesOverride !== null){
-        settings.showNames = normShowNames(namesOverride);
-      }
+      
       eventNameTitle.textContent = settings.eventName || "Exhibitors";
     }catch(e){
       console.warn("Viewer settings fetch failed", e);
