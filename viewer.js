@@ -114,20 +114,32 @@
   }
 
   async function loadAll({isPoll=false}={}){
-    const [s, r] = await Promise.all([fetchJson(`${getBackendUrl()}/settings?_=${Date.now()}`), fetchJson(`${getBackendUrl()}/stands?_=${Date.now()}`)]);
-    settings = s || settings;
-    if(settings.showNames === undefined) settings.showNames = true;
-    eventNameTitle.textContent = settings.eventName || "Event";
+    // Fetch settings first so the title always updates even if stands fail
+    try{
+      const s = await fetchJson(`${getBackendUrl()}/settings?_=${Date.now()}`);
+      settings = s || settings;
+      if(settings.showNames === undefined) settings.showNames = true;
+      eventNameTitle.textContent = settings.eventName || "Event";
+    }catch(e){
+      // keep previous settings
+      console.error("Viewer settings fetch failed", e);
+    }
 
     const keep = core.selectedStandId && (shouldRespectUser() || !isPoll);
     const prevSel = keep ? core.selectedStandId : null;
 
-    rows = normalizeRows(r);
-    core.setRows(rows);
-    if(prevSel) core.selectedStandId = prevSel;
-
-    refreshUI();
-    setUpdatedAt();
+    try{
+      const r = await fetchJson(`${getBackendUrl()}/stands?_=${Date.now()}`);
+      rows = normalizeRows(r);
+      core.setRows(rows);
+      if(prevSel) core.selectedStandId = prevSel;
+      refreshUI();
+      setUpdatedAt();
+    }catch(e){
+      console.error("Viewer stands fetch failed", e);
+      // keep last known rows on screen; show offline indicator
+      updatedAt.textContent = "Offline";
+    }
   }
 
   async function init(){
