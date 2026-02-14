@@ -307,7 +307,7 @@
       if(!standId || !this.svgRoot) return;
 
       const clone = this.svgRoot.cloneNode(true);
-      this.forceZoomBlackAndWhite(clone);
+      // Keep raw SVG styling in zoom (no black/white override)
       zoomSvgHost.appendChild(clone);
       this.zoomSvgRoot = clone;
 
