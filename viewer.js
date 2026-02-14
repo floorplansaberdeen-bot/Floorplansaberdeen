@@ -182,7 +182,22 @@
     searchEl.addEventListener("input", renderTable);
 
     await loadAll({isPoll:false});
-    setInterval(()=> loadAll({isPoll:true}).catch(()=>{}), 12000);
+
+    let pollTimer = null;
+    function stopPolling(){ if(pollTimer) clearInterval(pollTimer); pollTimer=null; }
+    function startPolling(){
+      stopPolling();
+      pollTimer = setInterval(()=> loadAll({isPoll:true}).catch(()=>{}), 12000);
+    }
+    startPolling();
+
+    function handleVisibility(){
+      if(document.visibilityState === "hidden"){ stopPolling(); return; }
+      startPolling();
+      loadAll({isPoll:true}).catch(()=>{});
+    }
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("pagehide", ()=>{ stopPolling(); });
   }
 
   init().catch(err=>console.error(err));

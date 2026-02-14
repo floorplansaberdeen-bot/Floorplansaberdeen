@@ -56,6 +56,9 @@
   let lastChange = null; // single undo (reliable)
 
   const SESSION_PWD = "admin_session_pwd";
+  const SESSION_PWD_UNTIL = "admin_session_pwd_until";
+  const PWD_TTL_MS = 24*60*60*1000; // 24 hours
+
 
   function setUnlocked(unlocked){
     if(unlocked){
@@ -68,7 +71,10 @@
   }
   function getPwd(){ return sessionStorage.getItem(SESSION_PWD) || ""; }
   function setPwd(p){ sessionStorage.setItem(SESSION_PWD, p); setUnlocked(true); }
-  function clearPwd(){ sessionStorage.removeItem(SESSION_PWD); setUnlocked(false); }
+  function clearPwd(){
+    localStorage.removeItem(SESSION_PWD);
+    localStorage.removeItem(SESSION_PWD_UNTIL);
+    setUnlocked(false); }
 
   async function promptPassword({always=false, reason="Admin password required"}={}) {
     if(!always){
@@ -93,6 +99,12 @@
     }
 
     reasonEl.textContent = reason;
+    // If this is a mandatory prompt (page load), remove cancel option
+    if(always){
+      btnCancel.style.display = "none";
+    } else {
+      btnCancel.style.display = "";
+    }
 
     return await new Promise((resolve)=>{
       let done=false;
@@ -114,10 +126,10 @@
         setPwd(pwd);
         finish(pwd);
       };
-      const onCancel = ()=> finish(null);
+      const onCancel = ()=>{ if(always){ return; } finish(null); };
       const onKey = (e)=>{
         if(e.key==="Enter"){ e.preventDefault(); onOk(); }
-        if(e.key==="Escape"){ e.preventDefault(); onCancel(); }
+        if(e.key==="Escape"){ e.preventDefault(); if(!always) onCancel(); }
       };
 
       input.value="";
@@ -291,6 +303,14 @@
             core.updateZoom(row.standId, zoomSvgHost, zoomWrap, zoomRing);
           }
         }
+  function handleVisibility(){
+    if(document.visibilityState === "hidden"){ stopPolling(); return; }
+    startPolling();
+    loadData().catch(()=>{});
+  }
+  document.addEventListener("visibilitychange", handleVisibility);
+  window.addEventListener("pagehide", ()=>{ stopPolling(); });
+
       }catch(_){
         showToast("Can't reach the backend right now.");
       }
@@ -601,6 +621,9 @@
     const bootPwd = await promptPassword({always:true, reason:"Admin password required"});
     if(!bootPwd){
       setUnlocked(false);
+      // If user cancels/escapes, do not allow entry to admin
+      location.href = "index.html";
+      return;
     }
 
     core = new window.FloorplanCore({
