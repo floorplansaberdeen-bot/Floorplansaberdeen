@@ -236,7 +236,7 @@
 
     applyColoursPublic(){
       const orange = "rgba(213,109,50,0.75)";
-      const red = "#e63b3b";
+      const red = "rgba(230,59,59,0.75)";
 
       // Paint ONLY real stands from backend rows
       this.rows.forEach(r=>{
