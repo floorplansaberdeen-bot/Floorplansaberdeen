@@ -1,7 +1,6 @@
 (function(){
   const DEFAULT_BACKEND = "https://floorplansaberdeen.floorplansaberdeen.workers.dev";
   const BACKEND_KEY = "floorplan_backend_url";
-  const SVG_URL = "./event_plan.svg";
 
   function el(id){ return document.getElementById(id); }
 
@@ -28,6 +27,17 @@
     const saved = localStorage.getItem(BACKEND_KEY);
     const base = (saved && saved.startsWith("http")) ? saved : DEFAULT_BACKEND;
     return normalizeBackendUrl(base);
+  }
+
+  function getEventId(){
+    const url = new URL(window.location.href);
+    return String(url.searchParams.get("event") || "").trim();
+  }
+
+  function getSvgUrl(){
+    const eventId = getEventId();
+    if(!eventId) return "";
+    return `/plans/${encodeURIComponent(eventId)}.svg`;
   }
 
   async function fetchJson(url, opts={}){
@@ -63,8 +73,6 @@
     return map;
   }
 
-  // The SVG contains many IDs that are NOT stands (e.g. background shapes).
-  // To avoid colouring/clicking those, we whitelist against the stand IDs returned by /stands.
   function filterStandMapToAllowedIds(map, allowedIds){
     if(!allowedIds || allowedIds.size===0) return map;
     const out = new Map();
@@ -111,11 +119,17 @@
       this.svgRoot = null;
       this.zoomSvgRoot = null;
       this.standMap = new Map();
+      this.eventId = getEventId();
     }
     backend(){ return getBackendUrl(); }
 
     async loadSvg(){
-      const res = await fetch(SVG_URL, { cache:"no-store" });
+      const svgUrl = getSvgUrl();
+      if(!svgUrl){
+        throw new Error("No event selected");
+      }
+
+      const res = await fetch(svgUrl, { cache:"no-store" });
       if(!res.ok) throw new Error("Could not load SVG");
       const txt = await res.text();
       this.opts.svgHost.innerHTML = txt;
@@ -132,15 +146,17 @@
     }
 
     async loadStands(){
-      const data = await fetchJson(`${this.backend()}/stands?_=${Date.now()}`);
+      const url = this.eventId
+        ? `${this.backend()}/stands?event=${encodeURIComponent(this.eventId)}&_=${Date.now()}`
+        : `${this.backend()}/stands?_=${Date.now()}`;
+
+      const data = await fetchJson(url);
       this.rows = (Array.isArray(data) ? data : []).map(r=>({
         standId: standIdFromString(r.standId ?? r.stand ?? r.id),
         status: String(r.status||"available").toLowerCase(),
         company: String(r.company||"").trim()
       })).filter(r=>r.standId);
 
-      // After we know the canonical stand IDs, restrict the standMap to ONLY those.
-      // This prevents background elements (e.g. X301) being treated as stands.
       if(this.svgRoot && this.standMap && this.standMap.size){
         const allowed = new Set(this.rows.map(r=>normalizeDomId(r.standId)));
         this.standMap = filterStandMapToAllowedIds(this.standMap, allowed);
@@ -173,7 +189,6 @@
           n = n.parentElement;
         }
 
-        // Clicked outside any stand -> clear selection
         this.clearSelection({fromPlan:true});
       };
       this.svgRoot.addEventListener("click", handler);
@@ -238,7 +253,6 @@
       const orange = "rgba(213,109,50,0.75)";
       const red = "rgba(230,59,59,0.75)";
 
-      // Paint ONLY real stands from backend rows
       this.rows.forEach(r=>{
         const elem = this.standElement(r.standId);
         if(!elem) return;
@@ -253,7 +267,6 @@
         });
       });
 
-      // Selected stand turns red
       if(this.selectedStandId){
         const elem = this.standElement(this.selectedStandId);
         if(elem){
@@ -276,7 +289,6 @@
       this.selectionNonce++;
       if(this.opts.onSelect) this.opts.onSelect(row, {fromPlan});
     }
-
 
     clearSelection({fromPlan=false}={}){
       const had = this.selectedStandId != null;
@@ -307,7 +319,6 @@
       if(!standId || !this.svgRoot) return;
 
       const clone = this.svgRoot.cloneNode(true);
-      // Keep raw SVG styling in zoom (no black/white override)
       zoomSvgHost.appendChild(clone);
       this.zoomSvgRoot = clone;
 
@@ -345,5 +356,13 @@
   }
 
   window.FloorplanCore = FloorplanCore;
-  window.FloorplanShared = { el, fetchJson, getBackendUrl, normalizeBackendUrl, BACKEND_KEY };
+  window.FloorplanShared = {
+    el,
+    fetchJson,
+    getBackendUrl,
+    normalizeBackendUrl,
+    BACKEND_KEY,
+    getEventId,
+    getSvgUrl
+  };
 })();
